@@ -13,7 +13,7 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="플로팅 보이스"
+            android:text="@string/app_name"
             android:textSize="26sp"
             android:textStyle="bold" />
 
@@ -21,13 +21,26 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="12dp"
-            android:text="내 Telegram 계정으로 메스 봇에게 음성을 전송합니다. 설정 저장이나 로그인만으로는 메시지가 전송되지 않습니다." />
+            android:text="@string/app_description" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/language_label"
+            android:textStyle="bold" />
+
+        <Spinner
+            android:id="@+id/language_selector"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="12dp"
+            android:entries="@array/language_options" />
 
         <EditText
             android:id="@+id/api_id"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:hint="Telegram API ID (숫자)"
+            android:hint="@string/hint_api_id"
             android:importantForAutofill="no"
             android:inputType="number" />
 
@@ -35,7 +48,7 @@
             android:id="@+id/api_hash"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:hint="Telegram API Hash (32자리)"
+            android:hint="@string/hint_api_hash"
             android:importantForAutofill="noExcludeDescendants"
             android:inputType="textPassword" />
 
@@ -43,47 +56,47 @@
             android:id="@+id/phone"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:hint="전화번호 (예: +821012345678)"
+            android:hint="@string/hint_phone"
             android:inputType="phone" />
 
         <EditText
             android:id="@+id/bot_username"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:hint="대상 메스 봇 username (@ 제외 가능)"
+            android:hint="@string/hint_bot_username"
             android:inputType="text" />
 
         <Button
             android:id="@+id/save_start"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="설정 암호화 저장 / Telegram 연결 시작" />
+            android:text="@string/button_save_start" />
 
         <TextView
             android:id="@+id/auth_status"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:paddingTop="8dp"
-            android:text="인증 상태: 시작 전"
+            android:text="@string/auth_status_initial"
             android:textStyle="bold" />
 
         <TextView
             android:id="@+id/account_status"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="로그인 계정: 인증되지 않음" />
+            android:text="@string/account_not_authenticated" />
 
         <Button
             android:id="@+id/submit_phone"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="전화번호 제출" />
+            android:text="@string/button_submit_phone" />
 
         <EditText
             android:id="@+id/auth_code"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:hint="Telegram 인증번호 (저장되지 않음)"
+            android:hint="@string/hint_auth_code"
             android:importantForAutofill="noExcludeDescendants"
             android:inputType="numberPassword" />
 
@@ -91,13 +104,13 @@
             android:id="@+id/submit_code"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Telegram 인증번호 제출" />
+            android:text="@string/button_submit_auth_code" />
 
         <EditText
             android:id="@+id/password"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:hint="Telegram 2단계 인증 비밀번호 (저장되지 않음)"
+            android:hint="@string/hint_password"
             android:importantForAutofill="noExcludeDescendants"
             android:inputType="textPassword" />
 
@@ -105,21 +118,21 @@
             android:id="@+id/submit_password"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="2단계 인증 비밀번호 제출" />
+            android:text="@string/button_submit_password" />
 
         <TextView
             android:id="@+id/email_help"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="12dp"
-            android:text="아래 이메일 항목은 인증 상태에서 요구할 때만 입력하세요."
+            android:text="@string/email_help"
             android:textStyle="bold" />
 
         <EditText
             android:id="@+id/email_address"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:hint="인증 이메일 (요구될 때만 입력)"
+            android:hint="@string/hint_email_address"
             android:importantForAutofill="noExcludeDescendants"
             android:inputType="textEmailAddress" />
 
@@ -127,13 +140,13 @@
             android:id="@+id/submit_email_address"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="이메일 주소 제출" />
+            android:text="@string/button_submit_email_address" />
 
         <EditText
             android:id="@+id/email_code"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:hint="이메일 인증번호 (저장되지 않음)"
+            android:hint="@string/hint_email_code"
             android:importantForAutofill="noExcludeDescendants"
             android:inputType="textPassword" />
 
@@ -141,20 +154,20 @@
             android:id="@+id/submit_email_code"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="이메일 인증번호 제출" />
+            android:text="@string/button_submit_email_code" />
 
         <Button
             android:id="@+id/resolve_bot"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="메스 봇 찾기 및 대상 확정" />
+            android:text="@string/button_resolve_bot" />
 
         <TextView
             android:id="@+id/target_status"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:paddingTop="8dp"
-            android:text="전송 대상: 확정되지 않음"
+            android:text="@string/target_not_confirmed"
             android:textStyle="bold" />
 
         <Button
@@ -162,32 +175,32 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="12dp"
-            android:text="필수 권한 허용 / 확인" />
+            android:text="@string/button_permissions" />
 
         <TextView
             android:id="@+id/permission_status"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="권한 상태" />
+            android:text="@string/permission_status_heading" />
 
         <Button
             android:id="@+id/start_overlay"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="플로팅 음성 버튼 시작" />
+            android:text="@string/button_start_overlay" />
 
         <Button
             android:id="@+id/stop_overlay"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="플로팅 음성 버튼 종료" />
+            android:text="@string/button_stop_overlay" />
 
         <Button
             android:id="@+id/logout"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="12dp"
-            android:text="Telegram 로그아웃 / 세션 해제" />
+            android:text="@string/button_logout" />
 
         <TextView
             android:id="@+id/operation_status"
@@ -196,7 +209,7 @@
             android:layout_marginTop="12dp"
             android:background="#FFE8EEF9"
             android:padding="12dp"
-            android:text="진행 상태가 여기에 표시됩니다."
+            android:text="@string/operation_status_initial"
             android:textIsSelectable="true" />
     </LinearLayout>
 </ScrollView>

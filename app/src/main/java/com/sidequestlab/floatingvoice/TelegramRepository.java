@@ -9,6 +9,7 @@ import org.drinkless.tdlib.Client;
 import org.drinkless.tdlib.TdApi;
 
 import java.io.File;
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 
@@ -24,11 +25,24 @@ public final class TelegramRepository {
         default void onAuthStage(AuthStage stage) { }
         default void onAccountChanged(String account) { }
         default void onTargetChanged(TargetChat target) { }
+        default void onLocaleChanged() { }
     }
 
     public interface SendCallback {
         void onQueued(long temporaryMessageId);
         void onRejected(String reason);
+    }
+
+    private enum AccountState { NOT_AUTHENTICATED, USER, CLOSED }
+
+    private static final class StatusMessage {
+        private final int resourceId;
+        private final Object[] arguments;
+
+        private StatusMessage(int resourceId, Object... arguments) {
+            this.resourceId = resourceId;
+            this.arguments = Arrays.copyOf(arguments, arguments.length);
+        }
     }
 
     private final Context context;
@@ -37,13 +51,16 @@ public final class TelegramRepository {
     private final List<Listener> listeners = new CopyOnWriteArrayList<>();
     private final Object clientLock = new Object();
     private final Object configurationLock = new Object();
+    private final Object stateDeliveryLock = new Object();
 
     private volatile Client client;
     private volatile AppConfig config;
     private volatile TargetChat target;
     private volatile AuthStage authStage = AuthStage.NOT_STARTED;
-    private volatile String accountSummary = "로그인 계정: 인증되지 않음";
-    private volatile String lastStatus = "Telegram 연결을 시작하지 않았습니다.";
+    private volatile StatusMessage lastStatus = new StatusMessage(R.string.repo_not_started);
+    private volatile AccountState accountState = AccountState.NOT_AUTHENTICATED;
+    private volatile String accountName;
+    private volatile long accountUserId;
 
     public TelegramRepository(Context context, SecureSettingsStore settingsStore,
                               PendingRecordingStore pendingRecordings) {
@@ -54,18 +71,30 @@ public final class TelegramRepository {
     }
 
     public void addListener(Listener listener) {
-        listeners.add(listener);
-        listener.onStatus(lastStatus);
-        listener.onAuthStage(authStage);
-        listener.onAccountChanged(accountSummary);
-        listener.onTargetChanged(target);
+        synchronized (stateDeliveryLock) {
+            listeners.add(listener);
+            listener.onStatus(render(lastStatus));
+            listener.onAuthStage(authStage);
+            listener.onAccountChanged(accountSummary());
+            listener.onTargetChanged(target);
+        }
     }
 
     public void removeListener(Listener listener) { listeners.remove(listener); }
     public AuthStage authStage() { return authStage; }
     public TargetChat target() { return target; }
-    public String lastStatus() { return lastStatus; }
+    public String lastStatus() {
+        synchronized (stateDeliveryLock) {
+            return render(lastStatus);
+        }
+    }
     public boolean isReadyWithTarget() { return authStage == AuthStage.READY && target != null; }
+
+    public void refreshLocalizedState() {
+        synchronized (stateDeliveryLock) {
+            for (Listener listener : listeners) listener.onLocaleChanged();
+        }
+    }
 
     public void start(AppConfig newConfig) {
         boolean clearedTarget = false;
@@ -78,23 +107,23 @@ public final class TelegramRepository {
                 clearedTarget = true;
             }
         }
-        if (clearedTarget) for (Listener listener : listeners) listener.onTargetChanged(null);
+        if (clearedTarget) notifyTargetChanged(null);
         synchronized (clientLock) {
             if (client != null) {
-                status("Telegram 연결이 이미 실행 중입니다. 변경한 설정은 저장했습니다.");
+                status(R.string.repo_connection_already_running);
                 return;
             }
             stage(AuthStage.PARAMETERS);
-            status("암호화된 Telegram 사용자 세션을 시작합니다…");
+            status(R.string.repo_starting_session);
             client = Client.create(this::handleUpdate,
-                    error -> status("Telegram 업데이트 처리 오류: " + error.getMessage()),
-                    error -> status("Telegram 연결 오류: " + error.getMessage()));
+                    error -> status(R.string.repo_update_error, error.getMessage()),
+                    error -> status(R.string.repo_connection_error, error.getMessage()));
         }
     }
 
     public void submitPhoneNumber(String phoneNumber) {
         if (authStage != AuthStage.PHONE) {
-            status("현재 전화번호 입력 단계가 아닙니다.");
+            status(R.string.repo_not_phone_stage);
             return;
         }
         TdApi.PhoneNumberAuthenticationSettings phoneSettings =
@@ -103,78 +132,79 @@ public final class TelegramRepository {
         TdApi.SetAuthenticationPhoneNumber request = new TdApi.SetAuthenticationPhoneNumber();
         request.phoneNumber = phoneNumber;
         request.settings = phoneSettings;
-        send(request, "전화번호를 제출했습니다.");
+        send(request, R.string.repo_phone_submitted);
     }
 
     public void submitEmailAddress(String emailAddress) {
         if (authStage != AuthStage.EMAIL_ADDRESS) {
-            status("현재 이메일 주소 입력 단계가 아닙니다.");
+            status(R.string.repo_not_email_address_stage);
             return;
         }
         TdApi.SetAuthenticationEmailAddress request = new TdApi.SetAuthenticationEmailAddress();
         request.emailAddress = emailAddress.trim();
-        send(request, "인증 이메일 주소를 제출했습니다.");
+        send(request, R.string.repo_email_address_submitted);
     }
 
     public void submitEmailCode(String code) {
         if (authStage != AuthStage.EMAIL_CODE) {
-            status("현재 이메일 인증번호 입력 단계가 아닙니다.");
+            status(R.string.repo_not_email_code_stage);
             return;
         }
         TdApi.EmailAddressAuthenticationCode emailCode = new TdApi.EmailAddressAuthenticationCode();
         emailCode.code = code.trim();
         TdApi.CheckAuthenticationEmailCode request = new TdApi.CheckAuthenticationEmailCode();
         request.code = emailCode;
-        send(request, "이메일 인증번호를 제출했습니다.");
+        send(request, R.string.repo_email_code_submitted);
     }
 
     public void submitCode(String code) {
         if (authStage != AuthStage.CODE) {
-            status("현재 Telegram 인증번호 입력 단계가 아닙니다.");
+            status(R.string.repo_not_auth_code_stage);
             return;
         }
         TdApi.CheckAuthenticationCode request = new TdApi.CheckAuthenticationCode();
         request.code = code.trim();
-        send(request, "Telegram 인증번호를 제출했습니다.");
+        send(request, R.string.repo_auth_code_submitted);
     }
 
     public void submitPassword(String password) {
         if (authStage != AuthStage.PASSWORD) {
-            status("현재 2단계 인증 비밀번호 입력 단계가 아닙니다.");
+            status(R.string.repo_not_password_stage);
             return;
         }
         TdApi.CheckAuthenticationPassword request = new TdApi.CheckAuthenticationPassword();
         request.password = password;
-        send(request, "2단계 인증 비밀번호를 제출했습니다.");
+        send(request, R.string.repo_password_submitted);
     }
 
     public void resolveConfiguredBot() {
         AppConfig current = config;
         if (authStage != AuthStage.READY || current == null) {
-            status("메스 봇을 찾기 전에 Telegram 로그인을 완료해주세요.");
+            status(R.string.repo_login_before_resolve);
             return;
         }
         String expectedUsername = current.botUsername();
         Client expectedClient = requireClient();
-        status("@" + expectedUsername + " 봇을 찾는 중…");
+        status(R.string.repo_searching_bot, expectedUsername);
         TdApi.SearchPublicChat request = new TdApi.SearchPublicChat();
         request.username = expectedUsername;
         expectedClient.send(request, result -> {
             if (!isResolutionCurrent(expectedUsername, expectedClient)) {
-                status("username이 변경되어 이전 봇 검색 결과를 무시했습니다.");
+                status(R.string.repo_stale_search_ignored);
                 return;
             }
             if (result instanceof TdApi.Error) {
-                status("봇을 찾지 못했습니다: " + describeError((TdApi.Error) result));
+                TdApi.Error error = (TdApi.Error) result;
+                status(R.string.repo_bot_not_found, error.code, error.message);
                 return;
             }
             if (!(result instanceof TdApi.Chat)) {
-                status("봇 검색에서 예상하지 못한 응답을 받았습니다.");
+                status(R.string.repo_unexpected_search_response);
                 return;
             }
             TdApi.Chat chat = (TdApi.Chat) result;
             if (!(chat.type instanceof TdApi.ChatTypePrivate)) {
-                status("검색 결과가 1:1 봇 대화가 아니어서 대상으로 저장하지 않았습니다.");
+                status(R.string.repo_not_private_chat);
                 return;
             }
             long userId = ((TdApi.ChatTypePrivate) chat.type).userId;
@@ -182,27 +212,27 @@ public final class TelegramRepository {
             getUser.userId = userId;
             expectedClient.send(getUser, userResult -> {
                 if (!isResolutionCurrent(expectedUsername, expectedClient)) {
-                    status("설정이 변경되어 이전 봇 확인 결과를 무시했습니다.");
+                    status(R.string.repo_stale_confirmation_ignored);
                     return;
                 }
                 if (userResult instanceof TdApi.Error) {
-                    status("대화는 찾았지만 봇 여부를 확인하지 못했습니다: "
-                            + describeError((TdApi.Error) userResult));
+                    TdApi.Error error = (TdApi.Error) userResult;
+                    status(R.string.repo_bot_check_failed, error.code, error.message);
                 } else if (userResult instanceof TdApi.User
                         && ((TdApi.User) userResult).type instanceof TdApi.UserTypeBot) {
                     TargetChat confirmed = new TargetChat(chat.id, chat.title, expectedUsername);
                     synchronized (configurationLock) {
                         if (!isResolutionCurrent(expectedUsername, expectedClient)) {
-                            status("설정이 변경되어 이전 봇 확인 결과를 무시했습니다.");
+                            status(R.string.repo_stale_confirmation_ignored);
                             return;
                         }
                         settingsStore.saveTarget(confirmed);
                         target = confirmed;
                     }
-                    status("고정 전송 대상을 확정했습니다: " + confirmed);
-                    for (Listener listener : listeners) listener.onTargetChanged(confirmed);
+                    status(R.string.repo_target_confirmed, confirmed);
+                    notifyTargetChanged(confirmed);
                 } else {
-                    status("검색한 사용자가 Telegram 봇이 아니어서 대상으로 저장하지 않았습니다.");
+                    status(R.string.repo_user_not_bot);
                 }
             });
         });
@@ -213,12 +243,12 @@ public final class TelegramRepository {
         AppConfig currentConfig = config;
         if (authStage != AuthStage.READY || fixedTarget == null || currentConfig == null
                 || !fixedTarget.username().equals(currentConfig.botUsername())) {
-            callback.onRejected("Telegram 연결 또는 대상 확정이 완료되지 않았습니다. 녹음 파일 보관 위치: "
-                    + recording.getAbsolutePath());
+            callback.onRejected(text(R.string.repo_connection_target_incomplete_retained,
+                    recording.getAbsolutePath()));
             return;
         }
         if (!recording.isFile() || recording.length() == 0) {
-            callback.onRejected("녹음 파일이 없거나 비어 있어 전송하지 않았습니다.");
+            callback.onRejected(text(R.string.repo_recording_empty));
             return;
         }
 
@@ -242,28 +272,29 @@ public final class TelegramRepository {
 
         synchronized (configurationLock) {
             if (config != currentConfig || target != fixedTarget) {
-                callback.onRejected("전송 직전에 대상 설정이 변경되어 보내지 않았습니다. 녹음 파일 보관 위치: "
-                        + recording.getAbsolutePath());
+                callback.onRejected(text(R.string.repo_target_changed_retained,
+                        recording.getAbsolutePath()));
                 return;
             }
-            status(fixedTarget.title() + "에 음성 메시지를 전송 대기열에 넣는 중…");
+            status(R.string.repo_queuing_for_target, fixedTarget.title());
             requireClient().send(request, result -> {
                 if (result instanceof TdApi.Message) {
                     long temporaryId = ((TdApi.Message) result).id;
                     pendingRecordings.put(temporaryId, recording.getAbsolutePath());
-                    status("음성 메시지가 전송 대기 중입니다(임시 메시지 " + temporaryId
-                            + "). 성공 확인 전까지 파일을 보관합니다.");
+                    status(R.string.repo_queued_temporary, temporaryId);
                     callback.onQueued(temporaryId);
                 } else if (result instanceof TdApi.Error) {
-                    String reason = "음성 메시지 전송이 거부되었습니다: "
-                            + describeError((TdApi.Error) result) + ". 녹음 파일 보관 위치: "
-                            + recording.getAbsolutePath();
-                    status(reason);
+                    TdApi.Error error = (TdApi.Error) result;
+                    String reason = text(R.string.repo_send_rejected_retained,
+                            error.code, error.message, recording.getAbsolutePath());
+                    status(R.string.repo_send_rejected_retained,
+                            error.code, error.message, recording.getAbsolutePath());
                     callback.onRejected(reason);
                 } else {
-                    String reason = "예상하지 못한 전송 응답입니다. 녹음 파일 보관 위치: "
-                            + recording.getAbsolutePath();
-                    status(reason);
+                    String reason = text(R.string.repo_unexpected_send_response_retained,
+                            recording.getAbsolutePath());
+                    status(R.string.repo_unexpected_send_response_retained,
+                            recording.getAbsolutePath());
                     callback.onRejected(reason);
                 }
             });
@@ -273,17 +304,18 @@ public final class TelegramRepository {
     public void logOutAndRevokeSession() {
         Client active = client;
         if (active == null) {
-            status("로그아웃할 Telegram 세션이 없습니다.");
+            status(R.string.repo_no_session_to_logout);
             return;
         }
         stage(AuthStage.LOGGING_OUT);
-        status("Telegram에서 로그아웃하고 이 기기의 세션을 해제하는 중…");
+        status(R.string.repo_logging_out);
         active.send(new TdApi.LogOut(), result -> {
             if (result instanceof TdApi.Error) {
                 if (authStage == AuthStage.LOGGING_OUT) stage(AuthStage.READY);
-                status("로그아웃하지 못했습니다: " + describeError((TdApi.Error) result));
+                TdApi.Error error = (TdApi.Error) result;
+                status(R.string.repo_logout_failed, error.code, error.message);
             } else {
-                status("로그아웃 요청이 접수되었습니다. 세션 종료를 기다리는 중입니다.");
+                status(R.string.repo_logout_accepted);
             }
         });
     }
@@ -307,16 +339,20 @@ public final class TelegramRepository {
             if (path != null) {
                 File recording = new File(path);
                 if (!recording.exists() || recording.delete()) {
-                    status("음성 메시지 전송 완료 — 로컬 녹음 파일을 삭제했습니다.");
+                    status(R.string.repo_send_complete_deleted);
                 } else {
-                    status("음성 메시지는 전송됐지만 로컬 파일을 삭제하지 못했습니다: " + path);
+                    status(R.string.repo_send_complete_delete_failed, path);
                 }
             }
         } else if (object instanceof TdApi.UpdateMessageSendFailed) {
             TdApi.UpdateMessageSendFailed update = (TdApi.UpdateMessageSendFailed) object;
             String path = pendingRecordings.take(update.oldMessageId);
-            status("음성 메시지 전송 실패: " + describeError(update.error)
-                    + (path == null ? "." : ". 녹음 파일 보관 위치: " + path));
+            if (path == null) {
+                status(R.string.repo_send_failed_no_path, update.error.code, update.error.message);
+            } else {
+                status(R.string.repo_send_failed_retained,
+                        update.error.code, update.error.message, path);
+            }
         }
     }
 
@@ -326,38 +362,40 @@ public final class TelegramRepository {
             sendTdlibParameters();
         } else if (state instanceof TdApi.AuthorizationStateWaitPhoneNumber) {
             stage(AuthStage.PHONE);
-            status("Telegram 계정 전화번호를 입력한 뒤 ‘전화번호 제출’을 눌러주세요.");
+            status(R.string.repo_enter_phone);
         } else if (state instanceof TdApi.AuthorizationStateWaitEmailAddress) {
             stage(AuthStage.EMAIL_ADDRESS);
-            status("Telegram이 이메일 주소를 요구합니다. 이메일은 저장하지 않습니다.");
+            status(R.string.repo_enter_email);
         } else if (state instanceof TdApi.AuthorizationStateWaitEmailCode) {
             stage(AuthStage.EMAIL_CODE);
-            status("이메일로 받은 인증번호를 입력해주세요. 인증번호는 저장하지 않습니다.");
+            status(R.string.repo_enter_email_code);
         } else if (state instanceof TdApi.AuthorizationStateWaitCode) {
             stage(AuthStage.CODE);
-            status("Telegram으로 받은 인증번호를 입력해주세요. 인증번호는 저장하지 않습니다.");
+            status(R.string.repo_enter_auth_code);
         } else if (state instanceof TdApi.AuthorizationStateWaitPassword) {
             stage(AuthStage.PASSWORD);
-            status("Telegram 2단계 인증 비밀번호를 입력해주세요. 비밀번호는 저장하지 않습니다.");
+            status(R.string.repo_enter_password);
         } else if (state instanceof TdApi.AuthorizationStateReady) {
             stage(AuthStage.READY);
             loadCurrentAccount();
-            status(target == null ? "Telegram 로그인 완료 — 메스 봇을 찾아 전송 대상을 확정해주세요."
-                    : "Telegram 연결 완료 — 고정 전송 대상: " + target);
+            if (target == null) {
+                status(R.string.repo_login_complete_resolve);
+            } else {
+                status(R.string.repo_connected_target, target);
+            }
         } else if (state instanceof TdApi.AuthorizationStateLoggingOut
                 || state instanceof TdApi.AuthorizationStateClosing) {
             stage(AuthStage.LOGGING_OUT);
-            status("Telegram 세션을 종료하는 중…");
+            status(R.string.repo_closing_session);
         } else if (state instanceof TdApi.AuthorizationStateClosed) {
             synchronized (clientLock) { client = null; }
-            accountSummary = "로그인 계정: 세션 종료됨";
-            for (Listener listener : listeners) listener.onAccountChanged(accountSummary);
+            accountState = AccountState.CLOSED;
+            notifyAccountChanged();
             stage(AuthStage.CLOSED);
-            status("Telegram 세션이 종료되었습니다. 다시 사용하려면 로그인해야 합니다.");
+            status(R.string.repo_session_closed);
         } else {
             stage(AuthStage.UNSUPPORTED);
-            status("현재 앱이 지원하지 않는 Telegram 인증 단계입니다: "
-                    + state.getClass().getSimpleName());
+            status(R.string.repo_unsupported_auth_stage, state.getClass().getSimpleName());
         }
     }
 
@@ -366,26 +404,27 @@ public final class TelegramRepository {
             if (!(result instanceof TdApi.User)) return;
             TdApi.User user = (TdApi.User) result;
             String name = (user.firstName + " " + user.lastName).trim();
-            accountSummary = "로그인 계정: " + (name.isEmpty() ? "Telegram 사용자" : name)
-                    + " (사용자 ID " + user.id + ")";
-            for (Listener listener : listeners) listener.onAccountChanged(accountSummary);
+            accountName = name;
+            accountUserId = user.id;
+            accountState = AccountState.USER;
+            notifyAccountChanged();
         });
     }
 
     private void sendTdlibParameters() {
         AppConfig current = config;
         if (current == null) {
-            status("Telegram API ID와 API Hash가 필요합니다.");
+            status(R.string.repo_api_credentials_required);
             return;
         }
         File database = new File(context.getFilesDir(), "tdlib/database");
         File files = new File(context.getFilesDir(), "tdlib/files");
         if (!database.mkdirs() && !database.isDirectory()) {
-            status("Telegram 데이터베이스 폴더를 만들 수 없습니다.");
+            status(R.string.repo_database_folder_failed);
             return;
         }
         if (!files.mkdirs() && !files.isDirectory()) {
-            status("Telegram 파일 폴더를 만들 수 없습니다.");
+            status(R.string.repo_files_folder_failed);
             return;
         }
 
@@ -400,40 +439,80 @@ public final class TelegramRepository {
         request.useSecretChats = false;
         request.apiId = current.apiId();
         request.apiHash = current.apiHash();
-        request.systemLanguageCode = "ko";
+        request.systemLanguageCode = LocalizedStrings.effectiveLanguageCode(context);
         request.deviceModel = Build.MANUFACTURER + " " + Build.MODEL;
         request.systemVersion = "Android " + Build.VERSION.RELEASE;
-        request.applicationVersion = "0.3.0";
-        send(request, "Telegram 연결 정보를 제출했습니다.");
+        request.applicationVersion = BuildConfig.VERSION_NAME;
+        send(request, R.string.repo_parameters_submitted);
     }
 
-    private void send(TdApi.Function request, String acceptedStatus) {
+    private void send(TdApi.Function request, int acceptedStatusResource) {
         requireClient().send(request, result -> {
             if (result instanceof TdApi.Error) {
-                status(describeError((TdApi.Error) result));
+                TdApi.Error error = (TdApi.Error) result;
+                status(R.string.repo_error_format, error.code, error.message);
             } else {
-                status(acceptedStatus);
+                status(acceptedStatusResource);
             }
         });
     }
 
     private Client requireClient() {
         Client active = client;
-        if (active == null) throw new IllegalStateException("Telegram 연결이 실행 중이 아닙니다");
+        if (active == null) throw new IllegalStateException("CLIENT_NOT_RUNNING");
         return active;
     }
 
-    private static String describeError(TdApi.Error error) {
-        return "Telegram 오류 " + error.code + ": " + error.message;
+
+    private String accountSummary() {
+        switch (accountState) {
+            case CLOSED:
+                return text(R.string.account_session_closed);
+            case USER:
+                String displayName = accountName == null || accountName.isEmpty()
+                        ? text(R.string.account_telegram_user) : accountName;
+                return text(R.string.account_summary, displayName, accountUserId);
+            case NOT_AUTHENTICATED:
+            default:
+                return text(R.string.account_not_authenticated);
+        }
+    }
+
+    private void notifyAccountChanged() {
+        synchronized (stateDeliveryLock) {
+            String summary = accountSummary();
+            for (Listener listener : listeners) listener.onAccountChanged(summary);
+        }
+    }
+
+    private void notifyTargetChanged(TargetChat next) {
+        synchronized (stateDeliveryLock) {
+            for (Listener listener : listeners) listener.onTargetChanged(next);
+        }
+    }
+
+    private String text(int resourceId, Object... arguments) {
+        return LocalizedStrings.get(context, resourceId, arguments);
+    }
+
+    private String render(StatusMessage message) {
+        return text(message.resourceId, message.arguments);
     }
 
     private void stage(AuthStage next) {
-        authStage = next;
-        for (Listener listener : listeners) listener.onAuthStage(next);
+        synchronized (stateDeliveryLock) {
+            authStage = next;
+            for (Listener listener : listeners) listener.onAuthStage(next);
+        }
     }
 
-    private void status(String next) {
-        lastStatus = next;
-        for (Listener listener : listeners) listener.onStatus(next);
+    private void status(int resourceId, Object... arguments) {
+        synchronized (stateDeliveryLock) {
+            StatusMessage next = new StatusMessage(resourceId, arguments);
+            lastStatus = next;
+            String localized = render(next);
+            for (Listener listener : listeners) listener.onStatus(localized);
+        }
     }
+
 }

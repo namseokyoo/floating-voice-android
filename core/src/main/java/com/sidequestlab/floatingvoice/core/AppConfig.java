@@ -11,6 +11,13 @@ public final class AppConfig {
     private static final Pattern API_HASH = Pattern.compile("[0-9a-fA-F]{32}");
     private static final Pattern PHONE = Pattern.compile("\\+[1-9][0-9]{6,14}");
 
+    public enum ValidationError {
+        INVALID_API_ID,
+        INVALID_API_HASH,
+        INVALID_PHONE_NUMBER,
+        INVALID_BOT_USERNAME
+    }
+
     private final int apiId;
     private final String apiHash;
     private final String phoneNumber;
@@ -25,30 +32,30 @@ public final class AppConfig {
 
     public static ValidationResult validate(String apiIdText, String apiHash, String phoneNumber,
                                             String botUsername) {
-        List<String> errors = new ArrayList<>();
+        List<ValidationError> errors = new ArrayList<>();
         int parsedApiId = 0;
         try {
             parsedApiId = Integer.parseInt(apiIdText == null ? "" : apiIdText.trim());
             if (parsedApiId <= 0) {
-                errors.add("API ID는 0보다 큰 숫자여야 합니다.");
+                errors.add(ValidationError.INVALID_API_ID);
             }
         } catch (NumberFormatException e) {
-            errors.add("API ID는 0보다 큰 숫자여야 합니다.");
+            errors.add(ValidationError.INVALID_API_ID);
         }
 
         String normalizedHash = apiHash == null ? "" : apiHash.trim();
         if (!API_HASH.matcher(normalizedHash).matches()) {
-            errors.add("API Hash는 영문·숫자로 된 정확히 32자리 값이어야 합니다.");
+            errors.add(ValidationError.INVALID_API_HASH);
         }
 
         String normalizedPhone = phoneNumber == null ? "" : phoneNumber.replaceAll("[\\s()-]", "");
         if (!PHONE.matcher(normalizedPhone).matches()) {
-            errors.add("전화번호는 국가번호 형식으로 입력해주세요. 예: +821012345678");
+            errors.add(ValidationError.INVALID_PHONE_NUMBER);
         }
 
         String normalizedUsername = UsernameNormalizer.normalize(botUsername);
         if (!UsernameNormalizer.isValid(normalizedUsername)) {
-            errors.add("봇 username은 영문, 숫자, 밑줄로 된 5~32자리여야 합니다.");
+            errors.add(ValidationError.INVALID_BOT_USERNAME);
         }
 
         AppConfig config = errors.isEmpty()
@@ -64,18 +71,18 @@ public final class AppConfig {
 
     public static final class ValidationResult {
         private final AppConfig config;
-        private final List<String> errors;
+        private final List<ValidationError> errors;
 
-        private ValidationResult(AppConfig config, List<String> errors) {
+        private ValidationResult(AppConfig config, List<ValidationError> errors) {
             this.config = config;
             this.errors = Collections.unmodifiableList(new ArrayList<>(errors));
         }
 
         public boolean isValid() { return config != null; }
         public AppConfig config() {
-            if (config == null) throw new IllegalStateException("설정값이 올바르지 않습니다");
+            if (config == null) throw new IllegalStateException(ValidationError.class.getSimpleName());
             return config;
         }
-        public List<String> errors() { return errors; }
+        public List<ValidationError> errors() { return errors; }
     }
 }

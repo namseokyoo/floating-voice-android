@@ -9,8 +9,8 @@ import android.content.Intent;
 import android.content.pm.ServiceInfo;
 import android.graphics.PixelFormat;
 import android.media.MediaRecorder;
-import android.os.Environment;
 import android.os.Build;
+import android.os.Environment;
 import android.os.IBinder;
 import android.os.SystemClock;
 import android.provider.Settings;
@@ -21,9 +21,9 @@ import android.view.WindowManager;
 import android.widget.ImageButton;
 
 import java.io.File;
-import java.io.IOException;
 import java.time.Instant;
 import java.time.format.DateTimeFormatter;
+import java.util.Arrays;
 
 public final class FloatingVoiceService extends Service implements TelegramRepository.Listener {
     public static final String ACTION_START = "com.sidequestlab.floatingvoice.START_OVERLAY";
@@ -38,7 +38,9 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
     private File activeRecording;
     private long recordingStartedAt;
     private TelegramRepository telegram;
-    private String notificationText = "준비됨 — 플로팅 버튼을 누르면 녹음합니다";
+    private String notificationText;
+    private int notificationResourceId = R.string.notification_ready;
+    private Object[] notificationArguments = new Object[0];
 
     @Override public void onCreate() {
         super.onCreate();
@@ -89,14 +91,14 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
 
     private void addBubble() {
         if (!Settings.canDrawOverlays(this)) {
-            updateState("다른 앱 위 표시 권한이 필요합니다", false);
+            updateState(R.string.overlay_permission_required);
             stopSelf();
             return;
         }
         windowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
-        bubble = new ImageButton(this);
+        bubble = new ImageButton(LocalizedStrings.context(this));
         bubble.setImageResource(R.drawable.ic_overlay_mic);
-        bubble.setContentDescription("녹음 시작");
+        bubble.setContentDescription(text(R.string.content_description_start_recording));
         bubble.setPadding(dp(17), dp(17), dp(17), dp(17));
         bubble.setBackgroundResource(R.drawable.overlay_idle);
         int size = dp(64);
@@ -121,7 +123,7 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
         File externalMusic = getExternalFilesDir(Environment.DIRECTORY_MUSIC);
         File root = new File(externalMusic == null ? getFilesDir() : externalMusic, "voice_notes");
         if (!root.mkdirs() && !root.isDirectory()) {
-            updateState("녹음 파일 폴더를 만들 수 없습니다", false);
+            updateState(R.string.recording_folder_failed);
             return;
         }
         activeRecording = new File(root, "voice-"
@@ -140,13 +142,13 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
             recorder = next;
             recordingStartedAt = SystemClock.elapsedRealtime();
             bubble.setImageResource(R.drawable.ic_overlay_stop);
-            bubble.setContentDescription("녹음 종료 후 전송");
+            bubble.setContentDescription(text(R.string.content_description_stop_and_send));
             bubble.setBackgroundResource(R.drawable.overlay_recording);
-            updateState("녹음 중 — 다시 누르면 녹음을 끝내고 전송합니다", true);
+            updateState(R.string.recording_in_progress);
         } catch (Exception e) {
             next.release();
             recorder = null;
-            updateState("녹음을 시작하지 못했습니다: " + e.getMessage(), false);
+            updateState(R.string.recording_start_failed, e.getMessage());
         }
     }
 
@@ -161,7 +163,7 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
         } catch (RuntimeException e) {
             current.release();
             updateIdleBubble();
-            updateState("녹음을 정상 종료하지 못했습니다. 파일 보관 위치: " + activeRecording, false);
+            updateState(R.string.recording_stop_failed_retained, activeRecording);
             return;
         }
         File completed = activeRecording;
@@ -169,11 +171,11 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
         updateIdleBubble();
         telegram.sendVoiceNote(completed, duration, new TelegramRepository.SendCallback() {
             @Override public void onQueued(long temporaryMessageId) {
-                updateState("음성 전송 대기 중 — 성공 확인 전까지 파일을 보관합니다", false);
+                updateState(R.string.voice_queued_retained);
             }
 
             @Override public void onRejected(String reason) {
-                updateState(reason, false);
+                updateState(reason);
             }
         });
     }
@@ -184,8 +186,9 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
         try { current.stop(); } catch (RuntimeException ignored) { }
         current.release();
         if (activeRecording != null) {
-            notificationText = "녹음 중 플로팅 버튼이 종료되었습니다. 파일 보관 위치: "
-                    + activeRecording.getAbsolutePath();
+            notificationResourceId = R.string.recording_interrupted_retained;
+            notificationArguments = new Object[] {activeRecording.getAbsolutePath()};
+            notificationText = null;
         }
     }
 
@@ -193,16 +196,36 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
         if (bubble != null) {
             bubble.post(() -> {
                 bubble.setImageResource(R.drawable.ic_overlay_mic);
-                bubble.setContentDescription("녹음 시작");
+                bubble.setContentDescription(text(R.string.content_description_start_recording));
                 bubble.setBackgroundResource(R.drawable.overlay_idle);
             });
         }
     }
 
-    private void updateState(String text, boolean recording) {
+    private void updateState(String text) {
+        notificationResourceId = 0;
+        notificationArguments = new Object[0];
         notificationText = text;
+        publishState();
+    }
+
+    private void updateState(int resourceId, Object... arguments) {
+        notificationResourceId = resourceId;
+        notificationArguments = Arrays.copyOf(arguments, arguments.length);
+        notificationText = null;
+        publishState();
+    }
+
+    private void publishState() {
+        createNotificationChannel();
         NotificationManager manager = getSystemService(NotificationManager.class);
         manager.notify(NOTIFICATION_ID, buildNotification());
+    }
+
+    private String renderedNotificationText() {
+        return notificationResourceId == 0
+                ? notificationText
+                : text(notificationResourceId, notificationArguments);
     }
 
     private Notification buildNotification() {
@@ -214,20 +237,25 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
         return new Notification.Builder(this, CHANNEL_ID)
                 .setSmallIcon(R.drawable.ic_floating_voice)
-                .setContentTitle("플로팅 보이스")
-                .setContentText(notificationText)
+                .setContentTitle(text(R.string.app_name))
+                .setContentText(renderedNotificationText())
                 .setContentIntent(openIntent)
                 .setOngoing(true)
                 .setOnlyAlertOnce(true)
-                .addAction(new Notification.Action.Builder(null, "플로팅 버튼 종료", stopIntent).build())
+                .addAction(new Notification.Action.Builder(null,
+                        text(R.string.notification_stop_action), stopIntent).build())
                 .build();
     }
 
     private void createNotificationChannel() {
         NotificationChannel channel = new NotificationChannel(CHANNEL_ID,
-                "플로팅 음성 녹음", NotificationManager.IMPORTANCE_LOW);
-        channel.setDescription("Telegram 음성 전송용 플로팅 녹음 상태 알림");
+                text(R.string.notification_channel_name), NotificationManager.IMPORTANCE_LOW);
+        channel.setDescription(text(R.string.notification_channel_description));
         getSystemService(NotificationManager.class).createNotificationChannel(channel);
+    }
+
+    private String text(int resourceId, Object... arguments) {
+        return LocalizedStrings.get(this, resourceId, arguments);
     }
 
     private int dp(int value) {
@@ -235,7 +263,28 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
     }
 
     @Override public void onStatus(String status) {
-        if (bubble != null) updateState(status, recorder != null);
+        if (bubble != null) {
+            boolean isRecording = recorder != null;
+            bubble.post(() -> bubble.setContentDescription(text(isRecording
+                    ? R.string.content_description_stop_and_send
+                    : R.string.content_description_start_recording)));
+            if (!isRecording) updateState(status);
+        }
+    }
+
+    @Override public void onLocaleChanged() {
+        if (bubble == null) return;
+        boolean isRecording = recorder != null;
+        bubble.post(() -> bubble.setContentDescription(text(isRecording
+                ? R.string.content_description_stop_and_send
+                : R.string.content_description_start_recording)));
+        if (isRecording) {
+            updateState(R.string.recording_in_progress);
+        } else if (notificationResourceId == 0) {
+            updateState(telegram.lastStatus());
+        } else {
+            publishState();
+        }
     }
 
     private final class DragTapListener implements View.OnTouchListener {

@@ -22,7 +22,18 @@ class AppConfigTest {
                 "0", "not-a-hash", "010-1234-5678", "bad!");
 
         assertFalse(result.isValid());
-        assertEquals(4, result.errors().size());
+        assertEquals(java.util.List.of(
+                AppConfig.ValidationError.INVALID_API_ID,
+                AppConfig.ValidationError.INVALID_API_HASH,
+                AppConfig.ValidationError.INVALID_PHONE_NUMBER,
+                AppConfig.ValidationError.INVALID_BOT_USERNAME), result.errors());
+    }
+
+    @Test
+    void validationErrorsAreLanguageNeutralCodes() {
+        for (AppConfig.ValidationError error : AppConfig.ValidationError.values()) {
+            assertTrue(error.name().matches("[A-Z_]+"));
+        }
     }
 
     @Test

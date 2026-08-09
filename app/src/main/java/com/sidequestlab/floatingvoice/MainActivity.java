@@ -1,8 +1,6 @@
 package com.sidequestlab.floatingvoice;
 
 import android.Manifest;
-import android.app.Activity;
-import android.app.AlertDialog;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.net.Uri;
@@ -11,16 +9,43 @@ import android.os.Bundle;
 import android.provider.Settings;
 import android.text.InputType;
 import android.view.View;
-import android.widget.Button;
+import android.widget.AdapterView;
 import android.widget.EditText;
+import android.widget.Spinner;
 import android.widget.TextView;
+
+import androidx.appcompat.app.AlertDialog;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.app.AppCompatDelegate;
+import androidx.core.os.LocaleListCompat;
 
 import com.sidequestlab.floatingvoice.core.AppConfig;
 
-import java.util.Optional;
+import java.util.ArrayList;
+import java.util.List;
 
-public final class MainActivity extends Activity implements TelegramRepository.Listener {
-    private static final int PERMISSION_REQUEST = 200;
+public final class MainActivity extends AppCompatActivity implements TelegramRepository.Listener {
+    private static final int PERMISSION_REQUEST = 100;
+
+    private enum LanguageOption {
+        SYSTEM(""), KOREAN("ko"), ENGLISH("en");
+
+        private final String languageTag;
+
+        LanguageOption(String languageTag) { this.languageTag = languageTag; }
+
+        private static LanguageOption fromLanguage(String language) {
+            for (LanguageOption option : values()) {
+                if (option.languageTag.equals(language)) return option;
+            }
+            return SYSTEM;
+        }
+
+        private static LanguageOption fromPosition(int position) {
+            LanguageOption[] options = values();
+            return position >= 0 && position < options.length ? options[position] : SYSTEM;
+        }
+    }
 
     private EditText apiId;
     private EditText apiHash;
@@ -42,11 +67,13 @@ public final class MainActivity extends Activity implements TelegramRepository.L
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         bindViews();
+        setupLanguageSelector();
 
         FloatingVoiceApp app = (FloatingVoiceApp) getApplication();
         telegram = app.telegram();
         settingsStore = app.settings();
         settingsStore.loadConfig().ifPresent(this::showConfig);
+        app.startTelegramIfConfigured();
         telegram.addListener(this);
 
         findViewById(R.id.save_start).setOnClickListener(v -> saveAndStart());
@@ -82,7 +109,7 @@ public final class MainActivity extends Activity implements TelegramRepository.L
     }
 
     @Override protected void onDestroy() {
-        telegram.removeListener(this);
+        if (telegram != null) telegram.removeListener(this);
         super.onDestroy();
     }
 
@@ -103,19 +130,54 @@ public final class MainActivity extends Activity implements TelegramRepository.L
         apiId.setInputType(InputType.TYPE_CLASS_NUMBER);
     }
 
+    private void setupLanguageSelector() {
+        Spinner selector = findViewById(R.id.language_selector);
+        LocaleListCompat current = AppCompatDelegate.getApplicationLocales();
+        String language = current.isEmpty() || current.get(0) == null
+                ? "" : current.get(0).getLanguage();
+        selector.setSelection(LanguageOption.fromLanguage(language).ordinal(), false);
+        selector.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override public void onItemSelected(AdapterView<?> parent, View view,
+                                                 int position, long id) {
+                LanguageOption option = LanguageOption.fromPosition(position);
+                LocaleListCompat requested = LocaleListCompat.forLanguageTags(option.languageTag);
+                if (!requested.equals(AppCompatDelegate.getApplicationLocales())) {
+                    AppCompatDelegate.setApplicationLocales(requested);
+                    ((FloatingVoiceApp) getApplication()).telegram().refreshLocalizedState();
+                }
+            }
+
+            @Override public void onNothingSelected(AdapterView<?> parent) { }
+        });
+    }
+
     private void saveAndStart() {
         AppConfig.ValidationResult result = AppConfig.validate(
                 apiId.getText().toString(), apiHash.getText().toString(),
                 phone.getText().toString(), username.getText().toString());
         if (!result.isValid()) {
-            operationStatus.setText(String.join("\n", result.errors()));
+            List<String> messages = new ArrayList<>();
+            for (AppConfig.ValidationError error : result.errors()) {
+                messages.add(getString(validationErrorResource(error)));
+            }
+            operationStatus.setText(String.join("\n", messages));
             return;
         }
         AppConfig config = result.config();
         settingsStore.saveConfig(config);
         showConfig(config);
         telegram.start(config);
-        operationStatus.setText("설정을 암호화해 저장했습니다. 메시지는 전송되지 않았습니다.");
+        operationStatus.setText(R.string.settings_saved_no_message);
+    }
+
+    private static int validationErrorResource(AppConfig.ValidationError error) {
+        switch (error) {
+            case INVALID_API_ID: return R.string.validation_invalid_api_id;
+            case INVALID_API_HASH: return R.string.validation_invalid_api_hash;
+            case INVALID_PHONE_NUMBER: return R.string.validation_invalid_phone;
+            case INVALID_BOT_USERNAME: return R.string.validation_invalid_username;
+            default: throw new IllegalArgumentException(error.name());
+        }
     }
 
     private void showConfig(AppConfig config) {
@@ -126,7 +188,7 @@ public final class MainActivity extends Activity implements TelegramRepository.L
     }
 
     private void requestRequiredPermissions() {
-        java.util.ArrayList<String> permissions = new java.util.ArrayList<>();
+        ArrayList<String> permissions = new ArrayList<>();
         if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
             permissions.add(Manifest.permission.RECORD_AUDIO);
         }
@@ -164,34 +226,34 @@ public final class MainActivity extends Activity implements TelegramRepository.L
     }
 
     private void refreshPermissionStatus() {
+        if (permissionStatus == null) return;
         boolean mic = checkSelfPermission(Manifest.permission.RECORD_AUDIO)
                 == PackageManager.PERMISSION_GRANTED;
         boolean notification = Build.VERSION.SDK_INT < 33
                 || checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)
                 == PackageManager.PERMISSION_GRANTED;
-        permissionStatus.setText("다른 앱 위 표시: " + yesNo(Settings.canDrawOverlays(this))
-                + "  마이크: " + yesNo(mic)
-                + "  알림: " + yesNo(notification));
+        permissionStatus.setText(getString(R.string.permission_status_format,
+                yesNo(Settings.canDrawOverlays(this)), yesNo(mic), yesNo(notification)));
     }
 
     private void startOverlay() {
         if (!permissionsGranted()) {
-            operationStatus.setText("다른 앱 위 표시, 마이크, 알림 권한을 먼저 허용해주세요.");
+            operationStatus.setText(R.string.permissions_required_first);
             requestRequiredPermissions();
             return;
         }
         if (!telegram.isReadyWithTarget()) {
-            operationStatus.setText("Telegram 로그인과 메스 봇 대상 확정을 먼저 완료해주세요.");
+            operationStatus.setText(R.string.telegram_target_required_first);
             return;
         }
         Intent service = new Intent(this, FloatingVoiceService.class)
                 .setAction(FloatingVoiceService.ACTION_START);
         try {
             startForegroundService(service);
-            operationStatus.setText("플로팅 버튼을 시작했습니다. 한 번 누르면 녹음, 다시 누르면 전송됩니다.");
+            operationStatus.setText(R.string.overlay_started);
         } catch (RuntimeException e) {
-            operationStatus.setText("플로팅 버튼을 시작하지 못했습니다: "
-                    + e.getClass().getSimpleName());
+            operationStatus.setText(getString(R.string.overlay_start_failed,
+                    e.getClass().getSimpleName()));
         }
     }
 
@@ -201,17 +263,19 @@ public final class MainActivity extends Activity implements TelegramRepository.L
 
     private void confirmLogout() {
         new AlertDialog.Builder(this)
-                .setTitle("Telegram에서 로그아웃할까요?")
-                .setMessage("이 기기의 Telegram 세션을 해제합니다. 플로팅 버튼을 먼저 종료하며, 전송 중이거나 실패한 녹음 파일은 삭제하지 않습니다.")
-                .setNegativeButton("취소", null)
-                .setPositiveButton("로그아웃", (dialog, which) -> {
+                .setTitle(R.string.logout_title)
+                .setMessage(R.string.logout_message)
+                .setNegativeButton(R.string.cancel, null)
+                .setPositiveButton(R.string.logout, (dialog, which) -> {
                     stopOverlay();
                     telegram.logOutAndRevokeSession();
                 })
                 .show();
     }
 
-    private static String yesNo(boolean value) { return value ? "허용됨" : "필요함"; }
+    private String yesNo(boolean value) {
+        return getString(value ? R.string.permission_granted : R.string.permission_needed);
+    }
 
     @Override public void onStatus(String status) {
         runOnUiThread(() -> operationStatus.setText(status));
@@ -219,7 +283,7 @@ public final class MainActivity extends Activity implements TelegramRepository.L
 
     @Override public void onAuthStage(TelegramRepository.AuthStage stage) {
         runOnUiThread(() -> {
-            authStatus.setText("인증 상태: " + authStageLabel(stage));
+            authStatus.setText(getString(R.string.auth_status_format, authStageLabel(stage)));
             updateAuthControls(stage);
         });
     }
@@ -230,7 +294,8 @@ public final class MainActivity extends Activity implements TelegramRepository.L
 
     @Override public void onTargetChanged(TargetChat target) {
         runOnUiThread(() -> targetStatus.setText(target == null
-                ? "전송 대상: 확정되지 않음" : "전송 대상: " + target));
+                ? getString(R.string.target_not_confirmed)
+                : getString(R.string.target_confirmed_format, target)));
     }
 
     private void updateAuthControls(TelegramRepository.AuthStage stage) {
@@ -254,20 +319,20 @@ public final class MainActivity extends Activity implements TelegramRepository.L
         findViewById(R.id.submit_email_code).setVisibility(emailCodeStep ? View.VISIBLE : View.GONE);
     }
 
-    private static String authStageLabel(TelegramRepository.AuthStage stage) {
+    private String authStageLabel(TelegramRepository.AuthStage stage) {
         switch (stage) {
-            case NOT_STARTED: return "시작 전";
-            case PARAMETERS: return "연결 준비 중";
-            case PHONE: return "전화번호 입력 필요";
-            case EMAIL_ADDRESS: return "이메일 주소 입력 필요";
-            case EMAIL_CODE: return "이메일 인증번호 입력 필요";
-            case CODE: return "Telegram 인증번호 입력 필요";
-            case PASSWORD: return "2단계 인증 비밀번호 입력 필요";
-            case READY: return "연결 완료";
-            case LOGGING_OUT: return "로그아웃 중";
-            case CLOSED: return "세션 종료됨";
-            case UNSUPPORTED: return "지원하지 않는 인증 단계";
-            default: return stage.name();
+            case NOT_STARTED: return getString(R.string.auth_stage_not_started);
+            case PARAMETERS: return getString(R.string.auth_stage_parameters);
+            case PHONE: return getString(R.string.auth_stage_phone);
+            case EMAIL_ADDRESS: return getString(R.string.auth_stage_email_address);
+            case EMAIL_CODE: return getString(R.string.auth_stage_email_code);
+            case CODE: return getString(R.string.auth_stage_code);
+            case PASSWORD: return getString(R.string.auth_stage_password);
+            case READY: return getString(R.string.auth_stage_ready);
+            case LOGGING_OUT: return getString(R.string.auth_stage_logging_out);
+            case CLOSED: return getString(R.string.auth_stage_closed);
+            case UNSUPPORTED: return getString(R.string.auth_stage_unsupported);
+            default: throw new IllegalArgumentException(stage.name());
         }
     }
 }

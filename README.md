@@ -2,6 +2,8 @@
 
 <img src="design/floating-voice-app-icon-source.png" alt="플로팅 보이스 앱 아이콘" width="128" />
 
+**한국어** | [English](README.en.md)
+
 # 플로팅 보이스
 
 ### 다른 앱 위에서 누르고, 말하고, 바로 보낸다
@@ -9,7 +11,7 @@
 플로팅 마이크 버튼을 한 번 누르면 녹음이 시작되고,<br>
 다시 누르면 내 Telegram 계정으로 확인된 봇 대화에 음성 메시지가 전송된다.
 
-![Version](https://img.shields.io/badge/version-0.3.0-315CDB?style=for-the-badge)
+![Version](https://img.shields.io/badge/version-0.4.0-315CDB?style=for-the-badge)
 ![Android](https://img.shields.io/badge/Android-10%2B-3DDC84?style=for-the-badge&logo=android&logoColor=white)
 ![ABI](https://img.shields.io/badge/ABI-arm64--v8a-555555?style=for-the-badge)
 ![Java](https://img.shields.io/badge/Java-17-ED8B00?style=for-the-badge&logo=openjdk&logoColor=white)
@@ -37,6 +39,7 @@
 | **전송 방식** | TDLib `InputMessageVoiceNote` + `SendMessage` |
 | **성공 판정** | `UpdateMessageSendSucceeded` 수신 후 확정 |
 | **실패 처리** | 녹음 파일을 삭제하지 않고 로컬에 보관 |
+| **표시 언어** | 시스템 기본값, 한국어 또는 English |
 | **지원 기기** | Android 10 이상, `arm64-v8a` |
 
 ## 왜 만들었나
@@ -73,6 +76,18 @@ Telegram에 짧은 음성 메모를 남기기 위해 매번 앱을 열고, 대�
 
 > [!IMPORTANT]
 > 전송 요청이 대기열에 들어간 것만으로 성공 처리하지 않는다. TDLib의 최종 성공 업데이트를 받은 뒤에만 녹음 파일을 삭제한다.
+
+## 언어 선택
+
+플로팅 보이스는 한국어와 영어 리소스를 모두 포함한다.
+
+- **시스템 기본값**은 기기의 언어 설정을 따른다.
+- **한국어**는 기기 언어와 관계없이 앱을 한국어로 표시한다.
+- **English**는 기기 언어와 관계없이 앱을 영어로 표시한다.
+- Android 13 이상에서는 시스템의 앱별 언어 설정과 자동으로 동기화된다.
+- Android 10~12에서는 AppCompat가 같은 선택을 로컬에 보관한다.
+
+언어 선택은 설정 화면뿐 아니라 인증 상태, 입력값 오류, 플로팅 버튼 접근성 설명, 포그라운드 서비스 알림, TDLib 처리 상태에도 적용된다.
 
 ## 처음 입력할 값
 
@@ -195,6 +210,7 @@ PendingRecordingStore   임시 메시지 ID와 녹음 파일 연결
 | minSdk | 29 |
 | Android Gradle Plugin | 8.13.0 |
 | Gradle wrapper | 8.13 |
+| AndroidX AppCompat | 1.7.1 |
 | NDK | 28.2.13676358 |
 | CMake | 3.22.1 |
 | ABI | `arm64-v8a` |
@@ -232,12 +248,13 @@ shasum -a 256 app.apk
 
 ```text
 floating-voice-android/
-├── app/                  Android 앱과 리소스
+├── app/                  Android 앱·언어 리소스·UI 자산
 ├── core/                 순수 Java 설정 검증·테스트
 ├── tdlib/                생성된 TDLib Java/JNI 로컬 모듈 계약
 ├── design/               앱 아이콘 원본·adaptive foreground·QA 시트
 ├── gradle/               Gradle wrapper
-├── README.md
+├── README.md             한국어 문서
+├── README.en.md          영문 문서
 └── settings.gradle
 ```
 
@@ -289,6 +306,9 @@ floating-voice-android/
 
 ## 다음 단계
 
+- [x] 한국어·영어 앱 리소스
+- [x] 시스템 기본값·앱 내 언어 선택
+- [x] 한국어·영어 저장소 문서
 - [ ] release 서명 AAB와 Play App Signing 구성
 - [ ] 개인정보처리방침·Data Safety·권한 고지 작성
 - [ ] 로그아웃 + 모든 로컬 데이터 삭제 기능
