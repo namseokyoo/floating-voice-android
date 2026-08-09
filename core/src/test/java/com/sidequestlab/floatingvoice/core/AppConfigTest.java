@@ -8,11 +8,11 @@ class AppConfigTest {
     void acceptsValidRuntimeConfigurationAndNormalizesValues() {
         AppConfig.ValidationResult result = AppConfig.validate(
                 " 123456 ", "0123456789abcdef0123456789ABCDEF",
-                "+82 10-1234-5678", "https://t.me/My_Voice_Bot");
+                "+1 202-555-0123", "https://t.me/My_Voice_Bot");
 
         assertTrue(result.isValid());
         assertEquals(123456, result.config().apiId());
-        assertEquals("+821012345678", result.config().phoneNumber());
+        assertEquals("+12025550123", result.config().phoneNumber());
         assertEquals("my_voice_bot", result.config().botUsername());
     }
 

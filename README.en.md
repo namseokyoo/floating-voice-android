@@ -16,6 +16,7 @@ Tap it again to send a voice message from your Telegram account to a verified bo
 ![ABI](https://img.shields.io/badge/ABI-arm64--v8a-555555?style=for-the-badge)
 ![Java](https://img.shields.io/badge/Java-17-ED8B00?style=for-the-badge&logo=openjdk&logoColor=white)
 ![TDLib](https://img.shields.io/badge/Telegram%20API-TDLib-26A5E4?style=for-the-badge)
+![License](https://img.shields.io/badge/License-Apache--2.0-D22128?style=for-the-badge)
 
 </div>
 
@@ -23,7 +24,9 @@ Tap it again to send a voice message from your Telegram account to a verified bo
 > This is an unofficial, independent app. It is not distributed or endorsed by Telegram. It signs in as a regular user through the official **TDLib** library and does not automate the Telegram app UI.
 
 > [!WARNING]
-> Current artifacts are **debug builds for personal testing**. Release signing, an Android App Bundle, a privacy policy, Play Data Safety declarations, and a complete local-data deletion flow are not ready for production distribution.
+> This repository distributes **source code only**. GitHub Releases do not attach an APK or AAB, and locally built debug APKs are for personal development and verification. Release signing, Play Data Safety declarations, and a complete local-data deletion flow are not ready for production distribution.
+
+[License](LICENSE) · [Privacy notice](PRIVACY.md) · [Security policy](SECURITY.md) · [Contributing](CONTRIBUTING.md)
 
 ---
 
@@ -95,7 +98,7 @@ The selected language applies to the settings screen, authentication state, vali
 |:---|:---|:---:|
 | **Telegram API ID** | Numeric ID from API development tools at [my.telegram.org](https://my.telegram.org) | Encrypted |
 | **Telegram API Hash** | 32-character hash from the same page | Encrypted |
-| **Phone number** | International format, for example `+821012345678` | Encrypted |
+| **Phone number** | International format, for example `+8210XXXXXXXX` | Encrypted |
 | **Target bot username** | `@username` of the fixed recipient bot | Encrypted |
 | **Telegram login code** | Code sent by Telegram during sign-in | No |
 | **Two-step verification password** | Entered only when Telegram requests it | No |
@@ -217,6 +220,38 @@ LocalizedStrings        Resolves the active app locale for non-Activity componen
 | ABI | `arm64-v8a` |
 | TDLib source | `022d60202e446ad1287b9fb68e687c8a0760788b` |
 
+### Prepare TDLib with Docker
+
+On Linux or macOS with Docker running, use the wrapper below. It builds with the official TDLib Dockerfile and installs the generated Java/JNI artifacts from the pinned revision.
+
+```bash
+./scripts/build-tdlib-docker.sh
+```
+
+The wrapper pins:
+
+- TDLib commit: `022d60202e446ad1287b9fb68e687c8a0760788b`
+- Android NDK: `28.2.13676358`
+- OpenSSL: `OpenSSL_1_1_1w`
+- TDLib interface: `Java`
+- Android STL: `c++_static`
+
+The official Docker flow builds multiple ABIs, but the project installs only `arm64-v8a/libtdjni.so`. Operating-system packages inside the build image can change over time, so this is a pinned-source compatible rebuild path, not a guarantee of a byte-for-byte identical ZIP. The audit worktree, `tdlib.zip`, and a provenance file recording the fixed build inputs and ZIP SHA-256 remain under the gitignored `tdlib-dist/` directory.
+
+Replace existing local artifacts only when intended:
+
+```bash
+TDLIB_OVERWRITE=1 ./scripts/build-tdlib-docker.sh
+```
+
+If `tdlib.zip` was previously produced by this wrapper, install it with the SHA-256 recorded in that build's provenance file. Recomputing a downloaded ZIP's digest on the spot and treating it as trusted does not establish provenance.
+
+```bash
+./scripts/install-tdlib-from-zip.sh /absolute/path/to/tdlib.zip EXPECTED_SHA256
+```
+
+The installer checks the SHA-256, required Java entries, and 64-bit arm64 ELF format, then stages and replaces the entire `tdlib/src/main` directory. On replacement failure it restores the previous directory, preventing a mixed Java/JNI revision.
+
 ### Required TDLib artifacts
 
 ```text
@@ -225,7 +260,7 @@ tdlib/src/main/java/org/drinkless/tdlib/TdApi.java
 tdlib/src/main/jniLibs/arm64-v8a/libtdjni.so
 ```
 
-Use the Java-interface output produced by the official TDLib `example/android/build-tdlib.sh` flow. Java bindings and JNI must come from the same TDLib revision.
+Use the Java-interface output produced by the official TDLib Dockerfile/`example/android/build-tdlib.sh` flow. Java bindings and JNI must come from the same TDLib revision.
 
 ### Build and verify
 
@@ -254,6 +289,10 @@ floating-voice-android/
 ├── tdlib/                Local generated TDLib Java/JNI contract
 ├── design/               Launcher source, adaptive foreground, and QA sheet
 ├── gradle/               Gradle wrapper
+├── scripts/              TDLib Docker build and artifact-install wrappers
+├── LICENSE               Apache License 2.0
+├── PRIVACY.md            Bilingual privacy notice
+├── SECURITY.md           Private vulnerability-reporting policy
 ├── README.md             Korean documentation
 ├── README.en.md          English documentation
 └── settings.gradle
@@ -311,13 +350,21 @@ The package ID has been `com.sidequestlab.floatingvoice` since version 0.2.0. Th
 - Logout revokes the Telegram session but there is no single action that erases every local setting and retained recording.
 - Failed recording files remain as unencrypted OGG files in app-specific storage.
 
+## Distribution policy
+
+- GitHub Releases provide only the source ZIP/TAR generated for the tag.
+- APKs, AABs, TDLib Java/JNI artifacts, signing keys, sessions, and recordings are not published as release assets.
+- A locally built debug APK is not an officially supported binary and has no update-compatibility guarantee.
+- Any future binary distribution must first use a durable release-signing key and complete the privacy, deletion, permission, and policy work.
+
 ## Roadmap
 
 - [x] Korean and English app resources
 - [x] System-default and in-app language selection
 - [x] Korean and English repository documentation
 - [ ] Release-signed AAB and Play App Signing
-- [ ] Privacy policy, Data Safety declaration, and permission disclosures
+- [x] Bilingual repository privacy notice
+- [ ] Store Data Safety declaration and permission disclosures
 - [ ] Logout plus complete local-data deletion
 - [ ] Failed-recording list with retry and delete actions
 - [ ] Review broader target-selection support
@@ -339,8 +386,9 @@ Mixing another TDLib revision, interface mode, or generated Java/JNI pair may ca
 
 ## License and notices
 
-This repository does not yet declare a standalone open-source license.
+Floating Voice source is released under the [Apache License 2.0](LICENSE). Copyright 2026 Namseok Yoo.
 
+- Third-party notices: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
 - TDLib: [Boost Software License 1.0](https://github.com/tdlib/td/blob/master/LICENSE_1_0.txt)
 - Telegram API: [Terms of Service](https://core.telegram.org/api/terms)
 - Telegram API ID: [Creating your Telegram Application](https://core.telegram.org/api/obtaining_api_id)

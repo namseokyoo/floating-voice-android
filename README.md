@@ -16,6 +16,7 @@
 ![ABI](https://img.shields.io/badge/ABI-arm64--v8a-555555?style=for-the-badge)
 ![Java](https://img.shields.io/badge/Java-17-ED8B00?style=for-the-badge&logo=openjdk&logoColor=white)
 ![TDLib](https://img.shields.io/badge/Telegram%20API-TDLib-26A5E4?style=for-the-badge)
+![License](https://img.shields.io/badge/License-Apache--2.0-D22128?style=for-the-badge)
 
 </div>
 
@@ -23,7 +24,9 @@
 > Telegram과 제휴하거나 Telegram이 공식 배포하는 앱이 아니다. 일반 사용자 계정으로 로그인하는 공식 **TDLib**를 사용하며, Telegram 앱 화면을 열거나 자동 조작하지 않는다.
 
 > [!WARNING]
-> 현재 저장소의 산출물은 **개인 테스트용 debug 빌드**이다. Play 스토어용 release 서명, AAB, 개인정보처리방침, Data Safety, 전체 데이터 삭제 기능은 아직 준비되지 않았다.
+> 이 저장소는 **소스 코드만 배포**한다. GitHub Release에 APK/AAB를 첨부하지 않으며, 로컬 debug APK는 개인 개발·검증용이다. Play 스토어용 release 서명, Data Safety, 전체 데이터 삭제 기능은 아직 준비되지 않았다.
+
+[라이선스](LICENSE) · [개인정보 안내](PRIVACY.md) · [보안 정책](SECURITY.md) · [기여 안내](CONTRIBUTING.md)
 
 ---
 
@@ -95,7 +98,7 @@ Telegram에 짧은 음성 메모를 남기기 위해 매번 앱을 열고, 대�
 |:---|:---|:---:|
 | **Telegram API ID** | [my.telegram.org](https://my.telegram.org)의 API development tools에서 발급한 숫자 | 암호화 저장 |
 | **Telegram API Hash** | 같은 페이지에서 발급한 32자리 값 | 암호화 저장 |
-| **전화번호** | 국가번호 포함 형식, 예: `+821012345678` | 암호화 저장 |
+| **전화번호** | 국가번호 포함 형식, 예: `+8210XXXXXXXX` | 암호화 저장 |
 | **대상 봇 username** | 고정 전송할 봇의 `@username` | 암호화 저장 |
 | **Telegram 인증번호** | 로그인 과정에서 Telegram이 보낸 코드 | 저장하지 않음 |
 | **2단계 인증 비밀번호** | 계정이 요구할 때만 입력 | 저장하지 않음 |
@@ -216,6 +219,38 @@ PendingRecordingStore   임시 메시지 ID와 녹음 파일 연결
 | ABI | `arm64-v8a` |
 | TDLib source | `022d60202e446ad1287b9fb68e687c8a0760788b` |
 
+### Docker로 TDLib 준비
+
+Docker가 실행 중인 Linux·macOS 환경에서는 다음 wrapper가 공식 TDLib Dockerfile과 고정 리비전을 사용해 Java/JNI를 준비한다.
+
+```bash
+./scripts/build-tdlib-docker.sh
+```
+
+wrapper는 다음 값을 고정한다.
+
+- TDLib commit: `022d60202e446ad1287b9fb68e687c8a0760788b`
+- Android NDK: `28.2.13676358`
+- OpenSSL: `OpenSSL_1_1_1w`
+- TDLib interface: `Java`
+- Android STL: `c++_static`
+
+공식 Docker 빌드는 여러 ABI를 만들지만 프로젝트에는 `arm64-v8a/libtdjni.so`만 설치한다. 빌드 환경의 운영체제 패키지가 시간에 따라 달라질 수 있으므로 byte-for-byte 동일한 ZIP을 보장하지는 않으며, 고정 TDLib 소스와 도구 버전으로 호환 산출물을 재생성하는 절차다. 감사용 작업 폴더, `tdlib.zip`, 고정 빌드 입력과 ZIP SHA-256을 기록한 provenance 파일은 Git에서 제외된 `tdlib-dist/`에 남는다.
+
+기존 로컬 TDLib 파일을 의도적으로 교체할 때만 다음을 사용한다.
+
+```bash
+TDLIB_OVERWRITE=1 ./scripts/build-tdlib-docker.sh
+```
+
+이 wrapper로 이전에 빌드한 `tdlib.zip`이 있다면 당시 provenance 파일에 기록된 SHA-256과 함께 설치할 수 있다. 다운로드한 ZIP의 해시를 그 자리에서 새로 계산해 신뢰값처럼 사용하면 출처 검증이 되지 않는다.
+
+```bash
+./scripts/install-tdlib-from-zip.sh /absolute/path/to/tdlib.zip EXPECTED_SHA256
+```
+
+installer는 SHA-256 일치, Java 산출물 존재, arm64 64-bit ELF 형식을 확인한 뒤 `tdlib/src/main` 전체를 staging하여 교체한다. 교체 실패 시 이전 디렉터리를 복원해 Java/JNI가 서로 다른 리비전으로 섞이지 않게 한다.
+
 ### 필요한 TDLib 산출물
 
 ```text
@@ -224,7 +259,7 @@ tdlib/src/main/java/org/drinkless/tdlib/TdApi.java
 tdlib/src/main/jniLibs/arm64-v8a/libtdjni.so
 ```
 
-공식 TDLib `example/android/build-tdlib.sh`의 Java 인터페이스 빌드 결과를 사용한다. Java와 JNI는 반드시 같은 TDLib 리비전에서 만들어야 한다.
+공식 TDLib Dockerfile/`example/android/build-tdlib.sh`의 Java 인터페이스 결과를 사용한다. Java와 JNI는 반드시 같은 TDLib 리비전에서 만들어야 한다.
 
 ### 빌드·검증
 
@@ -253,6 +288,10 @@ floating-voice-android/
 ├── tdlib/                생성된 TDLib Java/JNI 로컬 모듈 계약
 ├── design/               앱 아이콘 원본·adaptive foreground·QA 시트
 ├── gradle/               Gradle wrapper
+├── scripts/              TDLib Docker 빌드·산출물 설치 wrapper
+├── LICENSE               Apache License 2.0
+├── PRIVACY.md            한국어·영어 개인정보 안내
+├── SECURITY.md           비공개 취약점 제보 정책
 ├── README.md             한국어 문서
 ├── README.en.md          영문 문서
 └── settings.gradle
@@ -304,13 +343,21 @@ floating-voice-android/
 - 로그아웃은 Telegram 세션을 해제하지만 모든 로컬 설정·녹음을 한 번에 지우는 기능은 아직 없다.
 - 실패 녹음 파일은 앱 전용 저장소에 평문 OGG로 남는다.
 
+## 배포 정책
+
+- GitHub Release에는 태그 시점의 소스 ZIP/TAR만 제공한다.
+- APK·AAB·TDLib Java/JNI·서명키·세션·녹음은 Release asset으로 배포하지 않는다.
+- 로컬 debug APK는 공식 지원 바이너리가 아니며, 설치·업데이트 호환성을 보장하지 않는다.
+- 향후 바이너리를 배포하려면 별도의 장기 release 서명키, 개인정보·삭제 기능, 권한 정책 검토를 먼저 완료한다.
+
 ## 다음 단계
 
 - [x] 한국어·영어 앱 리소스
 - [x] 시스템 기본값·앱 내 언어 선택
 - [x] 한국어·영어 저장소 문서
 - [ ] release 서명 AAB와 Play App Signing 구성
-- [ ] 개인정보처리방침·Data Safety·권한 고지 작성
+- [x] 저장소용 한국어·영어 개인정보 안내
+- [ ] 스토어용 Data Safety·권한 고지 작성
 - [ ] 로그아웃 + 모든 로컬 데이터 삭제 기능
 - [ ] 실패 녹음 목록·재전송·삭제 UI
 - [ ] 대상 선택 범위 확장 여부 검토
@@ -332,8 +379,9 @@ floating-voice-android/
 
 ## 라이선스와 고지
 
-이 저장소 자체에는 아직 별도 오픈소스 라이선스를 선언하지 않았다.
+Floating Voice 소스는 [Apache License 2.0](LICENSE)으로 공개한다. Copyright 2026 Namseok Yoo.
 
+- 제3자 고지: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
 - TDLib: [Boost Software License 1.0](https://github.com/tdlib/td/blob/master/LICENSE_1_0.txt)
 - Telegram API: [Terms of Service](https://core.telegram.org/api/terms)
 - Telegram API ID: [Creating your Telegram Application](https://core.telegram.org/api/obtaining_api_id)

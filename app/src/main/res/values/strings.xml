@@ -11,7 +11,7 @@
 
     <string name="hint_api_id">Telegram API ID (numbers only)</string>
     <string name="hint_api_hash">Telegram API Hash (32 characters)</string>
-    <string name="hint_phone">Phone number (example: +821012345678)</string>
+    <string name="hint_phone">Phone number (example: +8210XXXXXXXX)</string>
     <string name="hint_bot_username">Target bot username (the @ is optional)</string>
     <string name="button_save_start">Save encrypted settings / Start Telegram connection</string>
     <string name="auth_status_initial">Authentication status: Not started</string>
@@ -37,7 +37,7 @@
 
     <string name="validation_invalid_api_id">API ID must be a number greater than zero.</string>
     <string name="validation_invalid_api_hash">API Hash must be exactly 32 hexadecimal characters.</string>
-    <string name="validation_invalid_phone">Enter the phone number in international format, for example +821012345678.</string>
+    <string name="validation_invalid_phone">Enter the phone number in international format, for example +8210XXXXXXXX.</string>
     <string name="validation_invalid_username">The bot username must contain 5–32 letters, numbers, or underscores.</string>
     <string name="settings_saved_no_message">Encrypted settings saved. No message was sent.</string>
     <string name="permission_granted">Allowed</string>

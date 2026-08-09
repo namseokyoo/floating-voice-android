@@ -11,7 +11,7 @@
 
     <string name="hint_api_id">Telegram API ID (숫자)</string>
     <string name="hint_api_hash">Telegram API Hash (32자리)</string>
-    <string name="hint_phone">전화번호 (예: +821012345678)</string>
+    <string name="hint_phone">전화번호 (예: +8210XXXXXXXX)</string>
     <string name="hint_bot_username">대상 봇 username (@ 제외 가능)</string>
     <string name="button_save_start">설정 암호화 저장 / Telegram 연결 시작</string>
     <string name="auth_status_initial">인증 상태: 시작 전</string>
@@ -37,7 +37,7 @@
 
     <string name="validation_invalid_api_id">API ID는 0보다 큰 숫자여야 합니다.</string>
     <string name="validation_invalid_api_hash">API Hash는 16진수로 된 정확히 32자리 값이어야 합니다.</string>
-    <string name="validation_invalid_phone">전화번호는 국가번호 형식으로 입력해주세요. 예: +821012345678</string>
+    <string name="validation_invalid_phone">전화번호는 국가번호 형식으로 입력해주세요. 예: +8210XXXXXXXX</string>
     <string name="validation_invalid_username">봇 username은 영문, 숫자, 밑줄로 된 5~32자리여야 합니다.</string>
     <string name="settings_saved_no_message">설정을 암호화해 저장했습니다. 메시지는 전송되지 않았습니다.</string>
     <string name="permission_granted">허용됨</string>
