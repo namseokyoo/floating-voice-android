@@ -1,30 +1,206 @@
-# Floating Voice
+<div align="center">
 
-Current app version: **0.3.0** (`versionCode 5`).
+<img src="design/floating-voice-app-icon-source.png" alt="플로팅 보이스 앱 아이콘" width="128" />
 
-Plain-Java Android app (`com.sidequestlab.floatingvoice`) using a **TDLib user account session**. It records mono OGG/Opus from a draggable overlay and sends a TDLib `InputMessageVoiceNote` only to a user-confirmed fixed Telegram bot chat.
+# 플로팅 보이스
 
-## Security and behavior
+### 다른 앱 위에서 누르고, 말하고, 바로 보낸다
 
-- Enter `api_id`, `api_hash`, phone number, auth code, 2FA password, and bot username at runtime. No key, phone, code, or password is embedded in source/resources/build files.
-- Persisted API credentials, phone, bot username, TDLib database key, and confirmed chat metadata are AES-GCM encrypted with a non-exportable Android Keystore key. Auth codes and 2FA passwords are never persisted and are cleared after submission.
-- This is not the Telegram Bot API. The app logs in a regular Telegram user through TDLib.
-- Bot confirmation uses `SearchPublicChat`, verifies that the chat is private, then verifies `GetUser(...).type` is `UserTypeBot`. Only then are chat ID/title persisted.
-- There is no automatic test message. A message is sent only after the user taps the overlay to start recording and taps it again to stop.
-- A recording is mapped to the TDLib temporary message ID and retained until `UpdateMessageSendSucceeded`. `UpdateMessageSendFailed` and immediate send errors retain the `.ogg` file.
+플로팅 마이크 버튼을 한 번 누르면 녹음이 시작되고,<br>
+다시 누르면 내 Telegram 계정으로 확인된 봇 대화에 음성 메시지가 전송된다.
 
-## Requirements
+![Version](https://img.shields.io/badge/version-0.3.0-315CDB?style=for-the-badge)
+![Android](https://img.shields.io/badge/Android-10%2B-3DDC84?style=for-the-badge&logo=android&logoColor=white)
+![ABI](https://img.shields.io/badge/ABI-arm64--v8a-555555?style=for-the-badge)
+![Java](https://img.shields.io/badge/Java-17-ED8B00?style=for-the-badge&logo=openjdk&logoColor=white)
+![TDLib](https://img.shields.io/badge/Telegram%20API-TDLib-26A5E4?style=for-the-badge)
 
-- JDK 17
-- Android SDK `/opt/homebrew/share/android-commandlinetools`
-- Android platform 36 and build-tools 36.1.0
-- Gradle wrapper 8.13 / Android Gradle Plugin 8.13.0
-- Generated Java TDLib interface and Android JNI libraries
-- An `arm64-v8a` Android 10+ phone. This personal build intentionally excludes 32-bit and emulator ABIs.
+</div>
 
-## Add TDLib artifacts
+> [!NOTE]
+> Telegram과 제휴하거나 Telegram이 공식 배포하는 앱이 아니다. 일반 사용자 계정으로 로그인하는 공식 **TDLib**를 사용하며, Telegram 앱 화면을 열거나 자동 조작하지 않는다.
 
-The `:tdlib` Android library intentionally contains no stubs. Copy output from the official TDLib Java build exactly as follows:
+> [!WARNING]
+> 현재 저장소의 산출물은 **개인 테스트용 debug 빌드**이다. Play 스토어용 release 서명, AAB, 개인정보처리방침, Data Safety, 전체 데이터 삭제 기능은 아직 준비되지 않았다.
+
+---
+
+## 한눈에 보기
+
+| 항목 | 현재 동작 |
+|:---|:---|
+| **녹음 시작** | 초록색 플로팅 마이크 아이콘 탭 |
+| **녹음 종료·전송** | 빨간색 정지 아이콘 탭 |
+| **음성 형식** | OGG / Opus / mono / 48 kHz |
+| **전송 주체** | 로그인한 본인의 Telegram 사용자 계정 |
+| **전송 대상** | username으로 확인한 고정 Telegram 봇 대화 |
+| **전송 방식** | TDLib `InputMessageVoiceNote` + `SendMessage` |
+| **성공 판정** | `UpdateMessageSendSucceeded` 수신 후 확정 |
+| **실패 처리** | 녹음 파일을 삭제하지 않고 로컬에 보관 |
+| **지원 기기** | Android 10 이상, `arm64-v8a` |
+
+## 왜 만들었나
+
+Telegram에 짧은 음성 메모를 남기기 위해 매번 앱을 열고, 대화를 찾고, 녹음 버튼을 누르는 과정을 줄이기 위한 전용 도구다.
+
+- 다른 앱을 쓰는 중에도 플로팅 버튼이 계속 보인다.
+- Telegram UI 위치가 바뀌어도 영향을 받지 않는다.
+- 미리 확인한 고정 대상 외에는 전송하지 않는다.
+- 자동 테스트 메시지나 백그라운드 자동 전송이 없다.
+
+## 쓰는 법
+
+```text
+플로팅 마이크 탭
+      │
+      ▼
+ OGG/Opus 녹음
+      │
+      ▼
+빨간 정지 아이콘 탭
+      │
+      ▼
+고정 대상 재검증 → TDLib 전송 → 성공 확인 → 로컬 파일 삭제
+                              └→ 실패 → 녹음 파일 보관
+```
+
+1. 앱에서 Telegram 로그인과 대상 봇 확인을 마친다.
+2. **필수 권한 허용**을 눌러 마이크·알림·다른 앱 위 표시 권한을 허용한다.
+3. 앱 화면이 보이는 상태에서 **플로팅 버튼 시작**을 누른다.
+4. 초록색 마이크 아이콘을 누르면 녹음이 시작된다.
+5. 빨간색 정지 아이콘을 누르면 녹음을 끝내고 전송한다.
+6. 버튼은 드래그해서 원하는 위치로 옮길 수 있다. 드래그 동작은 탭으로 처리되지 않는다.
+
+> [!IMPORTANT]
+> 전송 요청이 대기열에 들어간 것만으로 성공 처리하지 않는다. TDLib의 최종 성공 업데이트를 받은 뒤에만 녹음 파일을 삭제한다.
+
+## 처음 입력할 값
+
+| 입력 항목 | 설명 | 저장 여부 |
+|:---|:---|:---:|
+| **Telegram API ID** | [my.telegram.org](https://my.telegram.org)의 API development tools에서 발급한 숫자 | 암호화 저장 |
+| **Telegram API Hash** | 같은 페이지에서 발급한 32자리 값 | 암호화 저장 |
+| **전화번호** | 국가번호 포함 형식, 예: `+821012345678` | 암호화 저장 |
+| **대상 봇 username** | 고정 전송할 봇의 `@username` | 암호화 저장 |
+| **Telegram 인증번호** | 로그인 과정에서 Telegram이 보낸 코드 | 저장하지 않음 |
+| **2단계 인증 비밀번호** | 계정이 요구할 때만 입력 | 저장하지 않음 |
+| **이메일·이메일 코드** | Telegram 인증 상태가 요구할 때만 입력 | 저장하지 않음 |
+
+인증 단계에 필요하지 않은 입력칸은 자동으로 숨긴다. API Hash와 인증 비밀번호 입력칸은 화면에서 마스킹된다.
+
+## 권한을 왜 쓰나
+
+| 권한 | 사용 목적 | 사용 시점 |
+|:---|:---|:---|
+| `INTERNET` | TDLib가 Telegram 서버와 통신 | 로그인·대상 확인·전송 |
+| `RECORD_AUDIO` | 사용자가 누른 동안 음성 녹음 | 플로팅 마이크 탭 이후 |
+| `SYSTEM_ALERT_WINDOW` | 다른 앱 위에 플로팅 버튼 표시 | 사용자가 서비스를 시작한 동안 |
+| `POST_NOTIFICATIONS` | 플로팅 서비스 상태와 종료 버튼 표시 | Android 13 이상 |
+| `FOREGROUND_SERVICE_MICROPHONE` | 최신 Android의 백그라운드 마이크 정책 준수 | 플로팅 서비스 활성 중 |
+| `FOREGROUND_SERVICE_SPECIAL_USE` | 사용자 시작형 지속 오버레이 유지 | 플로팅 서비스 활성 중 |
+
+서비스는 보이는 Activity에서 사용자가 직접 시작해야 한다. 프로세스 종료나 재부팅 후 몰래 다시 시작하지 않으며 `START_NOT_STICKY`를 사용한다.
+
+## 보안과 데이터 처리
+
+### 기기에 저장하는 데이터
+
+- Telegram API ID·Hash
+- 계정 전화번호
+- 대상 봇 username과 확인된 chat ID·제목
+- TDLib 데이터베이스 암호화 키
+- TDLib 로컬 세션 데이터
+- 성공 확인 전의 녹음 파일
+
+### 적용된 보호
+
+- 설정값은 Android Keystore의 비추출 AES-256 키로 AES-GCM 암호화한다.
+- 인증번호와 2단계 인증 비밀번호는 저장하지 않고 제출 직후 입력칸을 비운다.
+- 앱 데이터의 클라우드 백업과 기기 간 이전을 차단한다.
+- 평문 HTTP 통신을 허용하지 않는다.
+- 플로팅 서비스는 `exported=false`라 다른 앱이 직접 실행할 수 없다.
+- 소스·리소스·빌드 설정에 실제 API ID·Hash·전화번호·토큰을 넣지 않는다.
+- 별도 개발자 서버로 로그인 정보나 음성을 전송하지 않는다.
+
+### 녹음 파일의 수명
+
+| 상태 | 처리 |
+|:---|:---|
+| 녹음 중 | 앱 전용 `Music/voice_notes/`에 저장 |
+| TDLib 전송 대기 | 성공 업데이트 전까지 보관 |
+| 최종 전송 성공 | 로컬 파일 삭제 |
+| 즉시 거부·최종 실패 | 복구할 수 있도록 파일 보관 |
+| 녹음 중 서비스 종료 | 자동 전송하지 않고 부분 파일 보관 |
+
+현재 화면 캡처는 허용되어 있다. 설정 화면을 공유할 때는 전화번호·API ID·대상 정보가 보이지 않는지 먼저 확인해야 한다.
+
+## 전송 대상 안전장치
+
+대상 username만 저장하고 바로 보내지 않는다.
+
+1. `SearchPublicChat`으로 username을 찾는다.
+2. 결과가 개인 대화인지 확인한다.
+3. `GetUser`로 실제 `UserTypeBot`인지 확인한다.
+4. 확인된 chat ID·제목·username을 암호화 저장한다.
+5. 전송 직전에 현재 설정의 username과 고정 대상이 같은지 다시 검사한다.
+6. 설정 변경 전에 시작된 오래된 비동기 검색 결과는 무시한다.
+
+현재 구현은 **공개 username이 있는 Telegram 봇**만 대상으로 지원한다.
+
+## 동작 구조
+
+```mermaid
+flowchart LR
+    U[사용자 탭] --> O[FloatingVoiceService]
+    O --> R[MediaRecorder\nOGG / Opus mono]
+    R --> F[앱 전용 녹음 파일]
+    F --> T[TelegramRepository]
+    T --> D[TDLib 사용자 세션]
+    D --> C[확인된 고정 봇 chat ID]
+    C --> S{최종 전송 결과}
+    S -->|성공| X[로컬 파일 삭제]
+    S -->|실패| K[파일 보관]
+```
+
+### 모듈
+
+| 모듈 | 역할 |
+|:---|:---|
+| `:app` | 설정·인증 UI, 권한, 플로팅 서비스, 녹음·전송 상태 |
+| `:core` | Android 비의존 설정 검증과 username 정규화, JUnit 테스트 |
+| `:tdlib` | 같은 TDLib 리비전에서 생성한 Java API와 JNI를 묶는 로컬 모듈 |
+
+### 주요 클래스
+
+```text
+FloatingVoiceApp        앱 범위 설정 저장소와 TDLib 클라이언트 소유
+MainActivity            설정·로그인·대상 확인·권한·서비스 제어
+FloatingVoiceService    플로팅 버튼·드래그·OGG/Opus 녹음
+TelegramRepository      TDLib 인증 상태·대상 검증·음성 전송·결과 추적
+SecureSettingsStore     Android Keystore 기반 설정 암호화
+PendingRecordingStore   임시 메시지 ID와 녹음 파일 연결
+```
+
+## 직접 빌드
+
+> [!CAUTION]
+> 생성된 TDLib Java/JNI 파일과 `vendor/`는 저장소에 커밋하지 않는다. 새 clone은 TDLib 산출물을 먼저 준비해야 전체 앱을 빌드할 수 있다.
+
+### 고정 개발 환경
+
+| 항목 | 버전 |
+|:---|:---|
+| JDK | 17 |
+| compileSdk / targetSdk | 36 / 36 |
+| minSdk | 29 |
+| Android Gradle Plugin | 8.13.0 |
+| Gradle wrapper | 8.13 |
+| NDK | 28.2.13676358 |
+| CMake | 3.22.1 |
+| ABI | `arm64-v8a` |
+| TDLib source | `022d60202e446ad1287b9fb68e687c8a0760788b` |
+
+### 필요한 TDLib 산출물
 
 ```text
 tdlib/src/main/java/org/drinkless/tdlib/Client.java
@@ -32,58 +208,114 @@ tdlib/src/main/java/org/drinkless/tdlib/TdApi.java
 tdlib/src/main/jniLibs/arm64-v8a/libtdjni.so
 ```
 
-If TDLib was built with the official `example/android/build-tdlib.sh`, copy `tdlib/java/org/drinkless/tdlib/*.java` and copy each `tdlib/libs/<abi>/*.so` into the matching `jniLibs/<abi>/` directory. Include companion shared libraries (for example `libssl.so`, `libcrypto.so`, or `libc++_shared.so`) when that build produced them.
+공식 TDLib `example/android/build-tdlib.sh`의 Java 인터페이스 빌드 결과를 사용한다. Java와 JNI는 반드시 같은 TDLib 리비전에서 만들어야 한다.
 
-The implementation was aligned to TDLib source commit `022d60202e446ad1287b9fb68e687c8a0760788b` (2026-07-17). The local build uses NDK `28.2.13676358`, arm64 only, and 16 KB ELF alignment for current Android devices. See **TDLib API compatibility risks** below before using artifacts from another commit/interface mode.
-
-## Build and test
+### 빌드·검증
 
 ```bash
 export JAVA_HOME=$(/usr/libexec/java_home -v 17)
-./gradlew :core:test
-./gradlew :app:assembleDebug
+./gradlew clean test lintDebug assembleDebug
 ```
 
-`:tdlib:verifyTdlibArtifacts` fails early with an actionable message when generated Java or JNI `.so` artifacts are absent. Pure-Java validation tests can still run with `:core:test`.
+`tdlib:verifyTdlibArtifacts`는 Java API 또는 `arm64-v8a/libtdjni.so`가 빠졌을 때 빌드 초기에 실패한다.
 
-## First run
+최종 APK 검증 기준:
 
-1. Obtain your own Telegram `api_id` and `api_hash` from <https://my.telegram.org>. Enter them with the user-account phone and target bot username.
-2. Tap **암호화 설정 저장 / Telegram 연결 시작**.
-3. When the status asks for a phone number, tap **전화번호 제출**; enter the Telegram authentication code, 2FA password, or email code only when that specific field appears.
-4. When authentication is complete, tap **메스 봇 찾기 및 전송 대상 확정** and check the persisted title/ID shown by the UI.
-5. Tap **필수 권한 허용** and grant overlay, microphone, and Android 13+ notification permissions while the activity is visible.
-6. Tap **플로팅 버튼 시작** while the setup activity is still visible. Android 14+ checks microphone foreground-service eligibility at this point; do not try to start it from a background automation.
-7. Drag the button as needed. Tap **녹음** once to record OGG/Opus mono; tap **전송** to stop and send to the fixed chat.
-8. Use **Telegram 로그아웃 / 세션 해제** to call TDLib `LogOut`. Stopping the overlay during a recording retains the partial local recording and does not send it.
+```bash
+apksigner verify --verbose app.apk
+zipalign -c -P 16 -v 4 app.apk
+aapt2 dump badging app.apk
+shasum -a 256 app.apk
+```
 
-Recordings live under app-specific external Music storage in `voice_notes/`. Failed/interrupted files are intentionally retained for manual recovery. Uninstalling or clearing app data can remove app-specific files and the Keystore key.
+## 프로젝트 구조
 
-## Visual assets
+```text
+floating-voice-android/
+├── app/                  Android 앱과 리소스
+├── core/                 순수 Java 설정 검증·테스트
+├── tdlib/                생성된 TDLib Java/JNI 로컬 모듈 계약
+├── design/               앱 아이콘 원본·adaptive foreground·QA 시트
+├── gradle/               Gradle wrapper
+├── README.md
+└── settings.gradle
+```
 
-- `design/floating-voice-app-icon-source.png`: full-resolution launcher artwork.
-- `design/floating-voice-adaptive-foreground-source.png`: transparent adaptive-icon foreground source.
-- `design/floating-voice-icon-qa.png`: square, circular-mask, and 48 px visual QA sheet.
-- The overlay uses separate microphone and stop vector drawables so the 64 dp control remains legible without text.
+## 앱 아이콘
 
-## Architecture
+<div align="center">
+<img src="design/floating-voice-icon-qa.png" alt="플로팅 보이스 앱 아이콘 시각 QA" width="720" />
+</div>
 
-- `:core`: Android-free `AppConfig` validation and `UsernameNormalizer`, with JUnit 5 tests.
-- `:tdlib`: local Android library contract for generated `Client`, `TdApi`, and JNI libraries.
-- `FloatingVoiceApp`: application-scoped ownership of secure settings and the one TDLib client.
-- `TelegramRepository`: TDLib authorization state machine, verified bot resolution, fixed-chat voice sending, persistent temporary-message/file mapping, success-only deletion, and logout.
-- `MainActivity`: explicit configuration/auth/status UI plus permission and overlay controls.
-- `FloatingVoiceService`: user-started `microphone|specialUse` foreground service, persistent notification, draggable overlay, and `MediaRecorder` OGG/Opus state machine. It returns `START_NOT_STICKY`; reboot/process death requires reopening the app and starting the overlay again.
+- 정사각형 legacy launcher 아이콘
+- 원형 adaptive icon 마스킹
+- 실제 48 px 축소 상태
+- 플로팅 버튼은 별도의 흰색 마이크·정지 벡터 아이콘 사용
 
-## TDLib API compatibility risks
+## 안 될 때
 
-The checked source commit uses these newer generated API shapes:
+<details>
+<summary><b>플로팅 버튼이 나타나지 않음</b></summary>
 
-- `SetTdlibParameters` includes `databaseEncryptionKey` directly and does **not** use the older separate `CheckDatabaseEncryptionKey` flow.
-- `SendMessage` contains `topicId: MessageTopic` (not older `messageThreadId`).
-- `InputMessageVoiceNote` wraps `InputVoiceNote`, plus `FormattedText caption` and `MessageSelfDestructType`.
-- `MessageSendOptions` includes `suggestedPostInfo` and other current fields; the app uses its generated zero-argument constructor/defaults.
-- Send completion/failure is correlated with `UpdateMessageSendSucceeded.oldMessageId` and `UpdateMessageSendFailed.oldMessageId`.
-- Bot verification assumes current `ChatTypePrivate.userId`, `GetUser.userId`, and `UserTypeBot` generated names.
+앱의 **필수 권한 허용**에서 다른 앱 위 표시 권한을 확인한다. Telegram 로그인이 완료되고 대상 봇이 확정되지 않으면 서비스가 시작되지 않는다.
+</details>
 
-TDLib generated Java has a zero-argument constructor for concrete classes at the referenced commit; this code mostly assigns named fields to reduce full-constructor churn. If the separately built artifacts use a different commit, compile errors around `topicId`, `InputVoiceNote`, auth parameter fields, update fields, or `Client.create/send` are expected and must be adapted to that exact generated `TdApi.java`. A JSON/JSONJava build is incompatible; build the official **Java** interface.
+<details>
+<summary><b>녹음이 시작되지 않음</b></summary>
+
+마이크 권한을 확인하고 앱 화면이 보이는 상태에서 플로팅 서비스를 다시 시작한다. Android 14 이상은 백그라운드에서 임의로 마이크 foreground service를 시작하지 못한다.
+</details>
+
+<details>
+<summary><b>음성이 전송되지 않음</b></summary>
+
+설정 화면의 인증 상태와 대상 봇 상태를 확인한다. 실패한 녹음은 삭제하지 않으므로 앱 전용 `voice_notes/` 경로에 남아 있을 수 있다.
+</details>
+
+<details>
+<summary><b>앱 업데이트 후 로그인이 풀림</b></summary>
+
+`0.2.0`부터 패키지 ID는 `com.sidequestlab.floatingvoice`이다. 이전 `com.sidequestlab.messvoice` 앱과는 별도 설치이며 세션이 자동 이전되지 않는다. `0.2.0` 이후 버전끼리는 같은 패키지를 사용한다.
+</details>
+
+## 현재 제약
+
+- debug 서명 APK이며 Play 스토어 배포용이 아니다.
+- `arm64-v8a`만 포함하므로 32비트 기기와 x86 에뮬레이터는 지원하지 않는다.
+- 공개 username이 없는 사용자·비공개 그룹·비공개 채널은 대상으로 선택할 수 없다.
+- 각 사용자가 자신의 Telegram API ID·Hash를 입력하는 개인용 구조다.
+- 로그아웃은 Telegram 세션을 해제하지만 모든 로컬 설정·녹음을 한 번에 지우는 기능은 아직 없다.
+- 실패 녹음 파일은 앱 전용 저장소에 평문 OGG로 남는다.
+
+## 다음 단계
+
+- [ ] release 서명 AAB와 Play App Signing 구성
+- [ ] 개인정보처리방침·Data Safety·권한 고지 작성
+- [ ] 로그아웃 + 모든 로컬 데이터 삭제 기능
+- [ ] 실패 녹음 목록·재전송·삭제 UI
+- [ ] 대상 선택 범위 확장 여부 검토
+- [ ] 실제 설정 화면과 플로팅 버튼 스크린샷 추가
+- [ ] 기기·Android 버전별 UI 테스트 확대
+
+## TDLib 호환성 주의
+
+현재 코드는 고정 TDLib 리비전의 다음 API 형태에 맞춰져 있다.
+
+- `SetTdlibParameters.databaseEncryptionKey`
+- `SendMessage.topicId: MessageTopic`
+- `InputMessageVoiceNote(InputVoiceNote, FormattedText, MessageSelfDestructType)`
+- `UpdateMessageSendSucceeded.oldMessageId`
+- `UpdateMessageSendFailed.oldMessageId`
+- `ChatTypePrivate.userId`, `GetUser.userId`, `UserTypeBot`
+
+다른 TDLib 리비전이나 JSON/JSONJava 인터페이스를 섞으면 컴파일 오류 또는 런타임 불일치가 발생할 수 있다.
+
+## 라이선스와 고지
+
+이 저장소 자체에는 아직 별도 오픈소스 라이선스를 선언하지 않았다.
+
+- TDLib: [Boost Software License 1.0](https://github.com/tdlib/td/blob/master/LICENSE_1_0.txt)
+- Telegram API: [Terms of Service](https://core.telegram.org/api/terms)
+- Telegram API ID: [Creating your Telegram Application](https://core.telegram.org/api/obtaining_api_id)
+
+Telegram 이름과 로고는 Telegram의 상표다. 이 프로젝트는 공식 Telegram 앱이 아니며 공식 Telegram 로고를 사용하지 않는다.
