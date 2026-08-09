@@ -18,7 +18,7 @@ import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.WindowManager;
-import android.widget.TextView;
+import android.widget.ImageButton;
 
 import java.io.File;
 import java.io.IOException;
@@ -33,7 +33,7 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
 
     private WindowManager windowManager;
     private WindowManager.LayoutParams layoutParams;
-    private TextView bubble;
+    private ImageButton bubble;
     private MediaRecorder recorder;
     private File activeRecording;
     private long recordingStartedAt;
@@ -94,11 +94,10 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
             return;
         }
         windowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
-        bubble = new TextView(this);
-        bubble.setText("녹음");
-        bubble.setTextColor(0xffffffff);
-        bubble.setTextSize(13);
-        bubble.setGravity(Gravity.CENTER);
+        bubble = new ImageButton(this);
+        bubble.setImageResource(R.drawable.ic_overlay_mic);
+        bubble.setContentDescription("녹음 시작");
+        bubble.setPadding(dp(17), dp(17), dp(17), dp(17));
         bubble.setBackgroundResource(R.drawable.overlay_idle);
         int size = dp(64);
         layoutParams = new WindowManager.LayoutParams(size, size,
@@ -140,7 +139,8 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
             next.start();
             recorder = next;
             recordingStartedAt = SystemClock.elapsedRealtime();
-            bubble.setText("전송");
+            bubble.setImageResource(R.drawable.ic_overlay_stop);
+            bubble.setContentDescription("녹음 종료 후 전송");
             bubble.setBackgroundResource(R.drawable.overlay_recording);
             updateState("녹음 중 — 다시 누르면 녹음을 끝내고 전송합니다", true);
         } catch (Exception e) {
@@ -192,7 +192,8 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
     private void updateIdleBubble() {
         if (bubble != null) {
             bubble.post(() -> {
-                bubble.setText("녹음");
+                bubble.setImageResource(R.drawable.ic_overlay_mic);
+                bubble.setContentDescription("녹음 시작");
                 bubble.setBackgroundResource(R.drawable.overlay_idle);
             });
         }

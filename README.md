@@ -1,6 +1,6 @@
 # Floating Voice
 
-Current app version: **0.2.0** (`versionCode 4`).
+Current app version: **0.3.0** (`versionCode 5`).
 
 Plain-Java Android app (`com.sidequestlab.floatingvoice`) using a **TDLib user account session**. It records mono OGG/Opus from a draggable overlay and sends a TDLib `InputMessageVoiceNote` only to a user-confirmed fixed Telegram bot chat.
 
@@ -58,6 +58,13 @@ export JAVA_HOME=$(/usr/libexec/java_home -v 17)
 8. Use **Telegram 로그아웃 / 세션 해제** to call TDLib `LogOut`. Stopping the overlay during a recording retains the partial local recording and does not send it.
 
 Recordings live under app-specific external Music storage in `voice_notes/`. Failed/interrupted files are intentionally retained for manual recovery. Uninstalling or clearing app data can remove app-specific files and the Keystore key.
+
+## Visual assets
+
+- `design/floating-voice-app-icon-source.png`: full-resolution launcher artwork.
+- `design/floating-voice-adaptive-foreground-source.png`: transparent adaptive-icon foreground source.
+- `design/floating-voice-icon-qa.png`: square, circular-mask, and 48 px visual QA sheet.
+- The overlay uses separate microphone and stop vector drawables so the 64 dp control remains legible without text.
 
 ## Architecture
 

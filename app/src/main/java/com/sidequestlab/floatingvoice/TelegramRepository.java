@@ -403,7 +403,7 @@ public final class TelegramRepository {
         request.systemLanguageCode = "ko";
         request.deviceModel = Build.MANUFACTURER + " " + Build.MODEL;
         request.systemVersion = "Android " + Build.VERSION.RELEASE;
-        request.applicationVersion = "0.2.0";
+        request.applicationVersion = "0.3.0";
         send(request, "Telegram 연결 정보를 제출했습니다.");
     }
 

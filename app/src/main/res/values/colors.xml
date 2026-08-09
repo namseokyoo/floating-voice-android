@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="brand">#315CDB</color>
+    <color name="launcher_background">#315CDB</color>
     <color name="brand_dark">#1F3A8A</color>
     <color name="recording">#C62828</color>
     <color name="idle">#256D3A</color>
