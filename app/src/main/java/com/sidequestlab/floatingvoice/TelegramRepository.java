@@ -1,9 +1,9 @@
-package com.sidequestlab.messvoice;
+package com.sidequestlab.floatingvoice;
 
 import android.content.Context;
 import android.os.Build;
 
-import com.sidequestlab.messvoice.core.AppConfig;
+import com.sidequestlab.floatingvoice.core.AppConfig;
 
 import org.drinkless.tdlib.Client;
 import org.drinkless.tdlib.TdApi;
@@ -403,7 +403,7 @@ public final class TelegramRepository {
         request.systemLanguageCode = "ko";
         request.deviceModel = Build.MANUFACTURER + " " + Build.MODEL;
         request.systemVersion = "Android " + Build.VERSION.RELEASE;
-        request.applicationVersion = "0.1.2";
+        request.applicationVersion = "0.2.0";
         send(request, "Telegram 연결 정보를 제출했습니다.");
     }
 

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.MessVoice" parent="android:style/Theme.Material.Light.NoActionBar">
+    <style name="Theme.FloatingVoice" parent="android:style/Theme.Material.Light.NoActionBar">
         <item name="android:fontFamily">sans</item>
         <item name="android:colorAccent">@color/brand</item>
         <item name="android:navigationBarColor">@color/brand_dark</item>

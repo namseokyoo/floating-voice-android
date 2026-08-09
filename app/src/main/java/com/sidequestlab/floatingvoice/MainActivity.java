@@ -1,4 +1,4 @@
-package com.sidequestlab.messvoice;
+package com.sidequestlab.floatingvoice;
 
 import android.Manifest;
 import android.app.Activity;
@@ -15,7 +15,7 @@ import android.widget.Button;
 import android.widget.EditText;
 import android.widget.TextView;
 
-import com.sidequestlab.messvoice.core.AppConfig;
+import com.sidequestlab.floatingvoice.core.AppConfig;
 
 import java.util.Optional;
 
@@ -43,7 +43,7 @@ public final class MainActivity extends Activity implements TelegramRepository.L
         setContentView(R.layout.activity_main);
         bindViews();
 
-        MessVoiceApp app = (MessVoiceApp) getApplication();
+        FloatingVoiceApp app = (FloatingVoiceApp) getApplication();
         telegram = app.telegram();
         settingsStore = app.settings();
         settingsStore.loadConfig().ifPresent(this::showConfig);

@@ -1,4 +1,4 @@
-package com.sidequestlab.messvoice;
+package com.sidequestlab.floatingvoice;
 
 import android.content.Context;
 import android.content.SharedPreferences;

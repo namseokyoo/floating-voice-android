@@ -1,8 +1,8 @@
-package com.sidequestlab.messvoice;
+package com.sidequestlab.floatingvoice;
 
 import android.app.Application;
 
-public final class MessVoiceApp extends Application {
+public final class FloatingVoiceApp extends Application {
     private SecureSettingsStore settings;
     private TelegramRepository telegram;
 

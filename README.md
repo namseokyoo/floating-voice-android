@@ -1,6 +1,8 @@
-# Mess Float Voice
+# Floating Voice
 
-Plain-Java Android app (`com.sidequestlab.messvoice`) using a **TDLib user account session**. It records mono OGG/Opus from a draggable overlay and sends a TDLib `InputMessageVoiceNote` only to a user-confirmed fixed Telegram bot chat.
+Current app version: **0.2.0** (`versionCode 4`).
+
+Plain-Java Android app (`com.sidequestlab.floatingvoice`) using a **TDLib user account session**. It records mono OGG/Opus from a draggable overlay and sends a TDLib `InputMessageVoiceNote` only to a user-confirmed fixed Telegram bot chat.
 
 ## Security and behavior
 
@@ -61,7 +63,7 @@ Recordings live under app-specific external Music storage in `voice_notes/`. Fai
 
 - `:core`: Android-free `AppConfig` validation and `UsernameNormalizer`, with JUnit 5 tests.
 - `:tdlib`: local Android library contract for generated `Client`, `TdApi`, and JNI libraries.
-- `MessVoiceApp`: application-scoped ownership of secure settings and the one TDLib client.
+- `FloatingVoiceApp`: application-scoped ownership of secure settings and the one TDLib client.
 - `TelegramRepository`: TDLib authorization state machine, verified bot resolution, fixed-chat voice sending, persistent temporary-message/file mapping, success-only deletion, and logout.
 - `MainActivity`: explicit configuration/auth/status UI plus permission and overlay controls.
 - `FloatingVoiceService`: user-started `microphone|specialUse` foreground service, persistent notification, draggable overlay, and `MediaRecorder` OGG/Opus state machine. It returns `START_NOT_STICKY`; reboot/process death requires reopening the app and starting the overlay again.

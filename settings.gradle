@@ -14,5 +14,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "MessFloatVoice"
+rootProject.name = "FloatingVoice"
 include(":app", ":core", ":tdlib")

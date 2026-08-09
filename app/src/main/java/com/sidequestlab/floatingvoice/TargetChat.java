@@ -1,4 +1,4 @@
-package com.sidequestlab.messvoice;
+package com.sidequestlab.floatingvoice;
 
 import java.util.Objects;
 

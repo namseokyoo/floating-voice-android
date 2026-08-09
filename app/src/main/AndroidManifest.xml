@@ -11,15 +11,15 @@
     <uses-feature android:name="android.hardware.microphone" android:required="true" />
 
     <application
-        android:name=".MessVoiceApp"
+        android:name=".FloatingVoiceApp"
         android:allowBackup="false"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
-        android:icon="@drawable/ic_mess_voice"
-        android:label="Mess Voice"
-        android:roundIcon="@drawable/ic_mess_voice"
+        android:icon="@drawable/ic_floating_voice"
+        android:label="플로팅 보이스"
+        android:roundIcon="@drawable/ic_floating_voice"
         android:supportsRtl="true"
-        android:theme="@style/Theme.MessVoice"
+        android:theme="@style/Theme.FloatingVoice"
         android:usesCleartextTraffic="false">
         <activity
             android:name=".MainActivity"

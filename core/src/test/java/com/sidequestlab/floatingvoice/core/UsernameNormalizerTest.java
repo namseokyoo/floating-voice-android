@@ -1,4 +1,4 @@
-package com.sidequestlab.messvoice.core;
+package com.sidequestlab.floatingvoice.core;
 
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;

@@ -1,4 +1,4 @@
-package com.sidequestlab.messvoice;
+package com.sidequestlab.floatingvoice;
 
 import android.app.Notification;
 import android.app.NotificationChannel;
@@ -26,10 +26,10 @@ import java.time.Instant;
 import java.time.format.DateTimeFormatter;
 
 public final class FloatingVoiceService extends Service implements TelegramRepository.Listener {
-    public static final String ACTION_START = "com.sidequestlab.messvoice.START_OVERLAY";
-    public static final String ACTION_STOP = "com.sidequestlab.messvoice.STOP_OVERLAY";
+    public static final String ACTION_START = "com.sidequestlab.floatingvoice.START_OVERLAY";
+    public static final String ACTION_STOP = "com.sidequestlab.floatingvoice.STOP_OVERLAY";
     private static final int NOTIFICATION_ID = 41;
-    private static final String CHANNEL_ID = "messvoice_overlay";
+    private static final String CHANNEL_ID = "floatingvoice_overlay";
 
     private WindowManager windowManager;
     private WindowManager.LayoutParams layoutParams;
@@ -42,7 +42,7 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
 
     @Override public void onCreate() {
         super.onCreate();
-        telegram = ((MessVoiceApp) getApplication()).telegram();
+        telegram = ((FloatingVoiceApp) getApplication()).telegram();
         telegram.addListener(this);
         createNotificationChannel();
     }
@@ -212,8 +212,8 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
         PendingIntent stopIntent = PendingIntent.getService(this, 1, stop,
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
         return new Notification.Builder(this, CHANNEL_ID)
-                .setSmallIcon(R.drawable.ic_mess_voice)
-                .setContentTitle("Mess Voice 플로팅 버튼")
+                .setSmallIcon(R.drawable.ic_floating_voice)
+                .setContentTitle("플로팅 보이스")
                 .setContentText(notificationText)
                 .setContentIntent(openIntent)
                 .setOngoing(true)

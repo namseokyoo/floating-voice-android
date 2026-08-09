@@ -1,4 +1,4 @@
-package com.sidequestlab.messvoice.core;
+package com.sidequestlab.floatingvoice.core;
 
 import java.util.Locale;
 import java.util.regex.Pattern;

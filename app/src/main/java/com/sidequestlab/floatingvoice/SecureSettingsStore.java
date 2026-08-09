@@ -1,4 +1,4 @@
-package com.sidequestlab.messvoice;
+package com.sidequestlab.floatingvoice;
 
 import android.content.Context;
 import android.content.SharedPreferences;
@@ -6,7 +6,7 @@ import android.security.keystore.KeyGenParameterSpec;
 import android.security.keystore.KeyProperties;
 import android.util.Base64;
 
-import com.sidequestlab.messvoice.core.AppConfig;
+import com.sidequestlab.floatingvoice.core.AppConfig;
 
 import java.nio.charset.StandardCharsets;
 import java.security.KeyStore;
@@ -21,7 +21,7 @@ import javax.crypto.spec.GCMParameterSpec;
 /** Encrypts persisted runtime configuration with a non-exportable Android Keystore key. */
 public final class SecureSettingsStore {
     private static final String PREFS = "encrypted_runtime_settings";
-    private static final String KEY_ALIAS = "messvoice.runtime.v1";
+    private static final String KEY_ALIAS = "floatingvoice.runtime.v1";
     private final SharedPreferences preferences;
 
     public SecureSettingsStore(Context context) {

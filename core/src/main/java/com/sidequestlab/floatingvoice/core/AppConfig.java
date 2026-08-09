@@ -1,4 +1,4 @@
-package com.sidequestlab.messvoice.core;
+package com.sidequestlab.floatingvoice.core;
 
 import java.util.ArrayList;
 import java.util.Collections;
