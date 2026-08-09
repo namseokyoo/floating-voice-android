@@ -1,0 +1,41 @@
+plugins {
+    id "com.android.library"
+}
+
+android {
+    namespace "org.drinkless.tdlib"
+    compileSdk 36
+
+    defaultConfig {
+        minSdk 29
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    sourceSets {
+        main {
+            java.srcDirs = ["src/main/java"]
+            jniLibs.srcDirs = ["src/main/jniLibs"]
+        }
+    }
+}
+
+tasks.register("verifyTdlibArtifacts") {
+    doLast {
+        def client = file("src/main/java/org/drinkless/tdlib/Client.java")
+        def api = file("src/main/java/org/drinkless/tdlib/TdApi.java")
+        def arm64Jni = file("src/main/jniLibs/arm64-v8a/libtdjni.so")
+        if (!client.isFile() || !api.isFile() || !arm64Jni.isFile() || arm64Jni.length() == 0) {
+            throw new GradleException("TDLib artifacts are missing. This build requires Client.java, TdApi.java, and the exact non-empty arm64-v8a/libtdjni.so artifact.")
+        }
+    }
+}
+
+preBuild.dependsOn(tasks.named("verifyTdlibArtifacts"))
+
+dependencies {
+    implementation "androidx.annotation:annotation:1.4.0"
+}
