@@ -107,6 +107,11 @@ public final class TelegramRepository {
             return render(lastStatus);
         }
     }
+    public String lastPersistentStatus() {
+        synchronized (stateDeliveryLock) {
+            return lastPersistentStatus == null ? null : render(lastPersistentStatus);
+        }
+    }
     public boolean isReadyWithTarget() {
         AppConfig current = config;
         TargetChat fixedTarget = target;

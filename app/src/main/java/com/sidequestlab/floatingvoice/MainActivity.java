@@ -577,14 +577,14 @@ public final class MainActivity extends AppCompatActivity implements TelegramRep
 
     private void stylePrimaryAction(boolean destructive) {
         if (destructive) {
-            int error = ContextCompat.getColor(this, R.color.fv_recording);
+            int error = ContextCompat.getColor(this, R.color.quiet_recording);
             dashboardPrimaryAction.setBackgroundTintList(ColorStateList.valueOf(Color.TRANSPARENT));
             dashboardPrimaryAction.setTextColor(error);
             dashboardPrimaryAction.setStrokeColor(ColorStateList.valueOf(error));
             dashboardPrimaryAction.setStrokeWidth(dp(1));
         } else {
-            int primary = ContextCompat.getColor(this, R.color.fv_primary);
-            int onPrimary = ContextCompat.getColor(this, R.color.fv_on_primary);
+            int primary = ContextCompat.getColor(this, R.color.quiet_primary);
+            int onPrimary = ContextCompat.getColor(this, R.color.quiet_on_primary);
             dashboardPrimaryAction.setBackgroundTintList(ColorStateList.valueOf(primary));
             dashboardPrimaryAction.setTextColor(onPrimary);
             dashboardPrimaryAction.setStrokeColor(ColorStateList.valueOf(Color.TRANSPARENT));
@@ -701,6 +701,13 @@ public final class MainActivity extends AppCompatActivity implements TelegramRep
 
     private void presentStatus(String status, boolean persistent, boolean transientFeedback) {
         connectionStatus.setText(status);
+        if (!persistent) {
+            connectionStatus.postDelayed(() -> {
+                if (status.contentEquals(connectionStatus.getText())) {
+                    connectionStatus.setText("");
+                }
+            }, 3500L);
+        }
         if (persistent) {
             persistentStatus = status;
             operationStatus.setText(status);
@@ -747,7 +754,12 @@ public final class MainActivity extends AppCompatActivity implements TelegramRep
 
     @Override public void onLocaleChanged() {
         runOnUiThread(() -> {
-            connectionStatus.setText(telegram.lastStatus());
+            String localizedPersistentStatus = telegram.lastPersistentStatus();
+            if (localizedPersistentStatus == null) {
+                presentStatus(telegram.lastStatus(), false, false);
+            } else {
+                presentStatus(localizedPersistentStatus, true, false);
+            }
             refreshUi();
             showPage(currentPage, editingApiSettings);
         });

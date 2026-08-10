@@ -2,25 +2,26 @@
 <resources>
     <style name="Theme.FloatingVoice" parent="Theme.Material3.DayNight.NoActionBar">
         <item name="android:fontFamily">sans</item>
-        <item name="colorPrimary">@color/fv_primary</item>
-        <item name="colorOnPrimary">@color/fv_on_primary</item>
-        <item name="colorPrimaryContainer">@color/fv_primary_container</item>
-        <item name="colorOnPrimaryContainer">@color/fv_on_primary_container</item>
-        <item name="colorSecondaryContainer">@color/fv_secondary_container</item>
-        <item name="colorOnSecondaryContainer">@color/fv_on_secondary_container</item>
-        <item name="colorSurface">@color/fv_surface</item>
-        <item name="colorSurfaceContainer">@color/fv_surface_container</item>
-        <item name="colorSurfaceContainerHigh">@color/fv_surface_container_high</item>
-        <item name="colorOnSurface">@color/fv_on_surface</item>
-        <item name="colorOnSurfaceVariant">@color/fv_on_surface_variant</item>
-        <item name="colorOutline">@color/fv_outline</item>
-        <item name="colorOutlineVariant">@color/fv_outline_variant</item>
-        <item name="colorError">@color/fv_recording</item>
-        <item name="colorOnError">@color/fv_on_recording</item>
-        <item name="colorErrorContainer">@color/fv_recording_container</item>
-        <item name="android:navigationBarColor">@color/fv_surface</item>
-        <item name="android:statusBarColor">@color/fv_surface</item>
-        <item name="android:windowBackground">@color/fv_surface</item>
+        <item name="colorPrimary">@color/quiet_primary</item>
+        <item name="colorOnPrimary">@color/quiet_on_primary</item>
+        <item name="colorPrimaryContainer">@color/quiet_primary_container</item>
+        <item name="colorOnPrimaryContainer">@color/quiet_on_primary_container</item>
+        <item name="colorSecondaryContainer">@color/quiet_secondary_container</item>
+        <item name="colorOnSecondaryContainer">@color/quiet_on_secondary_container</item>
+        <item name="colorSurface">@color/quiet_surface</item>
+        <item name="colorSurfaceContainer">@color/quiet_surface_container</item>
+        <item name="colorSurfaceContainerHigh">@color/quiet_surface_container_high</item>
+        <item name="colorOnSurface">@color/quiet_on_surface</item>
+        <item name="colorOnSurfaceVariant">@color/quiet_on_surface_variant</item>
+        <item name="colorOutline">@color/quiet_outline</item>
+        <item name="colorOutlineVariant">@color/quiet_outline_variant</item>
+        <item name="colorError">@color/quiet_recording</item>
+        <item name="colorOnError">@color/quiet_on_recording</item>
+        <item name="colorErrorContainer">@color/quiet_recording_container</item>
+        <item name="colorOnErrorContainer">@color/quiet_recording</item>
+        <item name="android:navigationBarColor">@color/quiet_surface</item>
+        <item name="android:statusBarColor">@color/quiet_surface</item>
+        <item name="android:windowBackground">@color/quiet_surface</item>
     </style>
 
     <style name="Theme.FloatingVoice.TextComposer" parent="Theme.FloatingVoice.OverlayMaterial3">
@@ -35,7 +36,7 @@
         <item name="windowNoTitle">true</item>
     </style>
 
-    <!-- Deterministic M3 theme shared by overlay and activity surfaces. -->
+    <!-- Overlay/composer theme keeps its v0.5.0 fixed semantic tokens. -->
     <style name="Theme.FloatingVoice.OverlayMaterial3" parent="Theme.Material3.DayNight.NoActionBar">
         <item name="colorPrimary">@color/fv_primary</item>
         <item name="colorOnPrimary">@color/fv_on_primary</item>
@@ -49,10 +50,8 @@
         <item name="colorOnSurface">@color/fv_on_surface</item>
         <item name="colorOnSurfaceVariant">@color/fv_on_surface_variant</item>
         <item name="colorOutline">@color/fv_outline</item>
-        <item name="colorOutlineVariant">@color/fv_outline_variant</item>
         <item name="colorError">@color/fv_recording</item>
         <item name="colorOnError">@color/fv_on_recording</item>
-        <item name="colorErrorContainer">@color/fv_recording_container</item>
         <item name="android:fontFamily">sans</item>
     </style>
 

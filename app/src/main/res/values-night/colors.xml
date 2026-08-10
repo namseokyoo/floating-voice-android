@@ -2,22 +2,39 @@
 <resources>
     <color name="launcher_background">#6F8F87</color>
 
-    <color name="fv_primary">#8FCFC5</color>
-    <color name="fv_on_primary">#18342F</color>
-    <color name="fv_primary_container">#2C4641</color>
-    <color name="fv_on_primary_container">#C6EEE7</color>
-    <color name="fv_secondary_container">#2C4641</color>
-    <color name="fv_on_secondary_container">#C6EEE7</color>
-    <color name="fv_surface">#1C1D1B</color>
-    <color name="fv_surface_container">#252724</color>
-    <color name="fv_surface_container_high">#2E302D</color>
-    <color name="fv_on_surface">#F2F1EB</color>
-    <color name="fv_on_surface_variant">#B9BBB3</color>
-    <color name="fv_outline">#858981</color>
-    <color name="fv_outline_variant">#3C3F3A</color>
-    <color name="fv_recording">#EE8B80</color>
-    <color name="fv_on_recording">#3B0B08</color>
-    <color name="fv_recording_container">#4A302D</color>
-    <color name="fv_cancel_container">#343733</color>
-    <color name="fv_on_cancel_container">#E7E8E1</color>
+    <!-- Quiet Recorder activity tokens. -->
+    <color name="quiet_primary">#8FCFC5</color>
+    <color name="quiet_on_primary">#18342F</color>
+    <color name="quiet_primary_container">#2C4641</color>
+    <color name="quiet_on_primary_container">#C6EEE7</color>
+    <color name="quiet_secondary_container">#2C4641</color>
+    <color name="quiet_on_secondary_container">#C6EEE7</color>
+    <color name="quiet_surface">#1C1D1B</color>
+    <color name="quiet_surface_container">#252724</color>
+    <color name="quiet_surface_container_high">#2E302D</color>
+    <color name="quiet_on_surface">#F2F1EB</color>
+    <color name="quiet_on_surface_variant">#B9BBB3</color>
+    <color name="quiet_outline">#858981</color>
+    <color name="quiet_outline_variant">#3C3F3A</color>
+    <color name="quiet_recording">#EE8B80</color>
+    <color name="quiet_on_recording">#3B0B08</color>
+    <color name="quiet_recording_container">#4A302D</color>
+
+    <!-- Fixed overlay/composer tokens retained from v0.5.0. -->
+    <color name="fv_primary">#C2C1FF</color>
+    <color name="fv_on_primary">#29286F</color>
+    <color name="fv_primary_container">#3D3D9E</color>
+    <color name="fv_on_primary_container">#E1E0FF</color>
+    <color name="fv_secondary_container">#464459</color>
+    <color name="fv_on_secondary_container">#E5E1F9</color>
+    <color name="fv_surface">#141218</color>
+    <color name="fv_surface_container">#211F26</color>
+    <color name="fv_surface_container_high">#2B2930</color>
+    <color name="fv_on_surface">#E6E1E9</color>
+    <color name="fv_on_surface_variant">#CAC4D0</color>
+    <color name="fv_outline">#938F99</color>
+    <color name="fv_recording">#B3261E</color>
+    <color name="fv_on_recording">#FFFFFF</color>
+    <color name="fv_cancel_container">#49454F</color>
+    <color name="fv_on_cancel_container">#E6E1E9</color>
 </resources>

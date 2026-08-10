@@ -148,7 +148,7 @@
                             android:layout_height="wrap_content"
                             android:text="@string/home_error_title"
                             android:textAppearance="?attr/textAppearanceLabelLarge"
-                            android:textColor="@color/fv_recording"
+                            android:textColor="@color/quiet_recording"
                             android:textStyle="bold" />
 
                         <TextView
@@ -171,7 +171,7 @@
                             android:layout_marginTop="4dp"
                             android:minHeight="48dp"
                             android:text="@string/dismiss_error"
-                            android:textColor="@color/fv_recording" />
+                            android:textColor="@color/quiet_recording" />
                     </LinearLayout>
                 </LinearLayout>
 
