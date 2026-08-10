@@ -1,12 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="debug_text_composer_label">텍스트 작성 키보드 실험 (디버그 전용)</string>
-    <string name="debug_text_composer_explanation">디버그 전용 실행 화면입니다. Telegram 로그인이나 대상 없이 포커스 가능한 텍스트 작성창을 엽니다. 텍스트는 전송하거나 저장하지 않습니다.</string>
-    <string name="debug_text_composer_settings">다른 앱 위 표시 권한 설정 열기</string>
-    <string name="debug_text_composer_show">텍스트 작성창 열기</string>
-    <string name="debug_text_composer_close">텍스트 작성창 닫기</string>
-    <string name="debug_text_composer_permission_required">다른 앱 위 표시 권한이 필요합니다. 이 실행 화면은 권한 검사를 약화하거나 권한을 부여하지 않습니다.</string>
-    <string name="debug_text_composer_ready">준비됨. Telegram 로그인과 대상은 필요하지 않습니다.</string>
-    <string name="debug_text_composer_showing">텍스트 작성창이 표시 중입니다. 텍스트는 전송하거나 저장하지 않습니다.</string>
-    <string name="debug_text_composer_failed">텍스트 작성창을 표시하지 못했습니다.</string>
+    <string name="debug_text_composer_label">텍스트 작성 Activity 실험 (디버그 전용)</string>
+    <string name="debug_text_composer_explanation">일반 텍스트 작성 Activity를 여는 디버그 전용 실행 화면입니다. Telegram 로그인이나 대상이 필요하지 않으며, 텍스트는 전송하거나 저장하지 않습니다.</string>
+    <string name="debug_text_composer_show">텍스트 작성 Activity 열기</string>
 </resources>

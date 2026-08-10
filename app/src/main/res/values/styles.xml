@@ -8,4 +8,13 @@
         <item name="android:statusBarColor">@color/brand_dark</item>
         <item name="android:windowBackground">@color/surface</item>
     </style>
+
+    <style name="Theme.FloatingVoice.TextComposer" parent="Theme.FloatingVoice">
+        <item name="android:backgroundDimAmount">0.55</item>
+        <item name="android:backgroundDimEnabled">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="windowNoTitle">true</item>
+    </style>
 </resources>

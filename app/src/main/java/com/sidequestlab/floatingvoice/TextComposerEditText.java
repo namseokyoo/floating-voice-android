@@ -6,7 +6,7 @@ import android.view.KeyEvent;
 
 import androidx.appcompat.widget.AppCompatEditText;
 
-/** EditText that lets the owning overlay close when Back reaches the focused editor. */
+/** Minimal pre-IME Back bridge so the composer Activity can finish while the editor is focused. */
 public final class TextComposerEditText extends AppCompatEditText {
     private Runnable backAction;
 

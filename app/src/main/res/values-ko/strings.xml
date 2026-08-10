@@ -79,9 +79,9 @@
     <string name="notification_channel_name">플로팅 음성 녹음</string>
     <string name="notification_channel_description">Telegram 음성 전송용 플로팅 녹음 상태 알림</string>
 
-    <string name="text_composer_title">텍스트 작성 — 키보드 실험</string>
+    <string name="text_composer_title">텍스트 작성</string>
     <string name="text_composer_hint">여기에 여러 줄을 입력하세요. 텍스트는 전송하거나 저장하지 않습니다.</string>
-    <string name="text_composer_close">텍스트 작성창 닫기</string>
+    <string name="text_composer_close">닫기</string>
 
     <string name="repo_not_started">Telegram 연결을 시작하지 않았습니다.</string>
     <string name="repo_connection_already_running">Telegram 연결이 이미 실행 중입니다. 변경한 설정은 저장했습니다.</string>
