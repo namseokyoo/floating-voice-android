@@ -8,7 +8,7 @@ readonly ANDROID_NDK_VERSION=28.2.13676358
 readonly OPENSSL_VERSION=OpenSSL_1_1_1w
 DOCKER_COMMAND=${DOCKER_COMMAND:-docker}
 
-for command_name in git "$DOCKER_COMMAND" unzip mktemp; do
+for command_name in git "$DOCKER_COMMAND" unzip mktemp python3; do
   if ! command -v "$command_name" >/dev/null 2>&1; then
     printf 'Error: required command not found: %s\n' "$command_name" >&2
     exit 1
@@ -47,7 +47,26 @@ if [[ "$ACTUAL_COMMIT" != "$TDLIB_COMMIT" ]]; then
   exit 1
 fi
 
-printf 'Building TDLib with the official pinned Dockerfile...\n'
+DOCKERFILE="$SOURCE_DIR/example/android/Dockerfile"
+python3 - "$DOCKERFILE" <<'PY'
+from pathlib import Path
+import sys
+
+path = Path(sys.argv[1])
+text = path.read_text()
+needle = "ARG TDLIB_INTERFACE=Java\n"
+if text.count(needle) != 1:
+    raise SystemExit("Error: pinned TDLib Dockerfile layout changed; refusing to patch compiler flags.")
+prefix_flags = (
+    "-ffile-prefix-map=/home/td=/usr/src/tdlib "
+    "-fdebug-prefix-map=/home/td=/usr/src/tdlib "
+    "-fmacro-prefix-map=/home/td=/usr/src/tdlib"
+)
+replacement = needle + f'ENV CFLAGS="{prefix_flags}"\n' + f'ENV CXXFLAGS="{prefix_flags}"\n'
+path.write_text(text.replace(needle, replacement))
+PY
+
+printf 'Building TDLib with the pinned upstream Dockerfile and sanitized source paths...\n'
 "$DOCKER_COMMAND" build \
   --build-arg "COMMIT_HASH=$TDLIB_COMMIT" \
   --build-arg "ANDROID_NDK_VERSION=$ANDROID_NDK_VERSION" \
@@ -63,6 +82,26 @@ if [[ ! -s "$TDLIB_ZIP" ]]; then
   exit 1
 fi
 
+python3 - "$TDLIB_ZIP" <<'PY'
+from pathlib import Path
+import sys
+import zipfile
+
+archive = Path(sys.argv[1])
+forbidden = (b"/Users/", b"/Volumes/", b"/home/td/")
+with zipfile.ZipFile(archive) as bundle:
+    libraries = [name for name in bundle.namelist() if name.endswith("/libtdjni.so")]
+    if not libraries:
+        raise SystemExit("Error: TDLib archive has no libtdjni.so to scan.")
+    for name in libraries:
+        payload = bundle.read(name)
+        if any(marker in payload for marker in forbidden):
+            raise SystemExit(
+                "Error: TDLib native artifact contains an unsanitized private/build source path."
+            )
+print(f"TDLib native path scan passed for {len(libraries)} ABI artifact(s).")
+PY
+
 if command -v sha256sum >/dev/null 2>&1; then
   read -r ARCHIVE_SHA _ < <(sha256sum "$TDLIB_ZIP")
 else
@@ -76,6 +115,8 @@ PROVENANCE_FILE="$OUTPUT_DIR/floating-voice-tdlib-provenance.txt"
   printf 'openssl_version=%s\n' "$OPENSSL_VERSION"
   printf 'tdlib_interface=Java\n'
   printf 'android_stl=c++_static\n'
+  printf 'compiler_prefix_map=/home/td=/usr/src/tdlib\n'
+  printf 'native_private_path_scan=passed\n'
   printf 'tdlib_zip_sha256=%s\n' "$ARCHIVE_SHA"
 } > "$PROVENANCE_FILE"
 

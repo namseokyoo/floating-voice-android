@@ -57,6 +57,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:hint="@string/hint_phone"
+            android:importantForAutofill="no"
             android:inputType="phone" />
 
         <EditText
@@ -64,6 +65,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:hint="@string/hint_bot_username"
+            android:importantForAutofill="no"
             android:inputType="text" />
 
         <Button

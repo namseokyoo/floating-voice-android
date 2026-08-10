@@ -11,7 +11,7 @@
 Tap the floating microphone once to start recording.<br>
 Tap it again to send a voice message from your Telegram account to a verified bot chat.
 
-![Version](https://img.shields.io/badge/version-0.4.0-315CDB?style=for-the-badge)
+![Version](https://img.shields.io/badge/version-0.4.1-315CDB?style=for-the-badge)
 ![Android](https://img.shields.io/badge/Android-10%2B-3DDC84?style=for-the-badge&logo=android&logoColor=white)
 ![ABI](https://img.shields.io/badge/ABI-arm64--v8a-555555?style=for-the-badge)
 ![Java](https://img.shields.io/badge/Java-17-ED8B00?style=for-the-badge&logo=openjdk&logoColor=white)
@@ -24,9 +24,9 @@ Tap it again to send a voice message from your Telegram account to a verified bo
 > This is an unofficial, independent app. It is not distributed or endorsed by Telegram. It signs in as a regular user through the official **TDLib** library and does not automate the Telegram app UI.
 
 > [!WARNING]
-> This repository distributes **source code only**. GitHub Releases do not attach an APK or AAB, and locally built debug APKs are for personal development and verification. Release signing, Play Data Safety declarations, and a complete local-data deletion flow are not ready for production distribution.
+> Starting with `v0.4.1`, GitHub Releases provide a **release-signed arm64 APK**. This is not a Play Store distribution, so Android may display an unknown-source installation warning. An AAB, Play Data Safety declarations, and a complete local-data deletion flow are not ready.
 
-[License](LICENSE) · [Privacy notice](PRIVACY.md) · [Security policy](SECURITY.md) · [Contributing](CONTRIBUTING.md)
+[License](LICENSE) · [Privacy notice](PRIVACY.md) · [Security policy](SECURITY.md) · [APK signing](docs/SIGNING.md) · [Contributing](CONTRIBUTING.md)
 
 ---
 
@@ -222,7 +222,7 @@ LocalizedStrings        Resolves the active app locale for non-Activity componen
 
 ### Prepare TDLib with Docker
 
-On Linux or macOS with Docker running, use the wrapper below. It builds with the official TDLib Dockerfile and installs the generated Java/JNI artifacts from the pinned revision.
+On Linux or macOS with Docker running, use the wrapper below. It builds with the official TDLib Dockerfile and installs the generated Java/JNI artifacts from the pinned revision. The wrapper adds compiler prefix mapping and rejects native libraries that still contain private local paths or the container build root.
 
 ```bash
 ./scripts/build-tdlib-docker.sh
@@ -236,7 +236,7 @@ The wrapper pins:
 - TDLib interface: `Java`
 - Android STL: `c++_static`
 
-The official Docker flow builds multiple ABIs, but the project installs only `arm64-v8a/libtdjni.so`. Operating-system packages inside the build image can change over time, so this is a pinned-source compatible rebuild path, not a guarantee of a byte-for-byte identical ZIP. The audit worktree, `tdlib.zip`, and a provenance file recording the fixed build inputs and ZIP SHA-256 remain under the gitignored `tdlib-dist/` directory.
+The official Docker flow builds multiple ABIs, but the project installs only `arm64-v8a/libtdjni.so`. Operating-system packages inside the build image can change over time, so this is a pinned-source compatible rebuild path, not a guarantee of a byte-for-byte identical ZIP. The audit worktree, `tdlib.zip`, and a provenance file recording the fixed build inputs, prefix mapping, native-path scan result, and ZIP SHA-256 remain under the gitignored `tdlib-dist/` directory.
 
 Replace existing local artifacts only when intended:
 
@@ -343,7 +343,7 @@ The package ID has been `com.sidequestlab.floatingvoice` since version 0.2.0. Th
 
 ## Current limitations
 
-- The APK is debug-signed and is not a Play Store production artifact.
+- The official APK is a GitHub Release sideload artifact, not a Play Store production artifact.
 - Only `arm64-v8a` is included; 32-bit devices and x86 emulators are unsupported.
 - Users, private groups, and private channels without a public bot username cannot be selected as targets.
 - The app uses a personal setup in which each user enters their own Telegram API ID and API Hash.
@@ -352,17 +352,19 @@ The package ID has been `com.sidequestlab.floatingvoice` since version 0.2.0. Th
 
 ## Distribution policy
 
-- GitHub Releases provide only the source ZIP/TAR generated for the tag.
-- APKs, AABs, TDLib Java/JNI artifacts, signing keys, sessions, and recordings are not published as release assets.
-- A locally built debug APK is not an officially supported binary and has no update-compatibility guarantee.
-- Any future binary distribution must first use a durable release-signing key and complete the privacy, deletion, permission, and policy work.
+- GitHub Releases provide the source ZIP/TAR and a release-signed `arm64-v8a` APK for the tag.
+- APKs are never committed to Git; they are attached only as GitHub Release assets.
+- AABs, generated TDLib Java/JNI sources, signing keys, sessions, and recordings are not release assets.
+- The official APK certificate SHA-256 fingerprint is `FD:97:82:9D:19:F8:B0:57:5B:79:EC:1E:8B:7A:26:16:A0:69:7C:EE:86:5D:29:B0:B5:28:78:3C:39:88:AB:A6`.
+- Each release note records the corresponding APK file SHA-256.
 
 ## Roadmap
 
 - [x] Korean and English app resources
 - [x] System-default and in-app language selection
 - [x] Korean and English repository documentation
-- [ ] Release-signed AAB and Play App Signing
+- [x] Release-signed arm64 APK through GitHub Releases
+- [ ] AAB and Play App Signing
 - [x] Bilingual repository privacy notice
 - [ ] Store Data Safety declaration and permission disclosures
 - [ ] Logout plus complete local-data deletion

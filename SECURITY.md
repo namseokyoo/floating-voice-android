@@ -2,9 +2,9 @@
 
 ## Supported versions
 
-Security fixes are applied to the current `main` branch and the latest source release. Version `0.4.x` is the first public source release line.
+Security fixes are applied to the current `main` branch and the latest GitHub Release. Version `0.4.x` is the first public release line.
 
-This repository does not publish or support an official APK binary. Locally produced debug APKs are development artifacts and are not GitHub Release assets.
+Starting with version `0.4.1`, the official release-signed `arm64-v8a` APK is attached to the corresponding GitHub Release. An APK from another location or with a different signing-certificate fingerprint is not an official artifact. Locally produced debug APKs remain unsupported development artifacts.
 
 ## Reporting a vulnerability
 

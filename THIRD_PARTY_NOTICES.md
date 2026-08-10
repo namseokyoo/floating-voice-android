@@ -2,7 +2,7 @@
 
 Floating Voice is licensed under the [Apache License 2.0](LICENSE).
 
-The repository is source-only. Generated TDLib Java bindings, native libraries, APKs, Telegram sessions, and local build trees are intentionally not committed or attached to source releases.
+Generated TDLib Java bindings, native libraries, APKs, Telegram sessions, and local build trees are intentionally not committed to Git. A release-signed APK may be attached separately to a GitHub Release and contains the compiled TDLib native library described below.
 
 ## TDLib
 

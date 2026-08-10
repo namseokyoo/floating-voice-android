@@ -1,6 +1,6 @@
 # Contributing
 
-Thanks for improving Floating Voice. The repository is intentionally source-only and handles sensitive Telegram account data, so privacy and send-safety take priority over convenience.
+Thanks for improving Floating Voice. The Git repository remains source-first while selected GitHub Releases may attach a release-signed APK. The app handles sensitive Telegram account data, so privacy and send-safety take priority over convenience.
 
 ## Before opening a pull request
 
@@ -20,7 +20,7 @@ export JAVA_HOME=$(/usr/libexec/java_home -v 17)
 ./gradlew clean test lintDebug assembleDebug
 ```
 
-At minimum, source-only changes must pass:
+At minimum, source changes must pass:
 
 ```bash
 ./gradlew :core:test

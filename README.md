@@ -11,7 +11,7 @@
 플로팅 마이크 버튼을 한 번 누르면 녹음이 시작되고,<br>
 다시 누르면 내 Telegram 계정으로 확인된 봇 대화에 음성 메시지가 전송된다.
 
-![Version](https://img.shields.io/badge/version-0.4.0-315CDB?style=for-the-badge)
+![Version](https://img.shields.io/badge/version-0.4.1-315CDB?style=for-the-badge)
 ![Android](https://img.shields.io/badge/Android-10%2B-3DDC84?style=for-the-badge&logo=android&logoColor=white)
 ![ABI](https://img.shields.io/badge/ABI-arm64--v8a-555555?style=for-the-badge)
 ![Java](https://img.shields.io/badge/Java-17-ED8B00?style=for-the-badge&logo=openjdk&logoColor=white)
@@ -24,9 +24,9 @@
 > Telegram과 제휴하거나 Telegram이 공식 배포하는 앱이 아니다. 일반 사용자 계정으로 로그인하는 공식 **TDLib**를 사용하며, Telegram 앱 화면을 열거나 자동 조작하지 않는다.
 
 > [!WARNING]
-> 이 저장소는 **소스 코드만 배포**한다. GitHub Release에 APK/AAB를 첨부하지 않으며, 로컬 debug APK는 개인 개발·검증용이다. Play 스토어용 release 서명, Data Safety, 전체 데이터 삭제 기능은 아직 준비되지 않았다.
+> `v0.4.1`부터 GitHub Release에 **release 서명된 arm64 APK**를 제공한다. Play 스토어 배포가 아니므로 Android의 출처를 알 수 없는 앱 설치 경고가 표시될 수 있다. AAB, Play Data Safety, 전체 데이터 삭제 기능은 아직 준비되지 않았다.
 
-[라이선스](LICENSE) · [개인정보 안내](PRIVACY.md) · [보안 정책](SECURITY.md) · [기여 안내](CONTRIBUTING.md)
+[라이선스](LICENSE) · [개인정보 안내](PRIVACY.md) · [보안 정책](SECURITY.md) · [APK 서명](docs/SIGNING.md) · [기여 안내](CONTRIBUTING.md)
 
 ---
 
@@ -221,7 +221,7 @@ PendingRecordingStore   임시 메시지 ID와 녹음 파일 연결
 
 ### Docker로 TDLib 준비
 
-Docker가 실행 중인 Linux·macOS 환경에서는 다음 wrapper가 공식 TDLib Dockerfile과 고정 리비전을 사용해 Java/JNI를 준비한다.
+Docker가 실행 중인 Linux·macOS 환경에서는 다음 wrapper가 공식 TDLib Dockerfile과 고정 리비전을 사용해 Java/JNI를 준비한다. wrapper는 compiler prefix mapping을 추가하고 설치 전에 native library에서 개인 로컬 경로와 container build 경로가 제거됐는지 검사한다.
 
 ```bash
 ./scripts/build-tdlib-docker.sh
@@ -235,7 +235,7 @@ wrapper는 다음 값을 고정한다.
 - TDLib interface: `Java`
 - Android STL: `c++_static`
 
-공식 Docker 빌드는 여러 ABI를 만들지만 프로젝트에는 `arm64-v8a/libtdjni.so`만 설치한다. 빌드 환경의 운영체제 패키지가 시간에 따라 달라질 수 있으므로 byte-for-byte 동일한 ZIP을 보장하지는 않으며, 고정 TDLib 소스와 도구 버전으로 호환 산출물을 재생성하는 절차다. 감사용 작업 폴더, `tdlib.zip`, 고정 빌드 입력과 ZIP SHA-256을 기록한 provenance 파일은 Git에서 제외된 `tdlib-dist/`에 남는다.
+공식 Docker 빌드는 여러 ABI를 만들지만 프로젝트에는 `arm64-v8a/libtdjni.so`만 설치한다. 빌드 환경의 운영체제 패키지가 시간에 따라 달라질 수 있으므로 byte-for-byte 동일한 ZIP을 보장하지는 않으며, 고정 TDLib 소스와 도구 버전으로 호환 산출물을 재생성하는 절차다. 감사용 작업 폴더, `tdlib.zip`, 고정 빌드 입력, prefix mapping, native 경로 검사 결과, ZIP SHA-256을 기록한 provenance 파일은 Git에서 제외된 `tdlib-dist/`에 남는다.
 
 기존 로컬 TDLib 파일을 의도적으로 교체할 때만 다음을 사용한다.
 
@@ -336,7 +336,7 @@ floating-voice-android/
 
 ## 현재 제약
 
-- debug 서명 APK이며 Play 스토어 배포용이 아니다.
+- 공식 APK는 GitHub Release에서만 제공하는 sideload용 산출물이며 Play 스토어 배포용이 아니다.
 - `arm64-v8a`만 포함하므로 32비트 기기와 x86 에뮬레이터는 지원하지 않는다.
 - 공개 username이 없는 사용자·비공개 그룹·비공개 채널은 대상으로 선택할 수 없다.
 - 각 사용자가 자신의 Telegram API ID·Hash를 입력하는 개인용 구조다.
@@ -345,17 +345,19 @@ floating-voice-android/
 
 ## 배포 정책
 
-- GitHub Release에는 태그 시점의 소스 ZIP/TAR만 제공한다.
-- APK·AAB·TDLib Java/JNI·서명키·세션·녹음은 Release asset으로 배포하지 않는다.
-- 로컬 debug APK는 공식 지원 바이너리가 아니며, 설치·업데이트 호환성을 보장하지 않는다.
-- 향후 바이너리를 배포하려면 별도의 장기 release 서명키, 개인정보·삭제 기능, 권한 정책 검토를 먼저 완료한다.
+- GitHub Release에는 태그 시점의 소스 ZIP/TAR와 release 서명된 `arm64-v8a` APK를 제공한다.
+- APK는 Git 이력에 commit하지 않고 Release asset으로만 첨부한다.
+- AAB·TDLib Java/JNI 원본·서명키·세션·녹음은 Release asset으로 배포하지 않는다.
+- 공식 APK 서명 인증서 SHA-256 fingerprint는 `FD:97:82:9D:19:F8:B0:57:5B:79:EC:1E:8B:7A:26:16:A0:69:7C:EE:86:5D:29:B0:B5:28:78:3C:39:88:AB:A6`이다.
+- APK 파일의 SHA-256은 각 Release Notes에 별도로 기록한다.
 
 ## 다음 단계
 
 - [x] 한국어·영어 앱 리소스
 - [x] 시스템 기본값·앱 내 언어 선택
 - [x] 한국어·영어 저장소 문서
-- [ ] release 서명 AAB와 Play App Signing 구성
+- [x] GitHub Release용 release 서명 arm64 APK
+- [ ] AAB와 Play App Signing 구성
 - [x] 저장소용 한국어·영어 개인정보 안내
 - [ ] 스토어용 Data Safety·권한 고지 작성
 - [ ] 로그아웃 + 모든 로컬 데이터 삭제 기능

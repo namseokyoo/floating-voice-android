@@ -2,11 +2,11 @@
 
 **Effective date / 시행일:** 2026-08-10
 
-**Applies to / 적용 대상:** Floating Voice source version `0.4.0`
+**Applies to / 적용 대상:** Floating Voice version `0.4.1`
 
-Floating Voice is currently published as source code only. No official APK is distributed through GitHub Releases or an app store.
+Floating Voice publishes source code and a release-signed `arm64-v8a` APK through GitHub Releases. It is not distributed through an app store.
 
-플로팅 보이스는 현재 소스 코드만 공개합니다. GitHub Release나 앱스토어를 통해 공식 APK를 배포하지 않습니다.
+플로팅 보이스는 소스 코드와 release 서명된 `arm64-v8a` APK를 GitHub Release로 공개합니다. 앱스토어에는 배포하지 않습니다.
 
 ## English
 
