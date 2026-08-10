@@ -71,6 +71,11 @@
     <string name="recording_folder_failed">Could not create the recording folder</string>
     <string name="content_description_stop_and_send">Stop recording and send</string>
     <string name="recording_in_progress">Recording — tap again to stop and send</string>
+    <string name="content_description_cancel_recording">Cancel recording without sending</string>
+    <string name="recording_in_progress_cancel_unavailable">Recording — tap again to stop and send. The cancel button could not be shown.</string>
+    <string name="recording_cancelled_no_message">Recording canceled. No message was sent.</string>
+    <string name="recording_cancel_failed_retained">Could not cancel the recording safely. No message was sent. File retained at: %1$s</string>
+    <string name="recording_cancel_delete_failed_retained">Recording stopped and was not sent, but the canceled file could not be deleted: %1$s</string>
     <string name="recording_start_failed">Could not start recording: %1$s</string>
     <string name="recording_stop_failed_retained">Could not stop recording normally. File retained at: %1$s</string>
     <string name="voice_queued_retained">Voice message queued — the file is retained until success is confirmed</string>

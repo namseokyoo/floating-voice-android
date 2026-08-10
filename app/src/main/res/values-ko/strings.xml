@@ -71,6 +71,11 @@
     <string name="recording_folder_failed">녹음 파일 폴더를 만들 수 없습니다</string>
     <string name="content_description_stop_and_send">녹음 종료 후 전송</string>
     <string name="recording_in_progress">녹음 중 — 다시 누르면 녹음을 끝내고 전송합니다</string>
+    <string name="content_description_cancel_recording">전송하지 않고 녹음 취소</string>
+    <string name="recording_in_progress_cancel_unavailable">녹음 중 — 다시 누르면 녹음을 끝내고 전송합니다. 취소 버튼을 표시하지 못했습니다.</string>
+    <string name="recording_cancelled_no_message">녹음을 취소했습니다. 메시지는 전송하지 않았습니다.</string>
+    <string name="recording_cancel_failed_retained">녹음을 안전하게 취소하지 못했습니다. 메시지는 전송하지 않았습니다. 파일 보관 위치: %1$s</string>
+    <string name="recording_cancel_delete_failed_retained">녹음을 끝내고 전송하지 않았지만 취소 파일을 삭제하지 못했습니다: %1$s</string>
     <string name="recording_start_failed">녹음을 시작하지 못했습니다: %1$s</string>
     <string name="recording_stop_failed_retained">녹음을 정상 종료하지 못했습니다. 파일 보관 위치: %1$s</string>
     <string name="voice_queued_retained">음성 전송 대기 중 — 성공 확인 전까지 파일을 보관합니다</string>

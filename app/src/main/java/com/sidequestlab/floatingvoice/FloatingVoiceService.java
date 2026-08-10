@@ -38,9 +38,15 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
     private static final long TOUCH_LONG_PRESS_THRESHOLD_MS = 600L;
 
     private final OverlayStateMachine overlayStateMachine = new OverlayStateMachine();
+    private final RecordingCancelOperation cancelOperation = new RecordingCancelOperation();
+    private final TerminalInputGate terminalInputGate = new TerminalInputGate();
+    private static final long TERMINAL_INPUT_SUPPRESSION_MS = 150L;
     private WindowManager windowManager;
+    private OverlayWindowRegistry<View, WindowManager.LayoutParams> windowRegistry;
     private WindowManager.LayoutParams layoutParams;
     private ImageButton bubble;
+    private WindowManager.LayoutParams cancelLayoutParams;
+    private ImageButton cancelButton;
     private DragTapListener dragTapListener;
     private MediaRecorder recorder;
     private File activeRecording;
@@ -93,14 +99,13 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
         ImageButton currentBubble = bubble;
         DragTapListener currentTouchListener = dragTapListener;
         bubble = null;
+        cancelButton = null;
         dragTapListener = null;
         if (currentBubble != null && currentTouchListener != null) {
             currentTouchListener.cancelPending(currentBubble);
         }
         if (recorder != null) stopAndRetainInterruptedRecording();
-        if (currentBubble != null && windowManager != null) {
-            try { windowManager.removeView(currentBubble); } catch (RuntimeException ignored) { }
-        }
+        if (windowRegistry != null) windowRegistry.removeAll();
         telegram.removeListener(this);
         super.onDestroy();
     }
@@ -114,6 +119,7 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
             return;
         }
         windowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
+        windowRegistry = new OverlayWindowRegistry<>(new WindowManagerBackend(windowManager));
         bubble = new ImageButton(LocalizedStrings.context(this));
         bubble.setImageResource(R.drawable.ic_overlay_mic);
         bubble.setContentDescription(text(R.string.content_description_start_recording));
@@ -128,10 +134,13 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
         layoutParams.gravity = Gravity.TOP | Gravity.START;
         layoutParams.x = dp(16);
         layoutParams.y = dp(160);
-        bubble.setOnClickListener(v -> dispatchOverlayEvent(OverlayEvent.TAP));
+        bubble.setOnClickListener(v -> {
+            if (terminalInputGate.shouldSuppress(SystemClock.uptimeMillis())) return;
+            dispatchOverlayEvent(OverlayEvent.TAP);
+        });
         dragTapListener = new DragTapListener();
         bubble.setOnTouchListener(dragTapListener);
-        windowManager.addView(bubble, layoutParams);
+        windowRegistry.add(bubble, layoutParams);
     }
 
     private OverlayStateMachine.Transition dispatchOverlayEvent(OverlayEvent event) {
@@ -149,9 +158,10 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
             switch (effect) {
                 case START_VOICE -> startRecording();
                 case STOP_VOICE -> stopRecordingAndSend();
+                case CANCEL_VOICE -> cancelRecording();
                 case SEND_VOICE -> sendReadyVoice();
-                case CANCEL_VOICE, SEND_TEXT, SHOW_MENU, HIDE_MENU, OPEN_TEXT_COMPOSER -> {
-                    // V5-03 wires only the existing tap-to-record voice path.
+                case SEND_TEXT, SHOW_MENU, HIDE_MENU, OPEN_TEXT_COMPOSER -> {
+                    // Later stages connect menu and text effects.
                 }
             }
         }
@@ -196,10 +206,15 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
         bubble.setImageResource(R.drawable.ic_overlay_stop);
         bubble.setContentDescription(text(R.string.content_description_stop_and_send));
         bubble.setBackgroundResource(R.drawable.overlay_recording);
-        updateState(R.string.recording_in_progress);
+        updateState(showCancelButton()
+                ? R.string.recording_in_progress
+                : R.string.recording_in_progress_cancel_unavailable);
     }
 
     private void stopRecordingAndSend() {
+        hideCancelButton();
+        terminalInputGate.suppressTouchesThrough(
+                SystemClock.uptimeMillis() + TERMINAL_INPUT_SUPPRESSION_MS);
         MediaRecorder current = recorder;
         recorder = null;
         int duration = (int) Math.max(1,
@@ -223,6 +238,115 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
         activeRecording = null;
         updateIdleBubble();
         dispatchOverlayEvent(OverlayEvent.VOICE_STOP_SUCCEEDED);
+    }
+
+    private void cancelRecording() {
+        hideCancelButton();
+        terminalInputGate.suppressTouchesThrough(
+                SystemClock.uptimeMillis() + TERMINAL_INPUT_SUPPRESSION_MS);
+        MediaRecorder current = recorder;
+        recorder = null;
+        File canceledRecording = activeRecording;
+        activeRecording = null;
+
+        RecordingCancelOperation.Result result = cancelOperation.execute(
+                recorderPort(current), canceledRecording, filePort());
+
+        updateIdleBubble();
+        switch (result.outcome()) {
+            case CANCELED -> {
+                dispatchOverlayEvent(OverlayEvent.VOICE_CANCEL_SUCCEEDED);
+                updateState(R.string.recording_cancelled_no_message);
+            }
+            case RETAINED_STOP_FAILURE -> {
+                dispatchOverlayEvent(OverlayEvent.VOICE_CANCEL_FAILED);
+                updateState(R.string.recording_cancel_failed_retained, result.recording());
+            }
+            case RETAINED_RELEASE_FAILURE -> {
+                dispatchOverlayEvent(OverlayEvent.VOICE_CANCEL_FAILED);
+                updateState(R.string.recording_cancel_failed_retained, result.recording());
+            }
+            case RETAINED_DELETE_FAILURE -> {
+                dispatchOverlayEvent(OverlayEvent.VOICE_CANCEL_FAILED);
+                updateState(R.string.recording_cancel_delete_failed_retained, result.recording());
+            }
+        }
+    }
+
+    private static RecordingCancelOperation.RecorderPort recorderPort(MediaRecorder recorder) {
+        return new RecordingCancelOperation.RecorderPort() {
+            @Override public void stop() {
+                if (recorder == null) throw new IllegalStateException("Recorder is not active");
+                recorder.stop();
+            }
+            @Override public void release() {
+                if (recorder != null) recorder.release();
+            }
+        };
+    }
+
+    private static RecordingCancelOperation.FilePort filePort() {
+        return new RecordingCancelOperation.FilePort() {
+            @Override public boolean exists(File file) {
+                return file != null && file.exists();
+            }
+            @Override public boolean delete(File file) {
+                return file != null && file.delete();
+            }
+        };
+    }
+
+    private boolean showCancelButton() {
+        if (cancelButton != null || windowRegistry == null) return cancelButton != null;
+        ImageButton next = new ImageButton(LocalizedStrings.context(this));
+        next.setImageResource(R.drawable.ic_overlay_cancel);
+        next.setContentDescription(text(R.string.content_description_cancel_recording));
+        next.setPadding(dp(14), dp(14), dp(14), dp(14));
+        next.setBackgroundResource(R.drawable.overlay_recording);
+        next.setOnClickListener(view -> {
+            if (cancelButton != view || isTearingDown()) return;
+            dispatchOverlayEvent(OverlayEvent.CANCEL_VOICE_REQUESTED);
+        });
+
+        int size = dp(56);
+        WindowManager.LayoutParams params = new WindowManager.LayoutParams(size, size,
+                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+                        | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+                PixelFormat.TRANSLUCENT);
+        params.gravity = Gravity.TOP | Gravity.START;
+        cancelButton = next;
+        cancelLayoutParams = params;
+        positionCancelButton();
+        try {
+            windowRegistry.add(next, params);
+            return true;
+        } catch (RuntimeException ignored) {
+            cancelButton = null;
+            cancelLayoutParams = null;
+            return false;
+        }
+    }
+
+    private void hideCancelButton() {
+        ImageButton current = cancelButton;
+        cancelButton = null;
+        cancelLayoutParams = null;
+        if (windowRegistry != null) windowRegistry.remove(current);
+    }
+
+    private void positionCancelButton() {
+        if (cancelLayoutParams == null || layoutParams == null) return;
+        int gap = dp(8);
+        int cancelSize = dp(56);
+        int bubbleSize = dp(64);
+        int width = getResources().getDisplayMetrics().widthPixels;
+        int height = getResources().getDisplayMetrics().heightPixels;
+        int right = layoutParams.x + bubbleSize + gap;
+        cancelLayoutParams.x = right + cancelSize <= width
+                ? right
+                : Math.max(0, layoutParams.x - gap - cancelSize);
+        cancelLayoutParams.y = Math.max(0, Math.min(layoutParams.y, height - cancelSize));
     }
 
     private void sendReadyVoice() {
@@ -349,9 +473,7 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
         currentBubble.post(() -> {
             if (bubble != currentBubble || isTearingDown()) return;
             boolean isRecording = isRecordingState();
-            currentBubble.setContentDescription(text(isRecording
-                    ? R.string.content_description_stop_and_send
-                    : R.string.content_description_start_recording));
+            refreshOverlayDescriptions(isRecording);
             if (!isRecording) updateState(status);
         });
     }
@@ -362,17 +484,28 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
         currentBubble.post(() -> {
             if (bubble != currentBubble || isTearingDown()) return;
             boolean isRecording = isRecordingState();
-            currentBubble.setContentDescription(text(isRecording
-                    ? R.string.content_description_stop_and_send
-                    : R.string.content_description_start_recording));
+            refreshOverlayDescriptions(isRecording);
             if (isRecording) {
-                updateState(R.string.recording_in_progress);
+                updateState(cancelButton != null
+                        ? R.string.recording_in_progress
+                        : R.string.recording_in_progress_cancel_unavailable);
             } else if (notificationResourceId == 0) {
                 updateState(telegram.lastStatus());
             } else {
                 publishState();
             }
         });
+    }
+
+    private void refreshOverlayDescriptions(boolean isRecording) {
+        if (bubble != null) {
+            bubble.setContentDescription(text(isRecording
+                    ? R.string.content_description_stop_and_send
+                    : R.string.content_description_start_recording));
+        }
+        if (cancelButton != null) {
+            cancelButton.setContentDescription(text(R.string.content_description_cancel_recording));
+        }
     }
 
     private boolean isRecordingState() {
@@ -420,9 +553,13 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
                             || movement == GestureClassifier.Classification.LONG_PRESS) {
                         cancelTimeout(view);
                     }
-                    layoutParams.x = initialX + Math.round(latestX - downX);
-                    layoutParams.y = initialY + Math.round(latestY - downY);
-                    windowManager.updateViewLayout(view, layoutParams);
+                    if (movement == GestureClassifier.Classification.DRAG) {
+                        layoutParams.x = initialX + Math.round(latestX - downX);
+                        layoutParams.y = initialY + Math.round(latestY - downY);
+                        windowRegistry.update(view, layoutParams);
+                        positionCancelButton();
+                        windowRegistry.update(cancelButton, cancelLayoutParams);
+                    }
                     return true;
                 case MotionEvent.ACTION_UP:
                     latestX = event.getRawX();
