@@ -113,7 +113,7 @@ final class FloatingActionMenuController {
     }
 
     void destroy() {
-        removalRetries = MAX_REMOVAL_RETRIES;
+        removalRetries = 0;
         dismiss();
     }
 

@@ -115,6 +115,8 @@ final class FloatingOverlayViewController {
         }
         root.setClickable(true);
         root.setFocusable(true);
+        root.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_YES);
+        recordingDragRegion.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
         root.setContentDescription(text(R.string.content_description_start_recording));
     }
 
@@ -133,6 +135,8 @@ final class FloatingOverlayViewController {
                 .setDuration(CONTAINER_TRANSITION_MS).start());
         root.setClickable(false);
         root.setFocusable(false);
+        root.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+        recordingDragRegion.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_YES);
         root.setContentDescription(text(R.string.content_description_recording_dock));
         stopAndSend.setContentDescription(text(R.string.content_description_stop_and_send));
         cancel.setContentDescription(text(R.string.content_description_cancel_recording));
@@ -151,17 +155,13 @@ final class FloatingOverlayViewController {
             recordingRow.addView(recordingDragRegion);
             recordingRow.addView(cancel);
         }
-        if (stopOnRight) {
-            cancel.setAccessibilityTraversalAfter(View.NO_ID);
-            cancel.setAccessibilityTraversalBefore(stopAndSend.getId());
-            stopAndSend.setAccessibilityTraversalAfter(cancel.getId());
-            stopAndSend.setAccessibilityTraversalBefore(View.NO_ID);
-        } else {
-            stopAndSend.setAccessibilityTraversalAfter(View.NO_ID);
-            stopAndSend.setAccessibilityTraversalBefore(cancel.getId());
-            cancel.setAccessibilityTraversalAfter(stopAndSend.getId());
-            cancel.setAccessibilityTraversalBefore(View.NO_ID);
-        }
+        // Semantic order stays constant even when physical order mirrors at the opposite edge.
+        stopAndSend.setAccessibilityTraversalAfter(View.NO_ID);
+        stopAndSend.setAccessibilityTraversalBefore(recordingDragRegion.getId());
+        recordingDragRegion.setAccessibilityTraversalAfter(stopAndSend.getId());
+        recordingDragRegion.setAccessibilityTraversalBefore(cancel.getId());
+        cancel.setAccessibilityTraversalAfter(recordingDragRegion.getId());
+        cancel.setAccessibilityTraversalBefore(View.NO_ID);
     }
 
     void setIdlePressed(boolean pressed) {
@@ -211,6 +211,8 @@ final class FloatingOverlayViewController {
         recordingTimer.setText(elapsed);
         recordingTimer.setContentDescription(
                 text(R.string.content_description_recording_elapsed, elapsed));
+        recordingDragRegion.setContentDescription(
+                text(R.string.content_description_recording_status_elapsed, elapsed));
     }
 
     private String text(int resourceId, Object... arguments) {

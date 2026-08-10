@@ -35,6 +35,17 @@ public final class OverlayWindowRegistryTest {
         assertEquals(1, backend.removeCalls);
     }
 
+    @Test public void teardownRetriesTransientRemovalFailures() {
+        FakeBackend backend = new FakeBackend();
+        OverlayWindowRegistry<Object, Object> registry = new OverlayWindowRegistry<>(backend);
+        registry.add(new Object(), new Object());
+        backend.removeFailuresRemaining = 2;
+
+        assertTrue(registry.removeAllWithRetries(3));
+        assertEquals(0, registry.attachedCount());
+        assertEquals(3, backend.removeCalls);
+    }
+
     @Test public void addFailureDoesNotRegisterTheView() {
         FakeBackend backend = new FakeBackend();
         backend.failAdd = true;
@@ -52,6 +63,7 @@ public final class OverlayWindowRegistryTest {
     private static final class FakeBackend implements OverlayWindowRegistry.Backend<Object, Object> {
         boolean failAdd;
         boolean failNextRemove;
+        int removeFailuresRemaining;
         int removeCalls;
         final List<Object> updated = new ArrayList<>();
 
@@ -65,6 +77,10 @@ public final class OverlayWindowRegistryTest {
             removeCalls++;
             if (failNextRemove) {
                 failNextRemove = false;
+                throw new IllegalStateException("remove");
+            }
+            if (removeFailuresRemaining > 0) {
+                removeFailuresRemaining--;
                 throw new IllegalStateException("remove");
             }
         }

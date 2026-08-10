@@ -1,7 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <color name="launcher_background">#315CDB</color>
+
     <color name="fv_primary">#C2C1FF</color>
-    <color name="fv_on_primary">#25245E</color>
+    <color name="fv_on_primary">#29286F</color>
     <color name="fv_primary_container">#3D3D9E</color>
     <color name="fv_on_primary_container">#E1E0FF</color>
     <color name="fv_secondary_container">#464459</color>
@@ -15,5 +17,5 @@
     <color name="fv_recording">#B3261E</color>
     <color name="fv_on_recording">#FFFFFF</color>
     <color name="fv_cancel_container">#49454F</color>
-    <color name="fv_on_cancel_container">#F5EFF7</color>
+    <color name="fv_on_cancel_container">#E6E1E9</color>
 </resources>

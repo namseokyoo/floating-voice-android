@@ -28,7 +28,7 @@ Compare the signer fingerprint above and the APK SHA-256 published in the corres
 
 ## Release rules
 
-- APKs are attached to GitHub Releases and are never committed to Git history.
+- APKs are not tracked in the current or release tree and official binaries are attached to GitHub Releases. Any debug test APK in an older internal feature-branch commit is historical test data, not an official artifact or release evidence.
 - Every release APK must use the same long-term certificate.
 - Every release records its APK filename, byte size, SHA-256, supported ABI, Android minimum version, and signature verification result.
 - The release key must remain outside the repository with a separately verified backup.

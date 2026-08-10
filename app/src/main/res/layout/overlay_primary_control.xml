@@ -7,7 +7,7 @@
     android:clipChildren="false"
     android:clipToPadding="false"
     android:focusable="true"
-    android:importantForAccessibility="yes"
+    android:importantForAccessibility="auto"
     android:theme="@style/Theme.FloatingVoice.OverlayMaterial3">
 
     <com.google.android.material.button.MaterialButton
@@ -79,7 +79,9 @@
                 android:layout_height="match_parent"
                 android:layout_marginHorizontal="8dp"
                 android:layout_weight="1"
+                android:focusable="true"
                 android:gravity="center_vertical"
+                android:importantForAccessibility="yes"
                 android:orientation="vertical">
 
                 <LinearLayout
@@ -99,6 +101,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="@string/overlay_recording_status"
+                        android:importantForAccessibility="no"
                         android:textColor="@color/fv_on_surface"
                         android:textSize="14sp"
                         android:textStyle="bold" />
@@ -109,6 +112,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="@string/overlay_timer_initial"
+                    android:importantForAccessibility="no"
                     android:textColor="@color/fv_on_surface_variant"
                     android:textSize="16sp"
                     android:textStyle="bold" />

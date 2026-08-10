@@ -11,7 +11,7 @@
 플로팅 마이크 버튼을 한 번 누르면 녹음이 시작되고,<br>
 다시 누르면 내 Telegram 계정으로 확인된 봇 대화에 음성 메시지가 전송된다.
 
-![Version](https://img.shields.io/badge/version-0.4.1-315CDB?style=for-the-badge)
+![Version](https://img.shields.io/badge/version-0.5.0-315CDB?style=for-the-badge)
 ![Android](https://img.shields.io/badge/Android-10%2B-3DDC84?style=for-the-badge&logo=android&logoColor=white)
 ![ABI](https://img.shields.io/badge/ABI-arm64--v8a-555555?style=for-the-badge)
 ![Java](https://img.shields.io/badge/Java-17-ED8B00?style=for-the-badge&logo=openjdk&logoColor=white)
@@ -36,6 +36,8 @@
 |:---|:---|
 | **녹음 시작** | 초록색 플로팅 마이크 아이콘 탭 |
 | **녹음 종료·전송** | 빨간색 정지 아이콘 탭 |
+| **녹음 취소** | 반대편 X 버튼 탭, 메시지 미전송 |
+| **텍스트 전송** | 플로팅 버튼 길게 누르기 → 텍스트 보내기 |
 | **음성 형식** | OGG / Opus / mono / 48 kHz |
 | **전송 주체** | 로그인한 본인의 Telegram 사용자 계정 |
 | **전송 대상** | username으로 확인한 고정 Telegram 봇 대화 |
@@ -76,6 +78,7 @@ Telegram에 짧은 음성 메모를 남기기 위해 매번 앱을 열고, 대�
 4. 초록색 마이크 아이콘을 누르면 녹음이 시작된다.
 5. 빨간색 정지 아이콘을 누르면 녹음을 끝내고 전송한다.
 6. 버튼은 드래그해서 원하는 위치로 옮길 수 있다. 드래그 동작은 탭으로 처리되지 않는다.
+7. 텍스트는 플로팅 버튼을 길게 누른 뒤 **텍스트 보내기**를 선택해 작성·전송한다.
 
 > [!IMPORTANT]
 > 전송 요청이 대기열에 들어간 것만으로 성공 처리하지 않는다. TDLib의 최종 성공 업데이트를 받은 뒤에만 녹음 파일을 삭제한다.
@@ -346,7 +349,7 @@ floating-voice-android/
 ## 배포 정책
 
 - GitHub Release에는 태그 시점의 소스 ZIP/TAR와 release 서명된 `arm64-v8a` APK를 제공한다.
-- APK는 Git 이력에 commit하지 않고 Release asset으로만 첨부한다.
+- 현재 및 출시용 tree에는 APK를 추적하지 않고, 공식 APK는 Release asset으로만 첨부한다. 과거 내부 feature-branch commit에 포함된 debug 테스트 APK는 공식 산출물이나 배포 증빙으로 인정하지 않는다.
 - AAB·TDLib Java/JNI 원본·서명키·세션·녹음은 Release asset으로 배포하지 않는다.
 - 공식 APK 서명 인증서 SHA-256 fingerprint는 `FD:97:82:9D:19:F8:B0:57:5B:79:EC:1E:8B:7A:26:16:A0:69:7C:EE:86:5D:29:B0:B5:28:78:3C:39:88:AB:A6`이다.
 - APK 파일의 SHA-256은 각 Release Notes에 별도로 기록한다.

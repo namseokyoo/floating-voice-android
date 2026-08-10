@@ -2,6 +2,24 @@
 <resources>
     <string name="app_name">플로팅 보이스</string>
     <string name="app_description">내 Telegram 계정으로 확인된 대상 봇에게 음성을 전송합니다. 설정 저장이나 로그인만으로는 메시지가 전송되지 않습니다.</string>
+    <string name="dashboard_setup_needed">설정이 필요해요</string>
+    <string name="dashboard_setup_supporting">Telegram 연결, 전송 대상, 필수 권한을 완료하면 플로팅 버튼을 시작할 수 있습니다.</string>
+    <string name="dashboard_ready">시작할 준비가 됐어요</string>
+    <string name="dashboard_ready_supporting">Telegram, 고정 전송 대상, 필수 권한이 모두 준비되었습니다.</string>
+    <string name="dashboard_running">플로팅 버튼 실행 중</string>
+    <string name="dashboard_running_supporting">다른 앱으로 돌아가 플로팅 버튼에서 음성이나 텍스트를 사용할 수 있습니다.</string>
+    <string name="dashboard_running_chip">실행 중</string>
+    <string name="dashboard_target_not_ready">Telegram 대상: 확인되지 않음</string>
+    <string name="dashboard_target_format">Telegram 대상: %1$s</string>
+    <string name="section_readiness">준비 상태</string>
+    <string name="section_preferences">사용 환경</string>
+    <string name="section_connection">Telegram 연결</string>
+    <string name="section_authentication">현재 인증 단계</string>
+    <string name="section_target_permissions">전송 대상과 권한</string>
+    <string name="section_recent_status">최근 상태</string>
+    <string name="connection_supporting">인증 정보와 전화번호는 이 기기에 암호화되어 저장됩니다. 인증번호와 비밀번호는 저장하지 않습니다.</string>
+    <string name="authentication_waiting">Telegram 연결을 시작하면 필요한 인증 단계만 여기에 표시됩니다.</string>
+    <string name="authentication_complete">Telegram 인증이 완료되었습니다.</string>
     <string name="language_label">언어</string>
     <string name="overlay_size_label">플로팅 버튼 크기</string>
     <string-array name="overlay_size_options">
@@ -35,7 +53,13 @@
     <string name="button_resolve_bot">대상 봇 찾기 및 수신 대상 확정</string>
     <string name="target_not_confirmed">전송 대상: 확정되지 않음</string>
     <string name="button_permissions">필수 권한 허용 / 확인</string>
-    <string name="permission_status_heading">권한 상태</string>
+
+    <string name="permission_overlay_initial">다른 앱 위 표시: 확인 중</string>
+    <string name="permission_microphone_initial">마이크: 확인 중</string>
+    <string name="permission_notification_initial">알림: 확인 중</string>
+    <string name="permission_overlay_format">다른 앱 위 표시: %1$s</string>
+    <string name="permission_microphone_format">마이크: %1$s</string>
+    <string name="permission_notification_format">알림: %1$s</string>
     <string name="button_start_overlay">플로팅 음성 버튼 시작</string>
     <string name="button_stop_overlay">플로팅 음성 버튼 종료</string>
     <string name="button_logout">Telegram 로그아웃 / 세션 해제</string>
@@ -48,10 +72,14 @@
     <string name="settings_saved_no_message">설정을 암호화해 저장했습니다. 메시지는 전송되지 않았습니다.</string>
     <string name="permission_granted">허용됨</string>
     <string name="permission_needed">필요함</string>
-    <string name="permission_status_format">다른 앱 위 표시: %1$s  마이크: %2$s  알림: %3$s</string>
+
     <string name="permissions_required_first">다른 앱 위 표시, 마이크, 알림 권한을 먼저 허용해주세요.</string>
     <string name="telegram_target_required_first">Telegram 로그인과 대상 봇 확정을 먼저 완료해주세요.</string>
     <string name="overlay_started">플로팅 버튼을 시작했습니다. 한 번 누르면 녹음, 다시 누르면 전송됩니다.</string>
+    <string name="overlay_starting">플로팅 버튼을 시작하는 중입니다…</string>
+    <string name="overlay_stopped">플로팅 버튼을 종료했습니다.</string>
+    <string name="overlay_stopping">플로팅 버튼을 종료하는 중입니다…</string>
+    <string name="service_prerequisite_lost">필수 권한 또는 확인된 Telegram 대상을 사용할 수 없어 플로팅 버튼을 종료합니다.</string>
     <string name="overlay_start_failed">플로팅 버튼을 시작하지 못했습니다: %1$s</string>
     <string name="logout_title">Telegram에서 로그아웃할까요?</string>
     <string name="logout_message">이 기기의 Telegram 세션을 해제합니다. 플로팅 버튼을 먼저 종료하며, 전송 중이거나 실패한 녹음 파일은 삭제하지 않습니다.</string>
@@ -75,13 +103,16 @@
     <string name="overlay_permission_required">다른 앱 위 표시 권한이 필요합니다</string>
     <string name="content_description_start_recording">녹음 시작</string>
     <string name="recording_folder_failed">녹음 파일 폴더를 만들 수 없습니다</string>
-    <string name="content_description_stop_and_send">녹음 종료 후 전송</string>
+    <string name="content_description_stop_and_send">녹음 종료 후 확인된 Telegram 대상에 전송</string>
     <string name="recording_in_progress">녹음 중 — 다시 누르면 녹음을 끝내고 전송합니다</string>
     <string name="content_description_cancel_recording">녹음 취소, 전송하지 않음</string>
     <string name="overlay_recording_status">녹음 중</string>
-    <string name="overlay_timer_initial" translatable="false">00:00</string>
+
     <string name="content_description_recording_dock">녹음 제어. 가운데 영역을 끌어 이동할 수 있습니다.</string>
     <string name="content_description_recording_elapsed">녹음 시간: %1$s</string>
+    <string name="content_description_recording_status_elapsed">녹음 중. 녹음 시간: %1$s. 이 영역을 끌어 이동할 수 있습니다.</string>
+    <string name="show_connection_settings">연결 설정 보기</string>
+    <string name="hide_connection_settings">연결 설정 숨기기</string>
     <string name="overlay_text_action_title">텍스트 보내기</string>
     <string name="overlay_text_action_supporting">작성 후 확인</string>
     <string name="content_description_open_text_composer">텍스트 작성 화면 열기</string>

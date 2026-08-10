@@ -4,6 +4,7 @@ import android.annotation.SuppressLint;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.os.Build;
 import android.os.Bundle;
 import android.text.Editable;
@@ -15,6 +16,7 @@ import android.widget.Button;
 
 import androidx.activity.OnBackPressedCallback;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.content.ContextCompat;
 import androidx.lifecycle.MutableLiveData;
 import androidx.lifecycle.ViewModel;
 import androidx.lifecycle.ViewModelProvider;
@@ -30,6 +32,7 @@ public final class TextComposerActivity extends AppCompatActivity {
     }
 
     private boolean submitInFlight;
+    private BroadcastReceiver serviceTeardownReceiver;
 
     @SuppressLint("ClickableViewAccessibility")
     @Override protected void onCreate(Bundle savedInstanceState) {
@@ -38,6 +41,15 @@ public final class TextComposerActivity extends AppCompatActivity {
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_SECURE);
         if (Build.VERSION.SDK_INT >= 31) getWindow().setHideOverlayWindows(true);
         setContentView(R.layout.activity_text_composer);
+        serviceTeardownReceiver = new BroadcastReceiver() {
+            @Override public void onReceive(Context context, Intent intent) {
+                if (intent != null && FloatingVoiceService.ACTION_SERVICE_TEARDOWN
+                        .equals(intent.getAction()) && !isFinishing()) finish();
+            }
+        };
+        ContextCompat.registerReceiver(this, serviceTeardownReceiver,
+                new IntentFilter(FloatingVoiceService.ACTION_SERVICE_TEARDOWN),
+                ContextCompat.RECEIVER_NOT_EXPORTED);
 
         DraftViewModel draftModel = new ViewModelProvider(this).get(DraftViewModel.class);
         if (Boolean.TRUE.equals(draftModel.closeAfterHandoff.getValue())) {
@@ -129,6 +141,11 @@ public final class TextComposerActivity extends AppCompatActivity {
     }
 
     @Override protected void onDestroy() {
+        if (serviceTeardownReceiver != null) {
+            try { unregisterReceiver(serviceTeardownReceiver); }
+            catch (IllegalArgumentException ignored) { }
+            serviceTeardownReceiver = null;
+        }
         if (isFinishing()) {
             sendBroadcast(new Intent(FloatingVoiceService.ACTION_COMPOSER_CLOSED)
                     .setPackage(getPackageName()));

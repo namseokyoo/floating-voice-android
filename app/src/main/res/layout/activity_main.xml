@@ -1,5 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/main_scroll"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:fillViewport="true">
@@ -8,223 +11,497 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:padding="20dp">
+        android:paddingStart="20dp"
+        android:paddingTop="24dp"
+        android:paddingEnd="20dp"
+        android:paddingBottom="32dp">
 
         <TextView
-            android:layout_width="wrap_content"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="@string/app_name"
-            android:textSize="26sp"
-            android:textStyle="bold" />
+            android:textAppearance="?attr/textAppearanceHeadlineSmall"
+            android:textColor="?attr/colorOnSurface" />
 
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="12dp"
-            android:text="@string/app_description" />
+            android:layout_marginTop="4dp"
+            android:layout_marginBottom="20dp"
+            android:text="@string/app_description"
+            android:textAppearance="?attr/textAppearanceBodyMedium"
+            android:textColor="?attr/colorOnSurfaceVariant" />
+
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:cardBackgroundColor="?attr/colorPrimaryContainer"
+            app:cardCornerRadius="24dp"
+            app:cardElevation="0dp"
+            app:strokeWidth="0dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="20dp">
+
+                <TextView
+                    android:id="@+id/dashboard_headline"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:accessibilityLiveRegion="polite"
+                    android:text="@string/dashboard_setup_needed"
+                    android:textAppearance="?attr/textAppearanceTitleLarge"
+                    android:textColor="?attr/colorOnPrimaryContainer" />
+
+                <TextView
+                    android:id="@+id/dashboard_supporting"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:text="@string/dashboard_setup_supporting"
+                    android:textAppearance="?attr/textAppearanceBodyMedium"
+                    android:textColor="?attr/colorOnPrimaryContainer" />
+
+                <com.google.android.material.chip.Chip
+                    android:id="@+id/dashboard_running_badge"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:clickable="false"
+                    android:text="@string/dashboard_running_chip"
+                    android:visibility="gone" />
+
+                <TextView
+                    android:id="@+id/dashboard_target"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="@string/dashboard_target_not_ready"
+                    android:textAppearance="?attr/textAppearanceLabelLarge"
+                    android:textColor="?attr/colorOnPrimaryContainer" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/start_overlay"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:minHeight="48dp"
+                    android:text="@string/button_start_overlay" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/stop_overlay"
+                    style="@style/Widget.Material3.Button.TonalButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:minHeight="48dp"
+                    android:text="@string/button_stop_overlay"
+                    android:visibility="gone" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
 
         <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/language_label"
-            android:textStyle="bold" />
+            style="@style/FloatingVoice.SectionTitle"
+            android:text="@string/section_readiness" />
 
-        <Spinner
-            android:id="@+id/language_selector"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="12dp"
-            android:entries="@array/language_options" />
+        <com.google.android.material.card.MaterialCardView
+            style="@style/FloatingVoice.SectionCard">
 
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/overlay_size_label"
-            android:textStyle="bold" />
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
 
-        <Spinner
-            android:id="@+id/overlay_size_selector"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="12dp"
-            android:entries="@array/overlay_size_options" />
+                <TextView
+                    android:id="@+id/auth_status"
+                    style="@style/FloatingVoice.StatusText"
+                    android:accessibilityLiveRegion="polite"
+                    android:background="?attr/selectableItemBackground"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center_vertical"
+                    android:minHeight="48dp"
+                    android:text="@string/auth_status_initial" />
 
-        <EditText
-            android:id="@+id/api_id"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:hint="@string/hint_api_id"
-            android:importantForAutofill="no"
-            android:inputType="number" />
+                <TextView
+                    android:id="@+id/account_status"
+                    style="@style/FloatingVoice.SupportingText"
+                    android:layout_marginTop="8dp"
+                    android:text="@string/account_not_authenticated" />
 
-        <EditText
-            android:id="@+id/api_hash"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:hint="@string/hint_api_hash"
-            android:importantForAutofill="noExcludeDescendants"
-            android:inputType="textPassword" />
+                <TextView
+                    android:id="@+id/target_status"
+                    style="@style/FloatingVoice.SupportingText"
+                    android:layout_marginTop="8dp"
+                    android:background="?attr/selectableItemBackground"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center_vertical"
+                    android:minHeight="48dp"
+                    android:text="@string/target_not_confirmed" />
 
-        <EditText
-            android:id="@+id/phone"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:hint="@string/hint_phone"
-            android:importantForAutofill="no"
-            android:inputType="phone" />
+                <TextView
+                    android:id="@+id/permission_status"
+                    style="@style/FloatingVoice.SupportingText"
+                    android:layout_marginTop="8dp"
+                    android:background="?attr/selectableItemBackground"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center_vertical"
+                    android:minHeight="48dp"
+                    android:text="@string/permission_overlay_initial" />
 
-        <EditText
-            android:id="@+id/bot_username"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:hint="@string/hint_bot_username"
-            android:importantForAutofill="no"
-            android:inputType="text" />
+                <TextView
+                    android:id="@+id/permission_microphone_status"
+                    style="@style/FloatingVoice.SupportingText"
+                    android:background="?attr/selectableItemBackground"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center_vertical"
+                    android:minHeight="48dp"
+                    android:text="@string/permission_microphone_initial" />
 
-        <Button
-            android:id="@+id/save_start"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/button_save_start" />
-
-        <TextView
-            android:id="@+id/auth_status"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:paddingTop="8dp"
-            android:text="@string/auth_status_initial"
-            android:textStyle="bold" />
-
-        <TextView
-            android:id="@+id/account_status"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/account_not_authenticated" />
-
-        <Button
-            android:id="@+id/submit_phone"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/button_submit_phone" />
-
-        <EditText
-            android:id="@+id/auth_code"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:hint="@string/hint_auth_code"
-            android:importantForAutofill="noExcludeDescendants"
-            android:inputType="numberPassword" />
-
-        <Button
-            android:id="@+id/submit_code"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/button_submit_auth_code" />
-
-        <EditText
-            android:id="@+id/password"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:hint="@string/hint_password"
-            android:importantForAutofill="noExcludeDescendants"
-            android:inputType="textPassword" />
-
-        <Button
-            android:id="@+id/submit_password"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/button_submit_password" />
+                <TextView
+                    android:id="@+id/permission_notification_status"
+                    style="@style/FloatingVoice.SupportingText"
+                    android:background="?attr/selectableItemBackground"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center_vertical"
+                    android:minHeight="48dp"
+                    android:text="@string/permission_notification_initial" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
 
         <TextView
-            android:id="@+id/email_help"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:text="@string/email_help"
-            android:textStyle="bold" />
+            style="@style/FloatingVoice.SectionTitle"
+            android:text="@string/section_preferences" />
 
-        <EditText
-            android:id="@+id/email_address"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:hint="@string/hint_email_address"
-            android:importantForAutofill="noExcludeDescendants"
-            android:inputType="textEmailAddress" />
+        <com.google.android.material.card.MaterialCardView
+            style="@style/FloatingVoice.SectionCard">
 
-        <Button
-            android:id="@+id/submit_email_address"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/button_submit_email_address" />
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
 
-        <EditText
-            android:id="@+id/email_code"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:hint="@string/hint_email_code"
-            android:importantForAutofill="noExcludeDescendants"
-            android:inputType="textPassword" />
+                <TextView
+                    android:id="@+id/language_selector_label"
+                    style="@style/FloatingVoice.FieldLabel"
+                    android:labelFor="@id/language_selector"
+                    android:text="@string/language_label" />
 
-        <Button
-            android:id="@+id/submit_email_code"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/button_submit_email_code" />
+                <Spinner
+                    android:id="@+id/language_selector"
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:entries="@array/language_options" />
 
-        <Button
-            android:id="@+id/resolve_bot"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/button_resolve_bot" />
+                <TextView
+                    android:id="@+id/overlay_size_selector_label"
+                    style="@style/FloatingVoice.FieldLabel"
+                    android:layout_marginTop="12dp"
+                    android:labelFor="@id/overlay_size_selector"
+                    android:text="@string/overlay_size_label" />
+
+                <Spinner
+                    android:id="@+id/overlay_size_selector"
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:entries="@array/overlay_size_options" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
 
         <TextView
-            android:id="@+id/target_status"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:paddingTop="8dp"
-            android:text="@string/target_not_confirmed"
-            android:textStyle="bold" />
+            style="@style/FloatingVoice.SectionTitle"
+            android:text="@string/section_connection" />
 
-        <Button
-            android:id="@+id/permissions"
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/connection_settings_toggle"
+            style="@style/Widget.Material3.Button.TextButton"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:text="@string/button_permissions" />
+            android:minHeight="48dp"
+            android:text="@string/show_connection_settings" />
+
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/connection_settings_card"
+            style="@style/FloatingVoice.SectionCard">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <TextView
+                    style="@style/FloatingVoice.SupportingText"
+                    android:text="@string/connection_supporting" />
+
+                <com.google.android.material.textfield.TextInputLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:hint="@string/hint_api_id">
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/api_id"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:importantForAutofill="no"
+                        android:inputType="number" />
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <com.google.android.material.textfield.TextInputLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:hint="@string/hint_api_hash"
+                    app:endIconMode="password_toggle">
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/api_hash"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:importantForAutofill="noExcludeDescendants"
+                        android:inputType="textPassword" />
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <com.google.android.material.textfield.TextInputLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:hint="@string/hint_bot_username">
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/bot_username"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:importantForAutofill="no"
+                        android:inputType="text" />
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/save_start"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:minHeight="48dp"
+                    android:text="@string/button_save_start" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
 
         <TextView
-            android:id="@+id/permission_status"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/permission_status_heading" />
+            style="@style/FloatingVoice.SectionTitle"
+            android:text="@string/section_authentication" />
 
-        <Button
-            android:id="@+id/start_overlay"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/button_start_overlay" />
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/authentication_card"
+            style="@style/FloatingVoice.SectionCard">
 
-        <Button
-            android:id="@+id/stop_overlay"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/button_stop_overlay" />
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
 
-        <Button
+                <com.google.android.material.textfield.TextInputLayout
+                    android:id="@+id/phone_field"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="@string/hint_phone">
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/phone"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:importantForAutofill="no"
+                        android:inputType="phone" />
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/submit_phone"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:minHeight="48dp"
+                    android:text="@string/button_submit_phone"
+                    android:visibility="gone" />
+
+                <com.google.android.material.textfield.TextInputLayout
+                    android:id="@+id/auth_code_field"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="@string/hint_auth_code"
+                    android:visibility="gone">
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/auth_code"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:importantForAutofill="noExcludeDescendants"
+                        android:inputType="numberPassword"
+                        android:saveEnabled="false" />
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/submit_code"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:minHeight="48dp"
+                    android:text="@string/button_submit_auth_code"
+                    android:visibility="gone" />
+
+                <com.google.android.material.textfield.TextInputLayout
+                    android:id="@+id/password_field"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="@string/hint_password"
+                    android:visibility="gone"
+                    app:endIconMode="password_toggle">
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/password"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:importantForAutofill="noExcludeDescendants"
+                        android:inputType="textPassword"
+                        android:saveEnabled="false" />
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/submit_password"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:minHeight="48dp"
+                    android:text="@string/button_submit_password"
+                    android:visibility="gone" />
+
+                <TextView
+                    android:id="@+id/email_help"
+                    style="@style/FloatingVoice.SupportingText"
+                    android:text="@string/email_help"
+                    android:visibility="gone" />
+
+                <com.google.android.material.textfield.TextInputLayout
+                    android:id="@+id/email_address_field"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="@string/hint_email_address"
+                    android:visibility="gone">
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/email_address"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:importantForAutofill="noExcludeDescendants"
+                        android:inputType="textEmailAddress"
+                        android:saveEnabled="false" />
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/submit_email_address"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:minHeight="48dp"
+                    android:text="@string/button_submit_email_address"
+                    android:visibility="gone" />
+
+                <com.google.android.material.textfield.TextInputLayout
+                    android:id="@+id/email_code_field"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="@string/hint_email_code"
+                    android:visibility="gone">
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/email_code"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:importantForAutofill="noExcludeDescendants"
+                        android:inputType="textPassword"
+                        android:saveEnabled="false"
+                        tools:ignore="TextFields" />
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/submit_email_code"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:minHeight="48dp"
+                    android:text="@string/button_submit_email_code"
+                    android:visibility="gone" />
+
+                <TextView
+                    android:id="@+id/authentication_complete"
+                    style="@style/FloatingVoice.SupportingText"
+                    android:text="@string/authentication_waiting"
+                    android:visibility="visible" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <TextView
+            style="@style/FloatingVoice.SectionTitle"
+            android:text="@string/section_target_permissions" />
+
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/target_permissions_card"
+            style="@style/FloatingVoice.SectionCard">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/resolve_bot"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:minHeight="48dp"
+                    android:text="@string/button_resolve_bot" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/permissions"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:minHeight="48dp"
+                    android:text="@string/button_permissions" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <TextView
+            style="@style/FloatingVoice.SectionTitle"
+            android:text="@string/section_recent_status" />
+
+        <com.google.android.material.card.MaterialCardView
+            style="@style/FloatingVoice.SectionCard"
+            app:cardBackgroundColor="?attr/colorSurfaceContainerHigh">
+
+            <TextView
+                android:id="@+id/operation_status"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:accessibilityLiveRegion="polite"
+                android:padding="16dp"
+                android:text="@string/operation_status_initial"
+                android:textAppearance="?attr/textAppearanceBodyMedium"
+                android:textColor="?attr/colorOnSurface"
+                android:textIsSelectable="true" />
+        </com.google.android.material.card.MaterialCardView>
+
+        <com.google.android.material.button.MaterialButton
             android:id="@+id/logout"
+            style="@style/Widget.Material3.Button.TextButton"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:text="@string/button_logout" />
-
-        <TextView
-            android:id="@+id/operation_status"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:background="#FFE8EEF9"
-            android:padding="12dp"
-            android:text="@string/operation_status_initial"
-            android:textIsSelectable="true" />
+            android:layout_marginTop="24dp"
+            android:minHeight="48dp"
+            android:text="@string/button_logout"
+            android:textColor="?attr/colorError" />
     </LinearLayout>
 </ScrollView>

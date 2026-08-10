@@ -1,12 +1,22 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.FloatingVoice" parent="Theme.AppCompat.Light.NoActionBar">
+    <style name="Theme.FloatingVoice" parent="Theme.Material3.DayNight.NoActionBar">
         <item name="android:fontFamily">sans</item>
-        <item name="colorAccent">@color/brand</item>
-        <item name="android:navigationBarColor">@color/brand_dark</item>
-        <item name="android:windowLightStatusBar">false</item>
-        <item name="android:statusBarColor">@color/brand_dark</item>
-        <item name="android:windowBackground">@color/surface</item>
+        <item name="colorPrimary">@color/fv_primary</item>
+        <item name="colorOnPrimary">@color/fv_on_primary</item>
+        <item name="colorPrimaryContainer">@color/fv_primary_container</item>
+        <item name="colorOnPrimaryContainer">@color/fv_on_primary_container</item>
+        <item name="colorSecondaryContainer">@color/fv_secondary_container</item>
+        <item name="colorOnSecondaryContainer">@color/fv_on_secondary_container</item>
+        <item name="colorSurface">@color/fv_surface</item>
+        <item name="colorSurfaceContainer">@color/fv_surface_container</item>
+        <item name="colorSurfaceContainerHigh">@color/fv_surface_container_high</item>
+        <item name="colorOnSurface">@color/fv_on_surface</item>
+        <item name="colorOnSurfaceVariant">@color/fv_on_surface_variant</item>
+        <item name="colorOutline">@color/fv_outline</item>
+        <item name="android:navigationBarColor">@color/fv_surface</item>
+        <item name="android:statusBarColor">@color/fv_surface</item>
+        <item name="android:windowBackground">@color/fv_surface</item>
     </style>
 
     <style name="Theme.FloatingVoice.TextComposer" parent="Theme.FloatingVoice.OverlayMaterial3">
@@ -21,7 +31,7 @@
         <item name="windowNoTitle">true</item>
     </style>
 
-    <!-- Overlay-only M3 theme. MainActivity stays on the existing AppCompat theme until V5-08. -->
+    <!-- Overlay-only M3 theme remains isolated from activity dynamic color. -->
     <style name="Theme.FloatingVoice.OverlayMaterial3" parent="Theme.Material3.DayNight.NoActionBar">
         <item name="colorPrimary">@color/fv_primary</item>
         <item name="colorOnPrimary">@color/fv_on_primary</item>
@@ -52,4 +62,40 @@
         <item name="cornerFamily">rounded</item>
         <item name="cornerSize">16dp</item>
     </style>
+
+    <style name="FloatingVoice.SectionTitle" parent="TextAppearance.Material3.TitleMedium">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_marginTop">24dp</item>
+        <item name="android:layout_marginBottom">8dp</item>
+        <item name="android:textColor">?attr/colorOnSurface</item>
+    </style>
+
+    <style name="FloatingVoice.SectionCard" parent="Widget.Material3.CardView.Elevated">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="cardCornerRadius">16dp</item>
+        <item name="cardElevation">1dp</item>
+        <item name="cardBackgroundColor">?attr/colorSurfaceContainer</item>
+    </style>
+
+    <style name="FloatingVoice.StatusText" parent="TextAppearance.Material3.TitleMedium">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:textColor">?attr/colorOnSurface</item>
+    </style>
+
+    <style name="FloatingVoice.SupportingText" parent="TextAppearance.Material3.BodyMedium">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:textColor">?attr/colorOnSurfaceVariant</item>
+    </style>
+
+    <style name="FloatingVoice.FieldLabel" parent="TextAppearance.Material3.LabelLarge">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:textColor">?attr/colorOnSurface</item>
+    </style>
+
+
 </resources>

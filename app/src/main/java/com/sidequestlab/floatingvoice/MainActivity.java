@@ -1,7 +1,10 @@
 package com.sidequestlab.floatingvoice;
 
 import android.Manifest;
+import android.content.BroadcastReceiver;
+import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Build;
@@ -17,13 +20,18 @@ import android.widget.TextView;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.app.AppCompatDelegate;
+import androidx.core.content.ContextCompat;
 import androidx.core.os.LocaleListCompat;
 
 import com.sidequestlab.floatingvoice.core.AppConfig;
+import com.sidequestlab.floatingvoice.core.DashboardReadiness;
 import com.sidequestlab.floatingvoice.core.OverlaySizePreset;
+import com.google.android.material.color.DynamicColors;
+import com.google.android.material.button.MaterialButton;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 public final class MainActivity extends AppCompatActivity implements TelegramRepository.Listener {
     private static final int PERMISSION_REQUEST = 100;
@@ -61,12 +69,22 @@ public final class MainActivity extends AppCompatActivity implements TelegramRep
     private TextView targetStatus;
     private TextView permissionStatus;
     private TextView operationStatus;
+    private TextView dashboardHeadline;
+    private TextView dashboardSupporting;
+    private TextView dashboardTarget;
+    private TextView permissionMicrophoneStatus;
+    private TextView permissionNotificationStatus;
+    private View dashboardRunningBadge;
+    private View connectionSettingsCard;
+    private MaterialButton connectionSettingsToggle;
     private TelegramRepository telegram;
     private SecureSettingsStore settingsStore;
     private OverlayUiPreferences overlayUiPreferences;
+    private BroadcastReceiver serviceStateReceiver;
 
     @Override protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        DynamicColors.applyToActivityIfAvailable(this);
         setContentView(R.layout.activity_main);
         bindViews();
         overlayUiPreferences = new OverlayUiPreferences(this);
@@ -76,7 +94,19 @@ public final class MainActivity extends AppCompatActivity implements TelegramRep
         FloatingVoiceApp app = (FloatingVoiceApp) getApplication();
         telegram = app.telegram();
         settingsStore = app.settings();
-        settingsStore.loadConfig().ifPresent(this::showConfig);
+        AppConfig savedConfig = settingsStore.loadConfig().orElse(null);
+        if (savedConfig != null) showConfig(savedConfig);
+        setupConnectionSettingsDisclosure(savedConfig == null);
+        serviceStateReceiver = new BroadcastReceiver() {
+            @Override public void onReceive(Context context, Intent intent) {
+                if (intent != null && FloatingVoiceService.ACTION_RUNNING_STATE_CHANGED
+                        .equals(intent.getAction())) {
+                    operationStatus.setText(FloatingVoiceService.isRunning()
+                            ? R.string.overlay_started : R.string.overlay_stopped);
+                    refreshDashboard();
+                }
+            }
+        };
         app.startTelegramIfConfigured();
         telegram.addListener(this);
 
@@ -104,12 +134,32 @@ public final class MainActivity extends AppCompatActivity implements TelegramRep
         findViewById(R.id.start_overlay).setOnClickListener(v -> startOverlay());
         findViewById(R.id.stop_overlay).setOnClickListener(v -> stopOverlay());
         findViewById(R.id.logout).setOnClickListener(v -> confirmLogout());
+        authStatus.setOnClickListener(v -> scrollToView(R.id.authentication_card));
+        targetStatus.setOnClickListener(v -> scrollToView(R.id.target_permissions_card));
+        permissionStatus.setOnClickListener(v -> requestRequiredPermissions());
+        permissionMicrophoneStatus.setOnClickListener(v -> requestRequiredPermissions());
+        permissionNotificationStatus.setOnClickListener(v -> requestRequiredPermissions());
         refreshPermissionStatus();
     }
 
     @Override protected void onResume() {
         super.onResume();
         refreshPermissionStatus();
+        refreshDashboard();
+    }
+
+    @Override protected void onStart() {
+        super.onStart();
+        ContextCompat.registerReceiver(this, serviceStateReceiver,
+                new IntentFilter(FloatingVoiceService.ACTION_RUNNING_STATE_CHANGED),
+                ContextCompat.RECEIVER_NOT_EXPORTED);
+        refreshDashboard();
+    }
+
+    @Override protected void onStop() {
+        try { unregisterReceiver(serviceStateReceiver); }
+        catch (IllegalArgumentException ignored) { }
+        super.onStop();
     }
 
     @Override protected void onDestroy() {
@@ -131,6 +181,14 @@ public final class MainActivity extends AppCompatActivity implements TelegramRep
         targetStatus = findViewById(R.id.target_status);
         permissionStatus = findViewById(R.id.permission_status);
         operationStatus = findViewById(R.id.operation_status);
+        dashboardHeadline = findViewById(R.id.dashboard_headline);
+        dashboardSupporting = findViewById(R.id.dashboard_supporting);
+        dashboardTarget = findViewById(R.id.dashboard_target);
+        dashboardRunningBadge = findViewById(R.id.dashboard_running_badge);
+        permissionMicrophoneStatus = findViewById(R.id.permission_microphone_status);
+        permissionNotificationStatus = findViewById(R.id.permission_notification_status);
+        connectionSettingsCard = findViewById(R.id.connection_settings_card);
+        connectionSettingsToggle = findViewById(R.id.connection_settings_toggle);
         apiId.setInputType(InputType.TYPE_CLASS_NUMBER);
     }
 
@@ -168,6 +226,24 @@ public final class MainActivity extends AppCompatActivity implements TelegramRep
         });
     }
 
+    private void setupConnectionSettingsDisclosure(boolean expanded) {
+        setConnectionSettingsExpanded(expanded);
+        connectionSettingsToggle.setOnClickListener(view ->
+                setConnectionSettingsExpanded(connectionSettingsCard.getVisibility() != View.VISIBLE));
+    }
+
+    private void setConnectionSettingsExpanded(boolean expanded) {
+        connectionSettingsCard.setVisibility(expanded ? View.VISIBLE : View.GONE);
+        connectionSettingsToggle.setText(expanded
+                ? R.string.hide_connection_settings : R.string.show_connection_settings);
+    }
+
+    private void scrollToView(int viewId) {
+        android.widget.ScrollView scroll = findViewById(R.id.main_scroll);
+        View destination = findViewById(viewId);
+        scroll.post(() -> scroll.smoothScrollTo(0, destination.getTop()));
+    }
+
     private void saveAndStart() {
         AppConfig.ValidationResult result = AppConfig.validate(
                 apiId.getText().toString(), apiHash.getText().toString(),
@@ -183,6 +259,7 @@ public final class MainActivity extends AppCompatActivity implements TelegramRep
         AppConfig config = result.config();
         settingsStore.saveConfig(config);
         showConfig(config);
+        setConnectionSettingsExpanded(false);
         telegram.start(config);
         operationStatus.setText(R.string.settings_saved_no_message);
     }
@@ -198,7 +275,7 @@ public final class MainActivity extends AppCompatActivity implements TelegramRep
     }
 
     private void showConfig(AppConfig config) {
-        apiId.setText(Integer.toString(config.apiId()));
+        apiId.setText(String.format(Locale.ROOT, "%d", config.apiId()));
         apiHash.setText(config.apiHash());
         phone.setText(config.phoneNumber());
         username.setText(config.botUsername());
@@ -249,8 +326,38 @@ public final class MainActivity extends AppCompatActivity implements TelegramRep
         boolean notification = Build.VERSION.SDK_INT < 33
                 || checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)
                 == PackageManager.PERMISSION_GRANTED;
-        permissionStatus.setText(getString(R.string.permission_status_format,
-                yesNo(Settings.canDrawOverlays(this)), yesNo(mic), yesNo(notification)));
+        permissionStatus.setText(getString(R.string.permission_overlay_format,
+                yesNo(Settings.canDrawOverlays(this))));
+        permissionMicrophoneStatus.setText(getString(R.string.permission_microphone_format,
+                yesNo(mic)));
+        permissionNotificationStatus.setText(getString(R.string.permission_notification_format,
+                yesNo(notification)));
+        refreshDashboard();
+    }
+
+    private void refreshDashboard() {
+        if (dashboardHeadline == null || dashboardSupporting == null) return;
+        boolean running = FloatingVoiceService.isRunning();
+        DashboardReadiness.State readiness = DashboardReadiness.evaluate(running,
+                telegram != null && telegram.isReadyWithTarget(), permissionsGranted());
+        TargetChat target = telegram == null ? null : telegram.target();
+        dashboardTarget.setText(target == null
+                ? getString(R.string.dashboard_target_not_ready)
+                : getString(R.string.dashboard_target_format, target));
+        dashboardRunningBadge.setVisibility(
+                readiness == DashboardReadiness.State.RUNNING ? View.VISIBLE : View.GONE);
+        if (readiness == DashboardReadiness.State.RUNNING) {
+            dashboardHeadline.setText(R.string.dashboard_running);
+            dashboardSupporting.setText(R.string.dashboard_running_supporting);
+        } else if (readiness == DashboardReadiness.State.READY) {
+            dashboardHeadline.setText(R.string.dashboard_ready);
+            dashboardSupporting.setText(R.string.dashboard_ready_supporting);
+        } else {
+            dashboardHeadline.setText(R.string.dashboard_setup_needed);
+            dashboardSupporting.setText(R.string.dashboard_setup_supporting);
+        }
+        findViewById(R.id.start_overlay).setVisibility(running ? View.GONE : View.VISIBLE);
+        findViewById(R.id.stop_overlay).setVisibility(running ? View.VISIBLE : View.GONE);
     }
 
     private void startOverlay() {
@@ -267,7 +374,7 @@ public final class MainActivity extends AppCompatActivity implements TelegramRep
                 .setAction(FloatingVoiceService.ACTION_START);
         try {
             startForegroundService(service);
-            operationStatus.setText(R.string.overlay_started);
+            operationStatus.setText(R.string.overlay_starting);
         } catch (RuntimeException e) {
             operationStatus.setText(getString(R.string.overlay_start_failed,
                     e.getClass().getSimpleName()));
@@ -275,7 +382,13 @@ public final class MainActivity extends AppCompatActivity implements TelegramRep
     }
 
     private void stopOverlay() {
-        stopService(new Intent(this, FloatingVoiceService.class));
+        boolean requested = stopService(new Intent(this, FloatingVoiceService.class));
+        if (requested) {
+            operationStatus.setText(R.string.overlay_stopping);
+        } else {
+            operationStatus.setText(R.string.overlay_stopped);
+            refreshDashboard();
+        }
     }
 
     private void confirmLogout() {
@@ -302,6 +415,7 @@ public final class MainActivity extends AppCompatActivity implements TelegramRep
         runOnUiThread(() -> {
             authStatus.setText(getString(R.string.auth_status_format, authStageLabel(stage)));
             updateAuthControls(stage);
+            refreshDashboard();
         });
     }
 
@@ -310,9 +424,12 @@ public final class MainActivity extends AppCompatActivity implements TelegramRep
     }
 
     @Override public void onTargetChanged(TargetChat target) {
-        runOnUiThread(() -> targetStatus.setText(target == null
-                ? getString(R.string.target_not_confirmed)
-                : getString(R.string.target_confirmed_format, target)));
+        runOnUiThread(() -> {
+            targetStatus.setText(target == null
+                    ? getString(R.string.target_not_confirmed)
+                    : getString(R.string.target_confirmed_format, target));
+            refreshDashboard();
+        });
     }
 
     private void updateAuthControls(TelegramRepository.AuthStage stage) {
@@ -321,19 +438,32 @@ public final class MainActivity extends AppCompatActivity implements TelegramRep
         boolean passwordStep = stage == TelegramRepository.AuthStage.PASSWORD;
         boolean emailAddressStep = stage == TelegramRepository.AuthStage.EMAIL_ADDRESS;
         boolean emailCodeStep = stage == TelegramRepository.AuthStage.EMAIL_CODE;
+        boolean showPhoneField = phoneStep
+                || stage == TelegramRepository.AuthStage.NOT_STARTED
+                || stage == TelegramRepository.AuthStage.PARAMETERS
+                || stage == TelegramRepository.AuthStage.CLOSED;
 
+        findViewById(R.id.phone_field).setVisibility(showPhoneField ? View.VISIBLE : View.GONE);
         findViewById(R.id.submit_phone).setVisibility(phoneStep ? View.VISIBLE : View.GONE);
-        findViewById(R.id.auth_code).setVisibility(codeStep ? View.VISIBLE : View.GONE);
+        findViewById(R.id.auth_code_field).setVisibility(codeStep ? View.VISIBLE : View.GONE);
         findViewById(R.id.submit_code).setVisibility(codeStep ? View.VISIBLE : View.GONE);
-        findViewById(R.id.password).setVisibility(passwordStep ? View.VISIBLE : View.GONE);
+        findViewById(R.id.password_field).setVisibility(passwordStep ? View.VISIBLE : View.GONE);
         findViewById(R.id.submit_password).setVisibility(passwordStep ? View.VISIBLE : View.GONE);
         findViewById(R.id.email_help).setVisibility(
                 emailAddressStep || emailCodeStep ? View.VISIBLE : View.GONE);
-        findViewById(R.id.email_address).setVisibility(emailAddressStep ? View.VISIBLE : View.GONE);
+        findViewById(R.id.email_address_field).setVisibility(
+                emailAddressStep ? View.VISIBLE : View.GONE);
         findViewById(R.id.submit_email_address).setVisibility(
                 emailAddressStep ? View.VISIBLE : View.GONE);
-        findViewById(R.id.email_code).setVisibility(emailCodeStep ? View.VISIBLE : View.GONE);
+        findViewById(R.id.email_code_field).setVisibility(emailCodeStep ? View.VISIBLE : View.GONE);
         findViewById(R.id.submit_email_code).setVisibility(emailCodeStep ? View.VISIBLE : View.GONE);
+
+        TextView summary = findViewById(R.id.authentication_complete);
+        boolean inputStep = phoneStep || codeStep || passwordStep
+                || emailAddressStep || emailCodeStep;
+        summary.setVisibility(inputStep ? View.GONE : View.VISIBLE);
+        summary.setText(stage == TelegramRepository.AuthStage.READY
+                ? R.string.authentication_complete : R.string.authentication_waiting);
     }
 
     private String authStageLabel(TelegramRepository.AuthStage stage) {

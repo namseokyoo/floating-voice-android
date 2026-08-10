@@ -2,6 +2,24 @@
 <resources>
     <string name="app_name">Floating Voice</string>
     <string name="app_description">Send voice messages to a verified target bot using your Telegram account. Saving settings or signing in never sends a message.</string>
+    <string name="dashboard_setup_needed">Setup needed</string>
+    <string name="dashboard_setup_supporting">Complete Telegram, target, and permission setup before starting the floating button.</string>
+    <string name="dashboard_ready">Ready to start</string>
+    <string name="dashboard_ready_supporting">Telegram, the fixed target, and required permissions are ready.</string>
+    <string name="dashboard_running">Floating button is running</string>
+    <string name="dashboard_running_supporting">Return to another app and use the floating button for voice or text.</string>
+    <string name="dashboard_running_chip">Running</string>
+    <string name="dashboard_target_not_ready">Telegram target: not confirmed</string>
+    <string name="dashboard_target_format">Telegram target: %1$s</string>
+    <string name="section_readiness">Readiness</string>
+    <string name="section_preferences">Preferences</string>
+    <string name="section_connection">Telegram connection</string>
+    <string name="section_authentication">Current authentication step</string>
+    <string name="section_target_permissions">Target and permissions</string>
+    <string name="section_recent_status">Recent status</string>
+    <string name="connection_supporting">Credentials and the phone number are encrypted on this device. Authentication codes and passwords are never saved.</string>
+    <string name="authentication_waiting">Start the Telegram connection to see the next required authentication step.</string>
+    <string name="authentication_complete">Telegram authentication is complete.</string>
     <string name="language_label">Language</string>
     <string name="overlay_size_label">Floating button size</string>
     <string-array name="overlay_size_options">
@@ -35,7 +53,13 @@
     <string name="button_resolve_bot">Find target bot and confirm recipient</string>
     <string name="target_not_confirmed">Send target: Not confirmed</string>
     <string name="button_permissions">Allow / Check required permissions</string>
-    <string name="permission_status_heading">Permission status</string>
+
+    <string name="permission_overlay_initial">Display over other apps: checking</string>
+    <string name="permission_microphone_initial">Microphone: checking</string>
+    <string name="permission_notification_initial">Notifications: checking</string>
+    <string name="permission_overlay_format">Display over other apps: %1$s</string>
+    <string name="permission_microphone_format">Microphone: %1$s</string>
+    <string name="permission_notification_format">Notifications: %1$s</string>
     <string name="button_start_overlay">Start floating voice button</string>
     <string name="button_stop_overlay">Stop floating voice button</string>
     <string name="button_logout">Log out of Telegram / Revoke session</string>
@@ -48,10 +72,14 @@
     <string name="settings_saved_no_message">Encrypted settings saved. No message was sent.</string>
     <string name="permission_granted">Allowed</string>
     <string name="permission_needed">Needed</string>
-    <string name="permission_status_format">Display over other apps: %1$s  Microphone: %2$s  Notifications: %3$s</string>
+
     <string name="permissions_required_first">Allow display over other apps, microphone, and notification permissions first.</string>
     <string name="telegram_target_required_first">Complete Telegram sign-in and confirm the target bot first.</string>
     <string name="overlay_started">Floating button started. Tap once to record, then tap again to send.</string>
+    <string name="overlay_starting">Starting the floating button…</string>
+    <string name="overlay_stopped">Floating button stopped.</string>
+    <string name="overlay_stopping">Stopping the floating button…</string>
+    <string name="service_prerequisite_lost">A required permission or the verified Telegram target is no longer available. The floating button is stopping.</string>
     <string name="overlay_start_failed">Could not start the floating button: %1$s</string>
     <string name="logout_title">Log out of Telegram?</string>
     <string name="logout_message">This revokes the Telegram session on this device. The floating button stops first; recordings that are sending or failed are not deleted.</string>
@@ -75,13 +103,15 @@
     <string name="overlay_permission_required">Display over other apps permission is required</string>
     <string name="content_description_start_recording">Start recording</string>
     <string name="recording_folder_failed">Could not create the recording folder</string>
-    <string name="content_description_stop_and_send">Stop recording and send</string>
+    <string name="content_description_stop_and_send">Stop recording and send to the verified Telegram target</string>
     <string name="recording_in_progress">Recording — tap again to stop and send</string>
     <string name="content_description_cancel_recording">Cancel recording without sending</string>
     <string name="overlay_recording_status">Recording</string>
-    <string name="overlay_timer_initial" translatable="false">00:00</string>
     <string name="content_description_recording_dock">Recording controls. Drag from the center to move.</string>
     <string name="content_description_recording_elapsed">Recording elapsed time: %1$s</string>
+    <string name="content_description_recording_status_elapsed">Recording. Elapsed time: %1$s. Drag here to move.</string>
+    <string name="show_connection_settings">Show connection settings</string>
+    <string name="hide_connection_settings">Hide connection settings</string>
     <string name="overlay_text_action_title">Send text</string>
     <string name="overlay_text_action_supporting">Compose, then review</string>
     <string name="content_description_open_text_composer">Open text composer</string>

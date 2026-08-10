@@ -10,8 +10,8 @@ android {
         applicationId "com.sidequestlab.floatingvoice"
         minSdk 29
         targetSdk 36
-        versionCode 7
-        versionName "0.4.1"
+        versionCode 9
+        versionName "0.5.0"
 
         testInstrumentationRunner "android.app.Instrumentation"
 
@@ -23,7 +23,7 @@ android {
     buildTypes {
         debug {
             applicationIdSuffix ".debug"
-            versionNameSuffix "-v5-05-1-ui-fix"
+            versionNameSuffix "-rc-device-test"
         }
         release {
             minifyEnabled false

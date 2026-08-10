@@ -2,11 +2,11 @@
 <resources>
     <dimen name="overlay_fab_size">64dp</dimen>
     <dimen name="overlay_dock_width">240dp</dimen>
-    <dimen name="overlay_dock_height">72dp</dimen>
+    <dimen name="overlay_dock_height">96dp</dimen>
     <dimen name="overlay_stop_size">56dp</dimen>
     <dimen name="overlay_cancel_size">48dp</dimen>
     <dimen name="overlay_palette_width">216dp</dimen>
-    <dimen name="overlay_palette_height">72dp</dimen>
+    <dimen name="overlay_palette_height">96dp</dimen>
     <dimen name="overlay_safe_margin">16dp</dimen>
     <dimen name="overlay_gap">8dp</dimen>
 </resources>

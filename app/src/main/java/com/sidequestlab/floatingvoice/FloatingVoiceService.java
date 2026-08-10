@@ -1,5 +1,6 @@
 package com.sidequestlab.floatingvoice;
 
+import android.Manifest;
 import android.annotation.SuppressLint;
 import android.app.Notification;
 import android.app.NotificationChannel;
@@ -17,7 +18,9 @@ import android.graphics.Rect;
 import android.media.MediaRecorder;
 import android.os.Build;
 import android.os.Environment;
+import android.os.Handler;
 import android.os.IBinder;
+import android.os.Looper;
 import android.os.SystemClock;
 import android.provider.Settings;
 import android.view.Gravity;
@@ -38,8 +41,13 @@ import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
 
 public final class FloatingVoiceService extends Service implements TelegramRepository.Listener {
+    private static volatile boolean running;
     public static final String ACTION_START = "com.sidequestlab.floatingvoice.START_OVERLAY";
     public static final String ACTION_STOP = "com.sidequestlab.floatingvoice.STOP_OVERLAY";
+    public static final String ACTION_RUNNING_STATE_CHANGED =
+            "com.sidequestlab.floatingvoice.RUNNING_STATE_CHANGED";
+    public static final String ACTION_SERVICE_TEARDOWN =
+            "com.sidequestlab.floatingvoice.SERVICE_TEARDOWN";
     public static final String ACTION_COMPOSER_CLOSED =
             "com.sidequestlab.floatingvoice.COMPOSER_CLOSED";
     public static final String ACTION_COMPOSER_SUBMIT =
@@ -51,6 +59,7 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
     private static final String CHANNEL_ID = "floatingvoice_overlay";
     private static final int TOUCH_MOVEMENT_THRESHOLD_DP = 12;
     private static final long TOUCH_LONG_PRESS_THRESHOLD_MS = 600L;
+    private static final long PREREQUISITE_CHECK_MS = 1_000L;
 
     private final OverlayStateMachine overlayStateMachine = new OverlayStateMachine();
     private final RecordingCancelOperation cancelOperation = new RecordingCancelOperation();
@@ -83,9 +92,22 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
     private BroadcastReceiver composerClosedReceiver;
     private OverlayUiPreferences overlayUiPreferences;
     private SharedPreferences.OnSharedPreferenceChangeListener uiPreferenceListener;
+    private Handler mainHandler;
+    private Runnable prerequisiteMonitor;
 
     @Override public void onCreate() {
         super.onCreate();
+        running = false;
+        mainHandler = new Handler(Looper.getMainLooper());
+        prerequisiteMonitor = () -> {
+            if (isTearingDown()) return;
+            if (!prerequisitesAvailable()) {
+                updateState(R.string.service_prerequisite_lost);
+                stopSelf();
+                return;
+            }
+            mainHandler.postDelayed(prerequisiteMonitor, PREREQUISITE_CHECK_MS);
+        };
         telegram = ((FloatingVoiceApp) getApplication()).telegram();
         telegram.addListener(this);
         overlayUiPreferences = new OverlayUiPreferences(this);
@@ -137,7 +159,8 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
             stopSelf();
             return START_NOT_STICKY;
         }
-        if (!telegram.isReadyWithTarget()) {
+        if (!prerequisitesAvailable()) {
+            updateRunningState(false);
             stopSelf();
             return START_NOT_STICKY;
         }
@@ -152,20 +175,31 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
                 startForeground(NOTIFICATION_ID, buildNotification());
             }
         } catch (RuntimeException e) {
+            updateRunningState(false);
             stopSelf();
             return START_NOT_STICKY;
         }
         if (primaryOverlay == null) addPrimaryOverlay();
+        updateRunningState(primaryOverlay != null && primaryOverlayAttached);
+        if (running) {
+            mainHandler.removeCallbacks(prerequisiteMonitor);
+            mainHandler.postDelayed(prerequisiteMonitor, PREREQUISITE_CHECK_MS);
+        }
         return START_NOT_STICKY;
     }
 
     @Override public void onDestroy() {
+        updateRunningState(false);
         overlayStateMachine.accept(OverlayEvent.TEARDOWN);
+        if (mainHandler != null && prerequisiteMonitor != null) {
+            mainHandler.removeCallbacks(prerequisiteMonitor);
+        }
         if (composerClosedReceiver != null) {
             try { unregisterReceiver(composerClosedReceiver); }
             catch (IllegalArgumentException ignored) { }
             composerClosedReceiver = null;
         }
+        sendBroadcast(new Intent(ACTION_SERVICE_TEARDOWN).setPackage(getPackageName()));
         if (overlayUiPreferences != null && uiPreferenceListener != null) {
             overlayUiPreferences.unregister(uiPreferenceListener);
             uiPreferenceListener = null;
@@ -178,13 +212,38 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
         overlayViewController = null;
         dragTapListener = null;
         if (recorder != null) stopAndRetainInterruptedRecording();
-        if (windowRegistry != null) windowRegistry.removeAll();
+        if (windowRegistry != null) windowRegistry.removeAllWithRetries(3);
         primaryOverlayAttached = false;
         telegram.removeListener(this);
         super.onDestroy();
     }
 
     @Override public IBinder onBind(Intent intent) { return null; }
+
+    public static boolean isRunning() { return running; }
+
+    private void updateRunningState(boolean nextRunning) {
+        running = nextRunning;
+        sendBroadcast(new Intent(ACTION_RUNNING_STATE_CHANGED).setPackage(getPackageName()));
+    }
+
+    private boolean prerequisitesAvailable() {
+        boolean microphone = checkSelfPermission(Manifest.permission.RECORD_AUDIO)
+                == android.content.pm.PackageManager.PERMISSION_GRANTED;
+        boolean notification = Build.VERSION.SDK_INT < 33
+                || checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)
+                == android.content.pm.PackageManager.PERMISSION_GRANTED;
+        return microphone && notification && Settings.canDrawOverlays(this)
+                && telegram != null && telegram.isReadyWithTarget();
+    }
+
+    @Override public void onAuthStage(TelegramRepository.AuthStage stage) {
+        if (running && stage != TelegramRepository.AuthStage.READY) stopSelf();
+    }
+
+    @Override public void onTargetChanged(TargetChat target) {
+        if (running && target == null) stopSelf();
+    }
 
     @SuppressLint("RtlHardcoded") // x/y are physical display coordinates, not logical start/end.
     private void addPrimaryOverlay() {

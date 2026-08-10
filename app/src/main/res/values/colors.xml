@@ -1,11 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="brand">#315CDB</color>
     <color name="launcher_background">#315CDB</color>
-    <color name="brand_dark">#1F3A8A</color>
-    <color name="recording">#C62828</color>
-    <color name="idle">#256D3A</color>
-    <color name="surface">#FAFAFA</color>
 
     <!-- Floating Voice Material 3 fallback tokens. Dynamic Color is a V5-09 gate. -->
     <color name="fv_primary">#5556D7</color>

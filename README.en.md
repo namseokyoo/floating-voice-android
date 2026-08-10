@@ -11,7 +11,7 @@
 Tap the floating microphone once to start recording.<br>
 Tap it again to send a voice message from your Telegram account to a verified bot chat.
 
-![Version](https://img.shields.io/badge/version-0.4.1-315CDB?style=for-the-badge)
+![Version](https://img.shields.io/badge/version-0.5.0-315CDB?style=for-the-badge)
 ![Android](https://img.shields.io/badge/Android-10%2B-3DDC84?style=for-the-badge&logo=android&logoColor=white)
 ![ABI](https://img.shields.io/badge/ABI-arm64--v8a-555555?style=for-the-badge)
 ![Java](https://img.shields.io/badge/Java-17-ED8B00?style=for-the-badge&logo=openjdk&logoColor=white)
@@ -36,6 +36,8 @@ Tap it again to send a voice message from your Telegram account to a verified bo
 |:---|:---|
 | **Start recording** | Tap the green floating microphone |
 | **Stop and send** | Tap the red stop button |
+| **Cancel recording** | Tap the opposite X button; nothing is sent |
+| **Send text** | Long-press the floating button → Send text |
 | **Audio format** | OGG / Opus / mono / 48 kHz |
 | **Sender** | The signed-in Telegram user account |
 | **Recipient** | A fixed Telegram bot chat verified by username |
@@ -76,6 +78,7 @@ Re-check fixed target → Send through TDLib → Confirm success → Delete loca
 4. Tap the green microphone to start recording.
 5. Tap the red stop button to finish and send.
 6. Drag the button to move it. A drag gesture is not treated as a tap.
+7. To send text, long-press the floating button, choose **Send text**, compose, and send.
 
 > [!IMPORTANT]
 > A message being accepted into TDLib's send queue is not considered final success. The local recording is deleted only after the final success update arrives.
@@ -353,7 +356,7 @@ The package ID has been `com.sidequestlab.floatingvoice` since version 0.2.0. Th
 ## Distribution policy
 
 - GitHub Releases provide the source ZIP/TAR and a release-signed `arm64-v8a` APK for the tag.
-- APKs are never committed to Git; they are attached only as GitHub Release assets.
+- APK files are not tracked in the current or release tree; official APKs are attached only as Release assets. Debug test APKs found in older internal feature-branch commits are not official artifacts or release evidence.
 - AABs, generated TDLib Java/JNI sources, signing keys, sessions, and recordings are not release assets.
 - The official APK certificate SHA-256 fingerprint is `FD:97:82:9D:19:F8:B0:57:5B:79:EC:1E:8B:7A:26:16:A0:69:7C:EE:86:5D:29:B0:B5:28:78:3C:39:88:AB:A6`.
 - Each release note records the corresponding APK file SHA-256.

@@ -2,7 +2,7 @@
 
 **Effective date / 시행일:** 2026-08-10
 
-**Applies to / 적용 대상:** Floating Voice version `0.4.1`
+**Applies to / 적용 대상:** Floating Voice version `0.5.0`
 
 Floating Voice publishes source code and a release-signed `arm64-v8a` APK through GitHub Releases. It is not distributed through an app store.
 
@@ -14,7 +14,7 @@ Floating Voice publishes source code and a release-signed `arm64-v8a` APK throug
 
 The app has no analytics SDK, advertising SDK, or developer-operated backend. It communicates directly with Telegram through TDLib after the user provides their own Telegram API credentials and signs in.
 
-Telegram processes account authentication, chat lookup, and voice-message delivery under Telegram's own terms and privacy practices. This project does not control Telegram's processing.
+Telegram processes account authentication, chat lookup, and voice/text-message delivery under Telegram's own terms and privacy practices. This project does not control Telegram's processing.
 
 ### Data stored on the device
 
@@ -24,6 +24,7 @@ The app may store:
 - verified target-bot username, chat ID, and title
 - a TDLib database-encryption key and TDLib session data
 - recordings awaiting final send confirmation or retained after failure
+- temporary TDLib text-message IDs used to classify final success or failure; text bodies are not persisted by the app composer
 
 Runtime settings are encrypted with AES-GCM using a non-exportable Android Keystore key. Login codes and two-step verification passwords are not persisted. Retained OGG recordings are not separately encrypted.
 
@@ -50,7 +51,7 @@ Do not include real credentials, account details, recordings, session files, or 
 
 앱에는 분석 SDK, 광고 SDK, 개발자가 운영하는 별도 서버가 없습니다. 사용자가 자신의 Telegram API 정보로 로그인한 뒤 TDLib를 통해 Telegram과 직접 통신합니다.
 
-계정 인증, 대화 검색, 음성 메시지 전달은 Telegram의 약관과 개인정보 처리 기준에 따라 Telegram이 처리합니다. 이 프로젝트는 Telegram의 데이터 처리를 통제하지 않습니다.
+계정 인증, 대화 검색, 음성·텍스트 메시지 전달은 Telegram의 약관과 개인정보 처리 기준에 따라 Telegram이 처리합니다. 이 프로젝트는 Telegram의 데이터 처리를 통제하지 않습니다.
 
 ### 기기에 저장되는 데이터
 
@@ -60,6 +61,7 @@ Do not include real credentials, account details, recordings, session files, or 
 - 확인된 대상 봇 username, chat ID, 제목
 - TDLib 데이터베이스 암호화 키와 TDLib 세션 데이터
 - 최종 전송 성공을 기다리거나 실패 후 보관된 녹음 파일
+- 최종 성공·실패 분류에 필요한 임시 TDLib 텍스트 메시지 ID (Composer는 텍스트 본문을 저장하지 않음)
 
 설정값은 Android Keystore의 비추출 키를 사용해 AES-GCM으로 암호화합니다. 로그인 코드와 2단계 인증 비밀번호는 저장하지 않습니다. 실패 후 남은 OGG 녹음 파일은 별도로 암호화되지 않습니다.
 

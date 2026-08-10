@@ -47,6 +47,14 @@ final class OverlayWindowRegistry<V, P> {
         return removedAll;
     }
 
+    boolean removeAllWithRetries(int maxAttempts) {
+        if (maxAttempts < 1) throw new IllegalArgumentException("maxAttempts");
+        for (int attempt = 0; attempt < maxAttempts; attempt++) {
+            if (removeAll()) return true;
+        }
+        return attachedViews.isEmpty();
+    }
+
     int attachedCount() {
         return attachedViews.size();
     }
