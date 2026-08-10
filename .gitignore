@@ -1,5 +1,6 @@
 .gradle/
 .idea/
+.hermes/
 local.properties
 **/build/
 *.iml
