@@ -3,12 +3,7 @@
     <application>
         <activity
             android:name=".TextComposerDebugActivity"
-            android:exported="true"
-            android:label="@string/debug_text_composer_label">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity>
+            android:exported="false"
+            android:label="@string/debug_text_composer_label" />
     </application>
 </manifest>
