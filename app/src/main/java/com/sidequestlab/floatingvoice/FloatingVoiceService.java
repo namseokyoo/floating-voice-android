@@ -1,5 +1,6 @@
 package com.sidequestlab.floatingvoice;
 
+import android.annotation.SuppressLint;
 import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
@@ -9,6 +10,7 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.SharedPreferences;
 import android.content.pm.ServiceInfo;
 import android.graphics.PixelFormat;
 import android.graphics.Rect;
@@ -40,6 +42,11 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
     public static final String ACTION_STOP = "com.sidequestlab.floatingvoice.STOP_OVERLAY";
     public static final String ACTION_COMPOSER_CLOSED =
             "com.sidequestlab.floatingvoice.COMPOSER_CLOSED";
+    public static final String ACTION_COMPOSER_SUBMIT =
+            "com.sidequestlab.floatingvoice.COMPOSER_SUBMIT";
+    public static final String EXTRA_COMPOSER_TEXT = "composer_text";
+    static final int COMPOSER_SUBMIT_REJECTED = 0;
+    static final int COMPOSER_SUBMIT_ACCEPTED = 1;
     private static final int NOTIFICATION_ID = 41;
     private static final String CHANNEL_ID = "floatingvoice_overlay";
     private static final int TOUCH_MOVEMENT_THRESHOLD_DP = 12;
@@ -58,11 +65,15 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
     private DragTapListener dragTapListener;
     private int idleAnchorX;
     private int idleAnchorY;
+    private int currentFabSizePx;
+    private boolean recordingStopOnRight;
     private MediaRecorder recorder;
     private File activeRecording;
     private File readyVoiceRecording;
     private int readyVoiceDuration;
     private long readyVoiceAttemptId;
+    private String readyText;
+    private long readyTextAttemptId;
     private long recordingStartedAt;
     private TelegramRepository telegram;
     private String notificationText;
@@ -70,14 +81,43 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
     private Object[] notificationArguments = new Object[0];
     private boolean primaryOverlayAttached;
     private BroadcastReceiver composerClosedReceiver;
+    private OverlayUiPreferences overlayUiPreferences;
+    private SharedPreferences.OnSharedPreferenceChangeListener uiPreferenceListener;
 
     @Override public void onCreate() {
         super.onCreate();
         telegram = ((FloatingVoiceApp) getApplication()).telegram();
         telegram.addListener(this);
+        overlayUiPreferences = new OverlayUiPreferences(this);
+        currentFabSizePx = dp(overlayUiPreferences.sizePreset().sizeDp());
+        uiPreferenceListener = (preferences, key) -> {
+            if (!OverlayUiPreferences.KEY_SIZE.equals(key) || isTearingDown()) return;
+            OverlayStateMachine.State state = overlayStateMachine.state();
+            if (!showsIdleBubble(state) && state != OverlayStateMachine.State.MENU_OPEN) return;
+            currentFabSizePx = dp(overlayUiPreferences.sizePreset().sizeDp());
+            if (overlayViewController != null) {
+                overlayViewController.setIdleSize(currentFabSizePx);
+                showIdleOverlay();
+            }
+        };
+        overlayUiPreferences.register(uiPreferenceListener);
         composerClosedReceiver = new BroadcastReceiver() {
             @Override public void onReceive(Context context, Intent intent) {
-                if (!ACTION_COMPOSER_CLOSED.equals(intent.getAction()) || isTearingDown()) return;
+                if (intent == null || isTearingDown()) return;
+                if (ACTION_COMPOSER_SUBMIT.equals(intent.getAction())) {
+                    String text = intent.getStringExtra(EXTRA_COMPOSER_TEXT);
+                    if (overlayStateMachine.state() == OverlayStateMachine.State.TEXT_COMPOSING
+                            && text != null && !text.trim().isEmpty()) {
+                        setResultCode(COMPOSER_SUBMIT_ACCEPTED);
+                        readyText = text.trim();
+                        readyTextAttemptId = overlayStateMachine.attemptId();
+                        dispatchOverlayEvent(OverlayEvent.SUBMIT_TEXT);
+                    } else {
+                        setResultCode(COMPOSER_SUBMIT_REJECTED);
+                    }
+                    return;
+                }
+                if (!ACTION_COMPOSER_CLOSED.equals(intent.getAction())) return;
                 if (overlayStateMachine.state() == OverlayStateMachine.State.TEXT_COMPOSING) {
                     dispatchOverlayEvent(OverlayEvent.CLOSE_COMPOSER);
                 }
@@ -85,6 +125,7 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
             }
         };
         IntentFilter composerFilter = new IntentFilter(ACTION_COMPOSER_CLOSED);
+        composerFilter.addAction(ACTION_COMPOSER_SUBMIT);
         ContextCompat.registerReceiver(this, composerClosedReceiver, composerFilter,
                 ContextCompat.RECEIVER_NOT_EXPORTED);
         createNotificationChannel();
@@ -125,6 +166,10 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
             catch (IllegalArgumentException ignored) { }
             composerClosedReceiver = null;
         }
+        if (overlayUiPreferences != null && uiPreferenceListener != null) {
+            overlayUiPreferences.unregister(uiPreferenceListener);
+            uiPreferenceListener = null;
+        }
         if (dragTapListener != null) dragTapListener.cancelPending();
         if (actionMenuController != null) actionMenuController.destroy();
         if (overlayViewController != null) overlayViewController.destroy();
@@ -141,6 +186,7 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
 
     @Override public IBinder onBind(Intent intent) { return null; }
 
+    @SuppressLint("RtlHardcoded") // x/y are physical display coordinates, not logical start/end.
     private void addPrimaryOverlay() {
         if (!Settings.canDrawOverlays(this)) {
             updateState(R.string.overlay_permission_required);
@@ -164,8 +210,8 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
         actionMenuController = new FloatingActionMenuController(
                 this, windowRegistry, new FloatingActionMenuController.Listener() {
             @Override public void onComposeText() {
-                // V5-05 bridge: the reducer closes the palette (HIDE_MENU) and emits
-                // OPEN_TEXT_COMPOSER. V5-07 binds composer draft/send lifecycle to the reducer.
+                // The reducer closes the palette, opens the transient composer, and keeps
+                // Telegram transport ownership in this service.
                 dispatchOverlayEvent(OverlayEvent.COMPOSE_TEXT);
             }
 
@@ -176,13 +222,14 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
             }
         });
         primaryOverlay = overlayViewController.root();
-        int size = px(R.dimen.overlay_fab_size);
+        overlayViewController.setIdleSize(currentFabSizePx);
+        int size = currentFabSizePx;
         layoutParams = new WindowManager.LayoutParams(size, size,
                 WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
                 WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
                         | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
                 PixelFormat.TRANSLUCENT);
-        layoutParams.gravity = Gravity.TOP | Gravity.START;
+        layoutParams.gravity = Gravity.TOP | Gravity.LEFT;
         Rect initialSafeBounds = currentDisplayBounds();
         int initialMargin = px(R.dimen.overlay_safe_margin);
         idleAnchorX = initialSafeBounds.left + initialMargin;
@@ -226,7 +273,7 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
                 case SHOW_MENU -> showActionMenu();
                 case HIDE_MENU -> hideActionMenu();
                 case OPEN_TEXT_COMPOSER -> openTextComposer();
-                case SEND_TEXT -> { /* V5-06 connects transport. */ }
+                case SEND_TEXT -> sendReadyText();
             }
         }
         return transition;
@@ -369,21 +416,28 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
         hideActionMenu();
         idleAnchorX = layoutParams.x;
         idleAnchorY = layoutParams.y;
-        overlayViewController.showRecording(recordingStartedAt);
-        layoutParams.width = px(R.dimen.overlay_dock_width);
-        layoutParams.height = px(R.dimen.overlay_dock_height);
+        int dockWidth = px(R.dimen.overlay_dock_width);
+        int dockHeight = px(R.dimen.overlay_dock_height);
+        int stopSize = px(R.dimen.overlay_stop_size);
+        int dockPadding = dp(8);
+        layoutParams.width = dockWidth;
+        layoutParams.height = dockHeight;
         Rect display = currentDisplayBounds();
-        int margin = px(R.dimen.overlay_safe_margin);
-        int rightAlignedX = idleAnchorX
-                + px(R.dimen.overlay_fab_size) - layoutParams.width;
-        int minX = display.left + margin;
-        int maxX = Math.max(minX, display.right - margin - layoutParams.width);
-        layoutParams.x = idleAnchorX + layoutParams.width <= display.right - margin
-                ? clamp(idleAnchorX, minX, maxX)
-                : clamp(rightAlignedX, minX, maxX);
-        int minY = display.top + margin;
-        int maxY = Math.max(minY, display.bottom - margin - layoutParams.height);
-        layoutParams.y = clamp(idleAnchorY, minY, maxY);
+        int minX = display.left;
+        int maxX = Math.max(minX, display.right - dockWidth);
+        int idleCenterX = idleAnchorX + currentFabSizePx / 2;
+        int stopCenterOffsetLeft = dockPadding + stopSize / 2;
+        int stopCenterOffsetRight = dockWidth - dockPadding - stopSize / 2;
+        int extendRightX = idleCenterX - stopCenterOffsetLeft;
+        int extendLeftX = idleCenterX - stopCenterOffsetRight;
+        boolean stopOnRight = extendRightX + dockWidth > display.right;
+        recordingStopOnRight = stopOnRight;
+        layoutParams.x = clamp(stopOnRight ? extendLeftX : extendRightX, minX, maxX);
+        int minY = display.top;
+        int maxY = Math.max(minY, display.bottom - dockHeight);
+        layoutParams.y = clamp(idleAnchorY + currentFabSizePx / 2 - dockHeight / 2,
+                minY, maxY);
+        overlayViewController.showRecording(recordingStartedAt, stopOnRight);
         try {
             windowRegistry.update(primaryOverlay, layoutParams);
             return true;
@@ -403,9 +457,13 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
 
     private void showIdleOverlay() {
         if (overlayViewController == null || primaryOverlay == null || layoutParams == null) return;
+        if (overlayUiPreferences != null) {
+            currentFabSizePx = dp(overlayUiPreferences.sizePreset().sizeDp());
+        }
         overlayViewController.showIdle();
-        layoutParams.width = px(R.dimen.overlay_fab_size);
-        layoutParams.height = px(R.dimen.overlay_fab_size);
+        overlayViewController.setIdleSize(currentFabSizePx);
+        layoutParams.width = currentFabSizePx;
+        layoutParams.height = currentFabSizePx;
         Rect display = currentDisplayBounds();
         int margin = px(R.dimen.overlay_safe_margin);
         int minX = display.left + margin;
@@ -450,7 +508,10 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
 
     private void openTextComposer() {
         Intent composer = new Intent(this, TextComposerActivity.class)
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK
+                        | Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS
+                        | Intent.FLAG_ACTIVITY_NO_HISTORY
+                        | Intent.FLAG_ACTIVITY_NO_ANIMATION);
         try {
             startActivity(composer);
             hidePrimaryOverlay();
@@ -491,15 +552,67 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
 
     private void updateIdleAnchorFromPrimary() {
         if (layoutParams == null) return;
-        Rect display = currentDisplayBounds();
-        int fabSize = px(R.dimen.overlay_fab_size);
-        if (layoutParams.width > fabSize
-                && layoutParams.x + layoutParams.width / 2 > display.centerX()) {
-            idleAnchorX = layoutParams.x + layoutParams.width - fabSize;
+        int fabSize = currentFabSizePx;
+        if (layoutParams.width > fabSize) {
+            int dockWidth = px(R.dimen.overlay_dock_width);
+            int dockHeight = px(R.dimen.overlay_dock_height);
+            int stopSize = px(R.dimen.overlay_stop_size);
+            int dockPadding = dp(8);
+            int stopCenterOffset = recordingStopOnRight
+                    ? dockWidth - dockPadding - stopSize / 2
+                    : dockPadding + stopSize / 2;
+            idleAnchorX = layoutParams.x + stopCenterOffset - fabSize / 2;
+            idleAnchorY = layoutParams.y + dockHeight / 2 - fabSize / 2;
         } else {
             idleAnchorX = layoutParams.x;
+            idleAnchorY = layoutParams.y;
         }
-        idleAnchorY = layoutParams.y;
+    }
+
+    private static boolean showsIdleBubble(OverlayStateMachine.State state) {
+        return state == OverlayStateMachine.State.IDLE
+                || state == OverlayStateMachine.State.VOICE_QUEUEING
+                || state == OverlayStateMachine.State.VOICE_PENDING
+                || state == OverlayStateMachine.State.TEXT_QUEUEING
+                || state == OverlayStateMachine.State.TEXT_PENDING;
+    }
+
+    private void sendReadyText() {
+        String text = readyText;
+        long attemptId = readyTextAttemptId;
+        readyText = null;
+        readyTextAttemptId = 0L;
+        if (text == null || text.isBlank()) {
+            dispatchOverlayEvent(OverlayEvent.TEXT_REJECTED, attemptId);
+            return;
+        }
+        telegram.sendText(text, new TelegramRepository.TextSendCallback() {
+            @Override public void onQueued(long temporaryMessageId) {
+                handleTextSendCallback(OverlayEvent.TEXT_QUEUED, attemptId,
+                        () -> updateState(R.string.repo_text_queued));
+            }
+
+            @Override public void onDelivered() {
+                handleTextSendCallback(OverlayEvent.TEXT_DELIVERED, attemptId,
+                        () -> updateState(R.string.repo_text_delivered));
+            }
+
+            @Override public void onRejected(String reason) {
+                handleTextSendCallback(OverlayEvent.TEXT_REJECTED, attemptId,
+                        () -> updateState(reason));
+            }
+        });
+    }
+
+    private void handleTextSendCallback(
+            OverlayEvent event, long attemptId, Runnable notificationUpdate) {
+        getMainExecutor().execute(() -> {
+            if (isTearingDown()) return;
+            OverlayStateMachine.Transition transition = dispatchOverlayEvent(event, attemptId);
+            if (transition.previousState() != transition.nextState()) {
+                notificationUpdate.run();
+            }
+        });
     }
 
     private void sendReadyVoice() {
@@ -716,16 +829,37 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
                         }
                         Rect display = currentDisplayBounds();
                         int margin = px(R.dimen.overlay_safe_margin);
-                        int minX = display.left + margin;
-                        int minY = display.top + margin;
+                        int minX;
+                        int maxX;
+                        int minY;
+                        int maxY;
+                        if (layoutParams.width > currentFabSizePx) {
+                            int dockWidth = px(R.dimen.overlay_dock_width);
+                            int dockHeight = px(R.dimen.overlay_dock_height);
+                            int stopSize = px(R.dimen.overlay_stop_size);
+                            int stopOffset = recordingStopOnRight
+                                    ? dockWidth - dp(8) - stopSize / 2
+                                    : dp(8) + stopSize / 2;
+                            minX = Math.max(display.left,
+                                    display.left + margin + currentFabSizePx / 2 - stopOffset);
+                            maxX = Math.min(display.right - layoutParams.width,
+                                    display.right - margin - currentFabSizePx / 2 - stopOffset);
+                            minY = Math.max(display.top,
+                                    display.top + margin + currentFabSizePx / 2 - dockHeight / 2);
+                            maxY = Math.min(display.bottom - layoutParams.height,
+                                    display.bottom - margin - currentFabSizePx / 2 - dockHeight / 2);
+                        } else {
+                            minX = display.left + margin;
+                            maxX = display.right - margin - layoutParams.width;
+                            minY = display.top + margin;
+                            maxY = display.bottom - margin - layoutParams.height;
+                        }
+                        maxX = Math.max(minX, maxX);
+                        maxY = Math.max(minY, maxY);
                         layoutParams.x = clamp(initialX + Math.round(latestX - downX),
-                                minX,
-                                Math.max(minX,
-                                        display.right - margin - layoutParams.width));
+                                minX, maxX);
                         layoutParams.y = clamp(initialY + Math.round(latestY - downY),
-                                minY,
-                                Math.max(minY,
-                                        display.bottom - margin - layoutParams.height));
+                                minY, maxY);
                         windowRegistry.update(primaryOverlay, layoutParams);
                         updateIdleAnchorFromPrimary();
                     }
@@ -743,7 +877,7 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
                             latestX - downX, latestY - downY);
                     if (classification == GestureClassifier.Classification.TAP
                             && view == primaryOverlay
-                            && overlayStateMachine.state() == OverlayStateMachine.State.IDLE) {
+                            && showsIdleBubble(overlayStateMachine.state())) {
                         primaryOverlay.performClick();
                     }
                     return true;

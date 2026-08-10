@@ -41,9 +41,11 @@
         app:strokeWidth="0dp">
 
         <LinearLayout
+            android:id="@+id/overlay_recording_row"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:gravity="center_vertical"
+            android:layoutDirection="ltr"
             android:orientation="horizontal"
             android:paddingLeft="8dp"
             android:paddingTop="8dp"

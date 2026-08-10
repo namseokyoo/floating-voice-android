@@ -193,7 +193,7 @@ class OverlayStateMachineTest {
     }
 
     @Test
-    void textRejectRestoresComposingStateSoDraftCanBeRetained() {
+    void textRejectAfterSubmitReturnsIdleBecauseComposerAlreadyClosed() {
         OverlayStateMachine machine = textComposingMachine();
 
         OverlayStateMachine.Transition submit = machine.accept(OverlayEvent.SUBMIT_TEXT);
@@ -201,7 +201,7 @@ class OverlayStateMachineTest {
         assertEquals(List.of(OverlayStateMachine.Effect.SEND_TEXT), submit.effects());
 
         OverlayStateMachine.Transition rejected = machine.accept(OverlayEvent.TEXT_REJECTED);
-        assertEquals(OverlayStateMachine.State.TEXT_COMPOSING, rejected.nextState());
+        assertEquals(OverlayStateMachine.State.IDLE, rejected.nextState());
         assertEquals(List.of(), rejected.effects());
     }
 
@@ -217,6 +217,49 @@ class OverlayStateMachineTest {
         OverlayStateMachine.Transition delivered = machine.accept(OverlayEvent.TEXT_DELIVERED);
         assertEquals(OverlayStateMachine.State.IDLE, delivered.nextState());
         assertEquals(List.of(), delivered.effects());
+    }
+
+    @Test
+    void textDeliveryCanFinishDirectlyFromQueueingWhenCallbacksRace() {
+        OverlayStateMachine machine = textComposingMachine();
+        machine.accept(OverlayEvent.SUBMIT_TEXT);
+
+        OverlayStateMachine.Transition delivered = machine.accept(OverlayEvent.TEXT_DELIVERED);
+
+        assertEquals(OverlayStateMachine.State.IDLE, delivered.nextState());
+        assertEquals(List.of(), delivered.effects());
+    }
+
+    @Test
+    void visibleBubbleCanStartRecordingWhileTextDeliveryIsPending() {
+        OverlayStateMachine machine = textComposingMachine();
+        machine.accept(OverlayEvent.SUBMIT_TEXT);
+        machine.accept(OverlayEvent.TEXT_QUEUED);
+        long textAttempt = machine.attemptId();
+
+        assertTextSendCanYieldToRecording(machine, textAttempt);
+    }
+
+    @Test
+    void visibleBubbleCanStartRecordingWhileTextIsStillQueueing() {
+        OverlayStateMachine machine = textComposingMachine();
+        machine.accept(OverlayEvent.SUBMIT_TEXT);
+        long textAttempt = machine.attemptId();
+
+        assertTextSendCanYieldToRecording(machine, textAttempt);
+    }
+
+    private static void assertTextSendCanYieldToRecording(
+            OverlayStateMachine machine, long textAttempt) {
+        OverlayStateMachine.Transition tapped = machine.accept(OverlayEvent.TAP);
+
+        assertEquals(OverlayStateMachine.State.VOICE_STARTING, tapped.nextState());
+        assertEquals(List.of(OverlayStateMachine.Effect.START_VOICE), tapped.effects());
+        assertEquals(textAttempt + 1, machine.attemptId());
+        OverlayStateMachine.Transition staleDelivery =
+                machine.accept(OverlayEvent.TEXT_DELIVERED, textAttempt);
+        assertEquals(OverlayStateMachine.State.VOICE_STARTING, staleDelivery.nextState());
+        assertEquals(List.of(), staleDelivery.effects());
     }
 
     @Test
@@ -306,14 +349,14 @@ class OverlayStateMachineTest {
     }
 
     @Test
-    void textRejectFromPendingRestoresComposingState() {
+    void textRejectFromPendingReturnsIdleBecauseComposerAlreadyClosed() {
         OverlayStateMachine machine = textComposingMachine();
         machine.accept(OverlayEvent.SUBMIT_TEXT);
         machine.accept(OverlayEvent.TEXT_QUEUED);
 
         OverlayStateMachine.Transition rejected = machine.accept(OverlayEvent.TEXT_REJECTED);
 
-        assertEquals(OverlayStateMachine.State.TEXT_COMPOSING, rejected.nextState());
+        assertEquals(OverlayStateMachine.State.IDLE, rejected.nextState());
         assertEquals(List.of(), rejected.effects());
     }
 
@@ -365,9 +408,10 @@ class OverlayStateMachineTest {
         legal.put(OverlayStateMachine.State.TEXT_COMPOSING, EnumSet.of(
                 OverlayEvent.SUBMIT_TEXT, OverlayEvent.CLOSE_COMPOSER));
         legal.put(OverlayStateMachine.State.TEXT_QUEUEING, EnumSet.of(
-                OverlayEvent.TEXT_QUEUED, OverlayEvent.TEXT_REJECTED));
+                OverlayEvent.TEXT_QUEUED, OverlayEvent.TEXT_REJECTED,
+                OverlayEvent.TEXT_DELIVERED, OverlayEvent.TAP));
         legal.put(OverlayStateMachine.State.TEXT_PENDING, EnumSet.of(
-                OverlayEvent.TEXT_DELIVERED, OverlayEvent.TEXT_REJECTED));
+                OverlayEvent.TEXT_DELIVERED, OverlayEvent.TEXT_REJECTED, OverlayEvent.TAP));
         legal.put(OverlayStateMachine.State.TEARING_DOWN, EnumSet.noneOf(OverlayEvent.class));
         return legal;
     }

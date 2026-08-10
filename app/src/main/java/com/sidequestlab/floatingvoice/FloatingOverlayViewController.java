@@ -5,8 +5,11 @@ import android.content.Context;
 import android.view.ContextThemeWrapper;
 import android.view.LayoutInflater;
 import android.view.View;
+import android.view.ViewGroup;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 
+import com.google.android.material.button.MaterialButton;
 import com.sidequestlab.floatingvoice.core.RecordingElapsedFormatter;
 
 import java.util.Objects;
@@ -24,6 +27,7 @@ final class FloatingOverlayViewController {
     private final View root;
     private final View idleAction;
     private final View recordingDock;
+    private final LinearLayout recordingRow;
     private final View recordingDragRegion;
     private final View stopAndSend;
     private final View cancel;
@@ -50,6 +54,7 @@ final class FloatingOverlayViewController {
         root = LayoutInflater.from(themed).inflate(R.layout.overlay_primary_control, null, false);
         idleAction = root.findViewById(R.id.overlay_idle_action);
         recordingDock = root.findViewById(R.id.overlay_recording_dock);
+        recordingRow = root.findViewById(R.id.overlay_recording_row);
         recordingDragRegion = root.findViewById(R.id.overlay_drag_region);
         stopAndSend = root.findViewById(R.id.overlay_stop_send);
         cancel = root.findViewById(R.id.overlay_cancel);
@@ -66,6 +71,16 @@ final class FloatingOverlayViewController {
     View root() { return root; }
 
     View recordingDragRegion() { return recordingDragRegion; }
+
+    void setIdleSize(int sizePx) {
+        ViewGroup.LayoutParams params = idleAction.getLayoutParams();
+        params.width = sizePx;
+        params.height = sizePx;
+        idleAction.setLayoutParams(params);
+        if (idleAction instanceof MaterialButton button) {
+            button.setIconSize(Math.max(24, Math.round(sizePx * 0.44f)));
+        }
+    }
 
     void setIdleClickListener(View.OnClickListener listener) {
         root.setOnClickListener(listener);
@@ -103,8 +118,9 @@ final class FloatingOverlayViewController {
         root.setContentDescription(text(R.string.content_description_start_recording));
     }
 
-    void showRecording(long startedAt) {
+    void showRecording(long startedAt, boolean stopOnRight) {
         recordingStartedAt = startedAt;
+        arrangeRecordingActions(stopOnRight);
         idleAction.animate().cancel();
         recordingDock.animate().cancel();
         idleAction.setVisibility(View.GONE);
@@ -122,6 +138,30 @@ final class FloatingOverlayViewController {
         cancel.setContentDescription(text(R.string.content_description_cancel_recording));
         recordingStatus.setText(text(R.string.overlay_recording_status));
         startTimer();
+    }
+
+    private void arrangeRecordingActions(boolean stopOnRight) {
+        recordingRow.removeAllViews();
+        if (stopOnRight) {
+            recordingRow.addView(cancel);
+            recordingRow.addView(recordingDragRegion);
+            recordingRow.addView(stopAndSend);
+        } else {
+            recordingRow.addView(stopAndSend);
+            recordingRow.addView(recordingDragRegion);
+            recordingRow.addView(cancel);
+        }
+        if (stopOnRight) {
+            cancel.setAccessibilityTraversalAfter(View.NO_ID);
+            cancel.setAccessibilityTraversalBefore(stopAndSend.getId());
+            stopAndSend.setAccessibilityTraversalAfter(cancel.getId());
+            stopAndSend.setAccessibilityTraversalBefore(View.NO_ID);
+        } else {
+            stopAndSend.setAccessibilityTraversalAfter(View.NO_ID);
+            stopAndSend.setAccessibilityTraversalBefore(cancel.getId());
+            cancel.setAccessibilityTraversalAfter(stopAndSend.getId());
+            cancel.setAccessibilityTraversalBefore(View.NO_ID);
+        }
     }
 
     void setIdlePressed(boolean pressed) {

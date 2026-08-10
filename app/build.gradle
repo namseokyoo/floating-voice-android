@@ -23,7 +23,7 @@ android {
     buildTypes {
         debug {
             applicationIdSuffix ".debug"
-            versionNameSuffix "-v5-05-material3"
+            versionNameSuffix "-v5-05-1-ui-fix"
         }
         release {
             minifyEnabled false

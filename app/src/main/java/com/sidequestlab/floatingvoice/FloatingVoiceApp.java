@@ -11,7 +11,8 @@ public final class FloatingVoiceApp extends Application {
     @Override public void onCreate() {
         super.onCreate();
         settings = new SecureSettingsStore(this);
-        telegram = new TelegramRepository(this, settings, new PendingRecordingStore(this));
+        telegram = new TelegramRepository(this, settings,
+                new PendingRecordingStore(this), new PendingTextSendStore(this));
     }
 
     @Override public void onConfigurationChanged(Configuration newConfig) {

@@ -3,6 +3,12 @@
     <string name="app_name">플로팅 보이스</string>
     <string name="app_description">내 Telegram 계정으로 확인된 대상 봇에게 음성을 전송합니다. 설정 저장이나 로그인만으로는 메시지가 전송되지 않습니다.</string>
     <string name="language_label">언어</string>
+    <string name="overlay_size_label">플로팅 버튼 크기</string>
+    <string-array name="overlay_size_options">
+        <item>작게</item>
+        <item>보통</item>
+        <item>크게</item>
+    </string-array>
     <string-array name="language_options" translatable="false">
         <item>System default</item>
         <item>한국어</item>
@@ -91,9 +97,19 @@
     <string name="notification_channel_name">플로팅 음성 녹음</string>
     <string name="notification_channel_description">Telegram 음성 전송용 플로팅 녹음 상태 알림</string>
 
-    <string name="text_composer_title">텍스트 작성</string>
-    <string name="text_composer_hint">여기에 여러 줄을 입력하세요. 텍스트는 전송하거나 저장하지 않습니다.</string>
+    <string name="text_composer_title">텍스트 메시지</string>
+    <string name="text_composer_hint">확인된 Telegram 대상에게 보낼 내용을 입력하세요.</string>
     <string name="text_composer_close">닫기</string>
+    <string name="text_composer_send">전송</string>
+    <string name="text_composer_send_failed">메시지를 전달하지 못했습니다. 작성 내용은 그대로 남아 있습니다.</string>
+    <string name="text_composer_obscured">다른 앱이 전송 버튼을 가리고 있어 전송을 차단했습니다.</string>
+    <string name="repo_text_connection_target_required">Telegram 연결과 확인된 대상이 필요합니다. 텍스트를 전송하지 않았습니다.</string>
+    <string name="repo_text_queuing">%1$s에 텍스트를 전송 대기열에 넣는 중…</string>
+    <string name="repo_text_queued">텍스트 메시지가 전송 대기 중입니다.</string>
+    <string name="repo_text_rejected">텍스트 메시지 전송이 거부되었습니다: Telegram 오류 %1$d: %2$s</string>
+    <string name="repo_text_unexpected_response">텍스트 전송 중 예상하지 못한 응답을 받았습니다.</string>
+    <string name="repo_text_delivered">텍스트 메시지를 전송했습니다.</string>
+    <string name="repo_text_failed">텍스트 메시지 전송 실패: Telegram 오류 %1$d: %2$s</string>
 
     <string name="repo_not_started">Telegram 연결을 시작하지 않았습니다.</string>
     <string name="repo_connection_already_running">Telegram 연결이 이미 실행 중입니다. 변경한 설정은 저장했습니다.</string>

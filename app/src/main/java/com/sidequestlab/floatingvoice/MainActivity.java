@@ -20,6 +20,7 @@ import androidx.appcompat.app.AppCompatDelegate;
 import androidx.core.os.LocaleListCompat;
 
 import com.sidequestlab.floatingvoice.core.AppConfig;
+import com.sidequestlab.floatingvoice.core.OverlaySizePreset;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -62,12 +63,15 @@ public final class MainActivity extends AppCompatActivity implements TelegramRep
     private TextView operationStatus;
     private TelegramRepository telegram;
     private SecureSettingsStore settingsStore;
+    private OverlayUiPreferences overlayUiPreferences;
 
     @Override protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         bindViews();
+        overlayUiPreferences = new OverlayUiPreferences(this);
         setupLanguageSelector();
+        setupOverlaySizeSelector();
 
         FloatingVoiceApp app = (FloatingVoiceApp) getApplication();
         telegram = app.telegram();
@@ -145,6 +149,19 @@ public final class MainActivity extends AppCompatActivity implements TelegramRep
                     AppCompatDelegate.setApplicationLocales(requested);
                     ((FloatingVoiceApp) getApplication()).telegram().refreshLocalizedState();
                 }
+            }
+
+            @Override public void onNothingSelected(AdapterView<?> parent) { }
+        });
+    }
+
+    private void setupOverlaySizeSelector() {
+        Spinner selector = findViewById(R.id.overlay_size_selector);
+        selector.setSelection(overlayUiPreferences.sizePreset().ordinal(), false);
+        selector.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override public void onItemSelected(AdapterView<?> parent, View view,
+                                                 int position, long id) {
+                overlayUiPreferences.setSizePreset(OverlaySizePreset.fromPosition(position));
             }
 
             @Override public void onNothingSelected(AdapterView<?> parent) { }

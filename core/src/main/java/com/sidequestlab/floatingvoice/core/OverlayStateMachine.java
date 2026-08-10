@@ -153,15 +153,23 @@ public final class OverlayStateMachine {
             case TEXT_QUEUEING -> {
                 if (event == OverlayEvent.TEXT_QUEUED) {
                     state = State.TEXT_PENDING;
-                } else if (event == OverlayEvent.TEXT_REJECTED) {
-                    state = State.TEXT_COMPOSING;
+                } else if (event == OverlayEvent.TEXT_REJECTED
+                        || event == OverlayEvent.TEXT_DELIVERED) {
+                    state = State.IDLE;
+                } else if (event == OverlayEvent.TAP) {
+                    attemptId++;
+                    state = State.VOICE_STARTING;
+                    effects = List.of(Effect.START_VOICE);
                 }
             }
             case TEXT_PENDING -> {
-                if (event == OverlayEvent.TEXT_DELIVERED) {
+                if (event == OverlayEvent.TEXT_DELIVERED
+                        || event == OverlayEvent.TEXT_REJECTED) {
                     state = State.IDLE;
-                } else if (event == OverlayEvent.TEXT_REJECTED) {
-                    state = State.TEXT_COMPOSING;
+                } else if (event == OverlayEvent.TAP) {
+                    attemptId++;
+                    state = State.VOICE_STARTING;
+                    effects = List.of(Effect.START_VOICE);
                 }
             }
             case TEARING_DOWN -> {

@@ -36,6 +36,19 @@
             android:layout_marginBottom="12dp"
             android:entries="@array/language_options" />
 
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/overlay_size_label"
+            android:textStyle="bold" />
+
+        <Spinner
+            android:id="@+id/overlay_size_selector"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="12dp"
+            android:entries="@array/overlay_size_options" />
+
         <EditText
             android:id="@+id/api_id"
             android:layout_width="match_parent"

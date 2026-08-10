@@ -3,6 +3,12 @@
     <string name="app_name">Floating Voice</string>
     <string name="app_description">Send voice messages to a verified target bot using your Telegram account. Saving settings or signing in never sends a message.</string>
     <string name="language_label">Language</string>
+    <string name="overlay_size_label">Floating button size</string>
+    <string-array name="overlay_size_options">
+        <item>Small</item>
+        <item>Medium</item>
+        <item>Large</item>
+    </string-array>
     <string-array name="language_options" translatable="false">
         <item>System default</item>
         <item>한국어</item>
@@ -91,9 +97,19 @@
     <string name="notification_channel_name">Floating voice recording</string>
     <string name="notification_channel_description">Floating recording status for sending Telegram voice messages</string>
 
-    <string name="text_composer_title">Text composer</string>
-    <string name="text_composer_hint">Type multiple lines here. Text is not sent or saved.</string>
+    <string name="text_composer_title">Text message</string>
+    <string name="text_composer_hint">Type a message to the verified Telegram target.</string>
     <string name="text_composer_close">Close</string>
+    <string name="text_composer_send">Send</string>
+    <string name="text_composer_send_failed">Could not hand off this message. Your draft is still here.</string>
+    <string name="text_composer_obscured">Send is blocked because another app is covering this control.</string>
+    <string name="repo_text_connection_target_required">Telegram connection and a verified target are required. Text was not sent.</string>
+    <string name="repo_text_queuing">Queuing text for %1$s…</string>
+    <string name="repo_text_queued">Text message queued.</string>
+    <string name="repo_text_rejected">Text message was rejected: Telegram error %1$d: %2$s</string>
+    <string name="repo_text_unexpected_response">Unexpected response while sending text.</string>
+    <string name="repo_text_delivered">Text message sent.</string>
+    <string name="repo_text_failed">Text message failed: Telegram error %1$d: %2$s</string>
 
     <string name="repo_not_started">The Telegram connection has not started.</string>
     <string name="repo_connection_already_running">The Telegram connection is already running. The changed settings were saved.</string>
