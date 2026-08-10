@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="debug_text_composer_label">Text Composer Keyboard Spike (Debug Only)</string>
+    <string name="debug_text_composer_explanation">Debug-only harness. It opens the focusable text composer without Telegram login or a target. No text is sent or saved.</string>
+    <string name="debug_text_composer_settings">Open display-over-other-apps settings</string>
+    <string name="debug_text_composer_show">Show text composer</string>
+    <string name="debug_text_composer_close">Close text composer</string>
+    <string name="debug_text_composer_permission_required">Display over other apps permission is required. This harness does not grant or weaken it.</string>
+    <string name="debug_text_composer_ready">Ready. Telegram login and target are not required.</string>
+    <string name="debug_text_composer_showing">Text composer is showing. Text is not sent or saved.</string>
+    <string name="debug_text_composer_failed">The text composer could not be attached.</string>
+</resources>
