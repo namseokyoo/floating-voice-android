@@ -20,6 +20,10 @@ import android.view.View;
 import android.view.WindowManager;
 import android.widget.ImageButton;
 
+import com.sidequestlab.floatingvoice.core.GestureClassifier;
+import com.sidequestlab.floatingvoice.core.OverlayEvent;
+import com.sidequestlab.floatingvoice.core.OverlayStateMachine;
+
 import java.io.File;
 import java.time.Instant;
 import java.time.format.DateTimeFormatter;
@@ -30,12 +34,19 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
     public static final String ACTION_STOP = "com.sidequestlab.floatingvoice.STOP_OVERLAY";
     private static final int NOTIFICATION_ID = 41;
     private static final String CHANNEL_ID = "floatingvoice_overlay";
+    private static final int TOUCH_MOVEMENT_THRESHOLD_DP = 12;
+    private static final long TOUCH_LONG_PRESS_THRESHOLD_MS = 600L;
 
+    private final OverlayStateMachine overlayStateMachine = new OverlayStateMachine();
     private WindowManager windowManager;
     private WindowManager.LayoutParams layoutParams;
     private ImageButton bubble;
+    private DragTapListener dragTapListener;
     private MediaRecorder recorder;
     private File activeRecording;
+    private File readyVoiceRecording;
+    private int readyVoiceDuration;
+    private long readyVoiceAttemptId;
     private long recordingStartedAt;
     private TelegramRepository telegram;
     private String notificationText;
@@ -78,10 +89,17 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
     }
 
     @Override public void onDestroy() {
+        overlayStateMachine.accept(OverlayEvent.TEARDOWN);
+        ImageButton currentBubble = bubble;
+        DragTapListener currentTouchListener = dragTapListener;
+        bubble = null;
+        dragTapListener = null;
+        if (currentBubble != null && currentTouchListener != null) {
+            currentTouchListener.cancelPending(currentBubble);
+        }
         if (recorder != null) stopAndRetainInterruptedRecording();
-        if (bubble != null && windowManager != null) {
-            windowManager.removeView(bubble);
-            bubble = null;
+        if (currentBubble != null && windowManager != null) {
+            try { windowManager.removeView(currentBubble); } catch (RuntimeException ignored) { }
         }
         telegram.removeListener(this);
         super.onDestroy();
@@ -110,26 +128,49 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
         layoutParams.gravity = Gravity.TOP | Gravity.START;
         layoutParams.x = dp(16);
         layoutParams.y = dp(160);
-        bubble.setOnClickListener(v -> toggleRecording());
-        bubble.setOnTouchListener(new DragTapListener());
+        bubble.setOnClickListener(v -> dispatchOverlayEvent(OverlayEvent.TAP));
+        dragTapListener = new DragTapListener();
+        bubble.setOnTouchListener(dragTapListener);
         windowManager.addView(bubble, layoutParams);
     }
 
-    private void toggleRecording() {
-        if (recorder == null) startRecording(); else stopRecordingAndSend();
+    private OverlayStateMachine.Transition dispatchOverlayEvent(OverlayEvent event) {
+        return applyTransition(overlayStateMachine.accept(event));
+    }
+
+    private OverlayStateMachine.Transition dispatchOverlayEvent(
+            OverlayEvent event, long attemptId) {
+        return applyTransition(overlayStateMachine.accept(event, attemptId));
+    }
+
+    private OverlayStateMachine.Transition applyTransition(
+            OverlayStateMachine.Transition transition) {
+        for (OverlayStateMachine.Effect effect : transition.effects()) {
+            switch (effect) {
+                case START_VOICE -> startRecording();
+                case STOP_VOICE -> stopRecordingAndSend();
+                case SEND_VOICE -> sendReadyVoice();
+                case CANCEL_VOICE, SEND_TEXT, SHOW_MENU, HIDE_MENU, OPEN_TEXT_COMPOSER -> {
+                    // V5-03 wires only the existing tap-to-record voice path.
+                }
+            }
+        }
+        return transition;
     }
 
     private void startRecording() {
         File externalMusic = getExternalFilesDir(Environment.DIRECTORY_MUSIC);
         File root = new File(externalMusic == null ? getFilesDir() : externalMusic, "voice_notes");
         if (!root.mkdirs() && !root.isDirectory()) {
+            dispatchOverlayEvent(OverlayEvent.VOICE_START_FAILED);
             updateState(R.string.recording_folder_failed);
             return;
         }
         activeRecording = new File(root, "voice-"
                 + DateTimeFormatter.ISO_INSTANT.format(Instant.now()).replace(':', '-') + ".ogg");
-        MediaRecorder next = new MediaRecorder();
+        MediaRecorder next = null;
         try {
+            next = new MediaRecorder();
             next.setAudioSource(MediaRecorder.AudioSource.MIC);
             next.setOutputFormat(MediaRecorder.OutputFormat.OGG);
             next.setAudioEncoder(MediaRecorder.AudioEncoder.OPUS);
@@ -139,17 +180,23 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
             next.setOutputFile(activeRecording.getAbsolutePath());
             next.prepare();
             next.start();
-            recorder = next;
-            recordingStartedAt = SystemClock.elapsedRealtime();
-            bubble.setImageResource(R.drawable.ic_overlay_stop);
-            bubble.setContentDescription(text(R.string.content_description_stop_and_send));
-            bubble.setBackgroundResource(R.drawable.overlay_recording);
-            updateState(R.string.recording_in_progress);
         } catch (Exception e) {
-            next.release();
+            if (next != null) {
+                try { next.release(); } catch (RuntimeException ignored) { }
+            }
             recorder = null;
+            dispatchOverlayEvent(OverlayEvent.VOICE_START_FAILED);
             updateState(R.string.recording_start_failed, e.getMessage());
+            return;
         }
+
+        recorder = next;
+        recordingStartedAt = SystemClock.elapsedRealtime();
+        dispatchOverlayEvent(OverlayEvent.VOICE_START_SUCCEEDED);
+        bubble.setImageResource(R.drawable.ic_overlay_stop);
+        bubble.setContentDescription(text(R.string.content_description_stop_and_send));
+        bubble.setBackgroundResource(R.drawable.overlay_recording);
+        updateState(R.string.recording_in_progress);
     }
 
     private void stopRecordingAndSend() {
@@ -158,24 +205,57 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
         int duration = (int) Math.max(1,
                 (SystemClock.elapsedRealtime() - recordingStartedAt + 999) / 1000);
         try {
+            if (current == null) throw new IllegalStateException("Recorder is not active");
             current.stop();
             current.release();
         } catch (RuntimeException e) {
-            current.release();
+            if (current != null) {
+                try { current.release(); } catch (RuntimeException ignored) { }
+            }
+            dispatchOverlayEvent(OverlayEvent.VOICE_STOP_FAILED);
             updateIdleBubble();
             updateState(R.string.recording_stop_failed_retained, activeRecording);
             return;
         }
-        File completed = activeRecording;
+        readyVoiceRecording = activeRecording;
+        readyVoiceDuration = duration;
+        readyVoiceAttemptId = overlayStateMachine.attemptId();
         activeRecording = null;
         updateIdleBubble();
+        dispatchOverlayEvent(OverlayEvent.VOICE_STOP_SUCCEEDED);
+    }
+
+    private void sendReadyVoice() {
+        File completed = readyVoiceRecording;
+        int duration = readyVoiceDuration;
+        long attemptId = readyVoiceAttemptId;
+        readyVoiceRecording = null;
+        readyVoiceDuration = 0;
+        readyVoiceAttemptId = 0;
+        if (completed == null) return;
+
         telegram.sendVoiceNote(completed, duration, new TelegramRepository.SendCallback() {
             @Override public void onQueued(long temporaryMessageId) {
-                updateState(R.string.voice_queued_retained);
+                handleVoiceSendCallback(OverlayEvent.VOICE_QUEUED, attemptId,
+                        () -> updateState(R.string.voice_queued_retained));
             }
 
             @Override public void onRejected(String reason) {
-                updateState(reason);
+                handleVoiceSendCallback(OverlayEvent.VOICE_REJECTED, attemptId,
+                        () -> updateState(reason));
+            }
+        });
+    }
+
+    private void handleVoiceSendCallback(
+            OverlayEvent event, long attemptId, Runnable notificationUpdate) {
+        ImageButton currentBubble = bubble;
+        if (currentBubble == null || isTearingDown()) return;
+        currentBubble.post(() -> {
+            if (bubble != currentBubble || isTearingDown()) return;
+            OverlayStateMachine.Transition transition = dispatchOverlayEvent(event, attemptId);
+            if (transition.previousState() != transition.nextState()) {
+                notificationUpdate.run();
             }
         });
     }
@@ -184,7 +264,7 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
         MediaRecorder current = recorder;
         recorder = null;
         try { current.stop(); } catch (RuntimeException ignored) { }
-        current.release();
+        try { current.release(); } catch (RuntimeException ignored) { }
         if (activeRecording != null) {
             notificationResourceId = R.string.recording_interrupted_retained;
             notificationArguments = new Object[] {activeRecording.getAbsolutePath()};
@@ -193,13 +273,14 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
     }
 
     private void updateIdleBubble() {
-        if (bubble != null) {
-            bubble.post(() -> {
-                bubble.setImageResource(R.drawable.ic_overlay_mic);
-                bubble.setContentDescription(text(R.string.content_description_start_recording));
-                bubble.setBackgroundResource(R.drawable.overlay_idle);
-            });
-        }
+        ImageButton currentBubble = bubble;
+        if (currentBubble == null) return;
+        currentBubble.post(() -> {
+            if (bubble != currentBubble || isTearingDown()) return;
+            currentBubble.setImageResource(R.drawable.ic_overlay_mic);
+            currentBubble.setContentDescription(text(R.string.content_description_start_recording));
+            currentBubble.setBackgroundResource(R.drawable.overlay_idle);
+        });
     }
 
     private void updateState(String text) {
@@ -263,28 +344,43 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
     }
 
     @Override public void onStatus(String status) {
-        if (bubble != null) {
-            boolean isRecording = recorder != null;
-            bubble.post(() -> bubble.setContentDescription(text(isRecording
+        ImageButton currentBubble = bubble;
+        if (currentBubble == null || isTearingDown()) return;
+        currentBubble.post(() -> {
+            if (bubble != currentBubble || isTearingDown()) return;
+            boolean isRecording = isRecordingState();
+            currentBubble.setContentDescription(text(isRecording
                     ? R.string.content_description_stop_and_send
-                    : R.string.content_description_start_recording)));
+                    : R.string.content_description_start_recording));
             if (!isRecording) updateState(status);
-        }
+        });
     }
 
     @Override public void onLocaleChanged() {
-        if (bubble == null) return;
-        boolean isRecording = recorder != null;
-        bubble.post(() -> bubble.setContentDescription(text(isRecording
-                ? R.string.content_description_stop_and_send
-                : R.string.content_description_start_recording)));
-        if (isRecording) {
-            updateState(R.string.recording_in_progress);
-        } else if (notificationResourceId == 0) {
-            updateState(telegram.lastStatus());
-        } else {
-            publishState();
-        }
+        ImageButton currentBubble = bubble;
+        if (currentBubble == null || isTearingDown()) return;
+        currentBubble.post(() -> {
+            if (bubble != currentBubble || isTearingDown()) return;
+            boolean isRecording = isRecordingState();
+            currentBubble.setContentDescription(text(isRecording
+                    ? R.string.content_description_stop_and_send
+                    : R.string.content_description_start_recording));
+            if (isRecording) {
+                updateState(R.string.recording_in_progress);
+            } else if (notificationResourceId == 0) {
+                updateState(telegram.lastStatus());
+            } else {
+                publishState();
+            }
+        });
+    }
+
+    private boolean isRecordingState() {
+        return overlayStateMachine.state() == OverlayStateMachine.State.RECORDING;
+    }
+
+    private boolean isTearingDown() {
+        return overlayStateMachine.state() == OverlayStateMachine.State.TEARING_DOWN;
     }
 
     private final class DragTapListener implements View.OnTouchListener {
@@ -292,32 +388,92 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
         private int initialY;
         private float downX;
         private float downY;
+        private float latestX;
+        private float latestY;
         private long downAt;
+        private Runnable longPressTimeout;
+        private final GestureClassifier classifier = new GestureClassifier(
+                dp(TOUCH_MOVEMENT_THRESHOLD_DP), TOUCH_LONG_PRESS_THRESHOLD_MS);
 
         @Override public boolean onTouch(View view, MotionEvent event) {
             switch (event.getActionMasked()) {
                 case MotionEvent.ACTION_DOWN:
+                    cancelTimeout(view);
                     initialX = layoutParams.x;
                     initialY = layoutParams.y;
                     downX = event.getRawX();
                     downY = event.getRawY();
+                    latestX = downX;
+                    latestY = downY;
                     downAt = SystemClock.elapsedRealtime();
+                    classifier.classify(GestureClassifier.Action.DOWN, 0, 0, 0);
+                    scheduleLongPress(view);
                     return true;
                 case MotionEvent.ACTION_MOVE:
-                    layoutParams.x = initialX + Math.round(event.getRawX() - downX);
-                    layoutParams.y = initialY + Math.round(event.getRawY() - downY);
-                    windowManager.updateViewLayout(bubble, layoutParams);
+                    latestX = event.getRawX();
+                    latestY = event.getRawY();
+                    GestureClassifier.Classification movement = classifier.classify(
+                            GestureClassifier.Action.MOVE,
+                            SystemClock.elapsedRealtime() - downAt,
+                            latestX - downX, latestY - downY);
+                    if (movement == GestureClassifier.Classification.DRAG
+                            || movement == GestureClassifier.Classification.LONG_PRESS) {
+                        cancelTimeout(view);
+                    }
+                    layoutParams.x = initialX + Math.round(latestX - downX);
+                    layoutParams.y = initialY + Math.round(latestY - downY);
+                    windowManager.updateViewLayout(view, layoutParams);
                     return true;
                 case MotionEvent.ACTION_UP:
-                    float distance = Math.abs(event.getRawX() - downX)
-                            + Math.abs(event.getRawY() - downY);
-                    if (distance < dp(12) && SystemClock.elapsedRealtime() - downAt < 600) {
+                    latestX = event.getRawX();
+                    latestY = event.getRawY();
+                    cancelTimeout(view);
+                    GestureClassifier.Classification classification = classifier.classify(
+                            GestureClassifier.Action.UP,
+                            SystemClock.elapsedRealtime() - downAt,
+                            latestX - downX, latestY - downY);
+                    if (classification == GestureClassifier.Classification.TAP) {
                         view.performClick();
                     }
+                    return true;
+                case MotionEvent.ACTION_CANCEL:
+                    latestX = event.getRawX();
+                    latestY = event.getRawY();
+                    cancelTimeout(view);
+                    classifier.classify(GestureClassifier.Action.CANCEL,
+                            SystemClock.elapsedRealtime() - downAt,
+                            latestX - downX, latestY - downY);
                     return true;
                 default:
                     return false;
             }
+        }
+
+        void cancelPending(View view) {
+            cancelTimeout(view);
+            classifier.classify(GestureClassifier.Action.CANCEL,
+                    Math.max(0, SystemClock.elapsedRealtime() - downAt),
+                    latestX - downX, latestY - downY);
+        }
+
+        private void scheduleLongPress(View view) {
+            longPressTimeout = () -> {
+                longPressTimeout = null;
+                GestureClassifier.Classification classification = classifier.classify(
+                        GestureClassifier.Action.TIMEOUT,
+                        SystemClock.elapsedRealtime() - downAt,
+                        latestX - downX, latestY - downY);
+                if (classification == GestureClassifier.Classification.LONG_PRESS) {
+                    // V5-05 will connect this classification to the visible menu.
+                }
+            };
+            view.postDelayed(longPressTimeout, TOUCH_LONG_PRESS_THRESHOLD_MS);
+        }
+
+        private void cancelTimeout(View view) {
+            Runnable pending = longPressTimeout;
+            longPressTimeout = null;
+            if (pending != null) view.removeCallbacks(pending);
         }
     }
 }
