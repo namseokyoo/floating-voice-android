@@ -23,6 +23,7 @@ public final class TelegramRepository {
 
     public interface Listener {
         default void onStatus(String status) { }
+        default void onStatus(String status, boolean persistent) { onStatus(status); }
         default void onAuthStage(AuthStage stage) { }
         default void onAccountChanged(String account) { }
         default void onTargetChanged(TargetChat target) { }
@@ -68,6 +69,8 @@ public final class TelegramRepository {
     private volatile TargetChat target;
     private volatile AuthStage authStage = AuthStage.NOT_STARTED;
     private volatile StatusMessage lastStatus = new StatusMessage(R.string.repo_not_started);
+    private volatile StatusMessage lastPersistentStatus;
+    private volatile boolean restartAfterClose;
     private volatile AccountState accountState = AccountState.NOT_AUTHENTICATED;
     private volatile String accountName;
     private volatile long accountUserId;
@@ -85,7 +88,11 @@ public final class TelegramRepository {
     public void addListener(Listener listener) {
         synchronized (stateDeliveryLock) {
             listeners.add(listener);
-            listener.onStatus(render(lastStatus));
+            listener.onStatus(render(lastStatus), isPersistentStatus(lastStatus.resourceId));
+            StatusMessage persistent = lastPersistentStatus;
+            if (persistent != null && persistent != lastStatus) {
+                listener.onStatus(render(persistent), true);
+            }
             listener.onAuthStage(authStage);
             listener.onAccountChanged(accountSummary());
             listener.onTargetChanged(target);
@@ -100,7 +107,37 @@ public final class TelegramRepository {
             return render(lastStatus);
         }
     }
-    public boolean isReadyWithTarget() { return authStage == AuthStage.READY && target != null; }
+    public boolean isReadyWithTarget() {
+        AppConfig current = config;
+        TargetChat fixedTarget = target;
+        return authStage == AuthStage.READY && current != null && current.hasBotUsername()
+                && fixedTarget != null
+                && fixedTarget.username().equals(current.botUsername());
+    }
+
+    public void clearPersistentStatus() { lastPersistentStatus = null; }
+
+    public void restartCurrentConfiguration() {
+        AppConfig current = config;
+        if (current == null) {
+            status(R.string.repo_api_credentials_required);
+            return;
+        }
+        Client active = client;
+        if (active == null) {
+            start(current);
+            return;
+        }
+        restartAfterClose = true;
+        status(R.string.repo_restarting_session);
+        active.send(new TdApi.Close(), result -> {
+            if (result instanceof TdApi.Error) {
+                restartAfterClose = false;
+                TdApi.Error error = (TdApi.Error) result;
+                status(R.string.repo_restart_failed, error.code, error.message);
+            }
+        });
+    }
 
     public void refreshLocalizedState() {
         synchronized (stateDeliveryLock) {
@@ -466,7 +503,12 @@ public final class TelegramRepository {
             accountState = AccountState.CLOSED;
             notifyAccountChanged();
             stage(AuthStage.CLOSED);
-            status(R.string.repo_session_closed);
+            if (restartAfterClose) {
+                restartAfterClose = false;
+                start(config);
+            } else {
+                status(R.string.repo_session_closed);
+            }
         } else {
             stage(AuthStage.UNSUPPORTED);
             status(R.string.repo_unsupported_auth_stage, state.getClass().getSimpleName());
@@ -585,8 +627,37 @@ public final class TelegramRepository {
             StatusMessage next = new StatusMessage(resourceId, arguments);
             lastStatus = next;
             String localized = render(next);
-            for (Listener listener : listeners) listener.onStatus(localized);
+            boolean persistent = isPersistentStatus(resourceId);
+            if (persistent) lastPersistentStatus = next;
+            for (Listener listener : listeners) listener.onStatus(localized, persistent);
         }
+    }
+
+    private static boolean isPersistentStatus(int resourceId) {
+        return resourceId == R.string.repo_update_error
+                || resourceId == R.string.repo_connection_error
+                || resourceId == R.string.repo_bot_not_found
+                || resourceId == R.string.repo_unexpected_search_response
+                || resourceId == R.string.repo_not_private_chat
+                || resourceId == R.string.repo_bot_check_failed
+                || resourceId == R.string.repo_user_not_bot
+                || resourceId == R.string.repo_recording_empty
+                || resourceId == R.string.repo_connection_target_incomplete_retained
+                || resourceId == R.string.repo_target_changed_retained
+                || resourceId == R.string.repo_send_rejected_retained
+                || resourceId == R.string.repo_unexpected_send_response_retained
+                || resourceId == R.string.repo_logout_failed
+                || resourceId == R.string.repo_send_complete_delete_failed
+                || resourceId == R.string.repo_send_failed_no_path
+                || resourceId == R.string.repo_send_failed_retained
+                || resourceId == R.string.repo_text_rejected
+                || resourceId == R.string.repo_text_unexpected_response
+                || resourceId == R.string.repo_text_failed
+                || resourceId == R.string.repo_unsupported_auth_stage
+                || resourceId == R.string.repo_database_folder_failed
+                || resourceId == R.string.repo_files_folder_failed
+                || resourceId == R.string.repo_error_format
+                || resourceId == R.string.repo_restart_failed;
     }
 
 }

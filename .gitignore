@@ -28,6 +28,7 @@ crash-dumps/
 vendor/
 tdlib-dist/
 dist/
+design/quiet-recorder-mockups/renders/
 .env
 .env.*
 *.jks

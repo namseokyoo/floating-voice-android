@@ -32,6 +32,21 @@ public final class AppConfig {
 
     public static ValidationResult validate(String apiIdText, String apiHash, String phoneNumber,
                                             String botUsername) {
+        ValidationResult connection = validateConnection(apiIdText, apiHash, phoneNumber);
+        List<ValidationError> errors = new ArrayList<>(connection.errors());
+        String normalizedUsername = UsernameNormalizer.normalize(botUsername);
+        if (!UsernameNormalizer.isValid(normalizedUsername)) {
+            errors.add(ValidationError.INVALID_BOT_USERNAME);
+        }
+        AppConfig config = errors.isEmpty()
+                ? new AppConfig(connection.config().apiId(), connection.config().apiHash(),
+                        connection.config().phoneNumber(), normalizedUsername)
+                : null;
+        return new ValidationResult(config, errors);
+    }
+
+    public static ValidationResult validateConnection(String apiIdText, String apiHash,
+                                                      String phoneNumber) {
         List<ValidationError> errors = new ArrayList<>();
         int parsedApiId = 0;
         try {
@@ -53,13 +68,8 @@ public final class AppConfig {
             errors.add(ValidationError.INVALID_PHONE_NUMBER);
         }
 
-        String normalizedUsername = UsernameNormalizer.normalize(botUsername);
-        if (!UsernameNormalizer.isValid(normalizedUsername)) {
-            errors.add(ValidationError.INVALID_BOT_USERNAME);
-        }
-
         AppConfig config = errors.isEmpty()
-                ? new AppConfig(parsedApiId, normalizedHash, normalizedPhone, normalizedUsername)
+                ? new AppConfig(parsedApiId, normalizedHash, normalizedPhone, "")
                 : null;
         return new ValidationResult(config, errors);
     }
@@ -68,6 +78,12 @@ public final class AppConfig {
     public String apiHash() { return apiHash; }
     public String phoneNumber() { return phoneNumber; }
     public String botUsername() { return botUsername; }
+    public boolean hasBotUsername() { return UsernameNormalizer.isValid(botUsername); }
+    public boolean hasSameConnection(AppConfig other) {
+        return other != null && apiId == other.apiId
+                && apiHash.equalsIgnoreCase(other.apiHash)
+                && phoneNumber.equals(other.phoneNumber);
+    }
 
     public static final class ValidationResult {
         private final AppConfig config;

@@ -1,14 +1,25 @@
 package com.sidequestlab.floatingvoice.core;
 
-/** Pure readiness decision for the MainActivity status dashboard. */
+/** Pure state decision for the MainActivity Quiet Recorder home. */
 public final class DashboardReadiness {
-    public enum State { SETUP_REQUIRED, READY, RUNNING }
+    public enum State {
+        CONNECT_TELEGRAM,
+        AUTHENTICATING,
+        SELECT_TARGET,
+        GRANT_PERMISSIONS,
+        READY,
+        RUNNING
+    }
 
     private DashboardReadiness() { }
 
-    public static State evaluate(boolean running, boolean telegramReady,
+    public static State evaluate(boolean running, boolean hasConfiguration,
+                                 boolean authenticationComplete, boolean targetConfirmed,
                                  boolean permissionsGranted) {
-        if (!telegramReady || !permissionsGranted) return State.SETUP_REQUIRED;
+        if (!hasConfiguration) return State.CONNECT_TELEGRAM;
+        if (!authenticationComplete) return State.AUTHENTICATING;
+        if (!targetConfirmed) return State.SELECT_TARGET;
+        if (!permissionsGranted) return State.GRANT_PERMISSIONS;
         return running ? State.RUNNING : State.READY;
     }
 }

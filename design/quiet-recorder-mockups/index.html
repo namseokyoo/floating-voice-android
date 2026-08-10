@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Floating Voice · Quiet Recorder Mockups</title>
+<style>
+  * { box-sizing: border-box; }
+  :root {
+    --page: #e7e6e1;
+    --page-text: #262925;
+    --page-muted: #686d68;
+  }
+  html { background: var(--page); }
+  body {
+    margin: 0;
+    color: var(--page-text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans KR", sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .board {
+    width: 1280px;
+    margin: 0 auto;
+    padding: 54px 46px 64px;
+  }
+  .board-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    margin: 0 8px 34px;
+  }
+  .board-head h1 { margin: 0 0 8px; font-size: 30px; letter-spacing: -.6px; }
+  .board-head p { margin: 0; color: var(--page-muted); font-size: 15px; }
+  .legend { display: flex; gap: 9px; align-items: center; color: var(--page-muted); font-size: 13px; }
+  .legend i { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+  .legend .sage { background: #52746c; }
+  .legend .coral { background: #a4473f; margin-left: 9px; }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 34px 28px;
+  }
+  .specimen { display: flex; flex-direction: column; align-items: center; }
+  .label { width: 372px; margin: 0 0 11px; display: flex; justify-content: space-between; align-items: baseline; }
+  .label strong { font-size: 15px; letter-spacing: -.1px; }
+  .label span { color: var(--page-muted); font-size: 12px; text-transform: uppercase; letter-spacing: .8px; }
+  .phone {
+    --bg: #f4f2ec;
+    --surface: #eeece5;
+    --text: #222622;
+    --muted: #686e68;
+    --line: #d8d6ce;
+    --accent: #52746c;
+    --on-accent: #f8fbf8;
+    --accent-soft: #dce7e2;
+    --coral: #a4473f;
+    --coral-soft: #f2ded9;
+    position: relative;
+    width: 372px;
+    height: 806px;
+    overflow: hidden;
+    border-radius: 46px;
+    color: var(--text);
+    background: var(--bg);
+    border: 1px solid rgba(32,37,32,.14);
+    box-shadow: 0 18px 42px rgba(26,30,26,.14), 0 2px 5px rgba(26,30,26,.08);
+  }
+  .phone.dark {
+    --bg: #1c1d1b;
+    --surface: #252724;
+    --text: #f2f1eb;
+    --muted: #b9bbb3;
+    --line: #3c3f3a;
+    --accent: #8fcfc5;
+    --on-accent: #18342f;
+    --accent-soft: #2c4641;
+    --coral: #ee8b80;
+    --coral-soft: #4a302d;
+    border-color: rgba(255,255,255,.13);
+    box-shadow: 0 18px 42px rgba(0,0,0,.25), 0 2px 5px rgba(0,0,0,.18);
+  }
+  .statusbar {
+    height: 42px;
+    padding: 15px 23px 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    font-size: 12px;
+    font-weight: 650;
+    letter-spacing: .1px;
+  }
+  .sysicons { display: flex; gap: 7px; align-items: center; }
+  .signal { width: 14px; height: 10px; display: flex; gap: 1px; align-items: flex-end; }
+  .signal i { width: 2px; background: currentColor; border-radius: 1px; }
+  .signal i:nth-child(1){height:4px}.signal i:nth-child(2){height:6px}.signal i:nth-child(3){height:8px}.signal i:nth-child(4){height:10px}
+  .wifi { width: 14px; height: 10px; border-top: 2px solid currentColor; border-radius: 50%; position: relative; }
+  .wifi:after { content:""; position:absolute; width:3px; height:3px; border-radius:50%; background:currentColor; left:5px; top:5px; }
+  .battery { width: 19px; height: 9px; border: 1.5px solid currentColor; border-radius: 2px; position: relative; }
+  .battery:before { content:""; position:absolute; inset:1.5px; right:3px; background:currentColor; border-radius:1px; }
+  .battery:after { content:""; position:absolute; width:2px; height:4px; right:-3.5px; top:1px; background:currentColor; border-radius:0 1px 1px 0; opacity:.55; }
+  .topbar { height: 64px; padding: 8px 21px 7px 25px; display: flex; align-items: center; justify-content: space-between; }
+  .brand { font-size: 18px; font-weight: 700; letter-spacing: -.35px; }
+  .icon-btn { width: 42px; height: 42px; border: 0; color: var(--muted); background: transparent; border-radius: 50%; display:grid; place-items:center; cursor:pointer; }
+  .icon-btn:hover { background: var(--surface); color: var(--text); }
+  .icon-btn svg { width: 21px; height: 21px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+  .content { height: calc(100% - 106px); padding: 0 28px 24px; display: flex; flex-direction: column; }
+  .state-main { flex: 1; display: flex; flex-direction: column; justify-content: center; padding-bottom: 34px; }
+  .glyph { width: 54px; height: 54px; color: var(--accent); margin-bottom: 28px; }
+  .glyph svg { width: 100%; height: 100%; fill:none; stroke:currentColor; stroke-width:1.55; stroke-linecap:round; stroke-linejoin:round; }
+  .glyph.ready { width: 66px; height: 66px; border-radius: 50%; background: var(--accent-soft); display:grid; place-items:center; }
+  .glyph.ready svg { width:31px; height:31px; }
+  .glyph.running { width: 74px; height: 74px; border-radius: 50%; background: var(--accent-soft); display:grid; place-items:center; position:relative; }
+  .glyph.running svg { width:31px; height:31px; }
+  .glyph.running:after { content:""; position:absolute; width:10px; height:10px; right:1px; top:3px; background:var(--accent); border:4px solid var(--bg); border-radius:50%; }
+  .eyebrow { font-size: 13px; color: var(--accent); font-weight: 720; letter-spacing: .2px; margin-bottom: 9px; }
+  h2 { font-size: 30px; line-height: 1.19; letter-spacing: -1.15px; margin: 0 0 13px; font-weight: 735; }
+  .support { margin: 0; color: var(--muted); font-size: 15px; line-height: 1.6; letter-spacing: -.2px; }
+  .target { display:flex; align-items:center; gap:8px; margin-top:18px; color:var(--text); font-size:14px; font-weight:620; }
+  .target i { width:8px; height:8px; border-radius:50%; background:var(--accent); box-shadow:0 0 0 4px var(--accent-soft); }
+  .primary, .secondary {
+    width: 100%; min-height: 54px; border-radius: 12px; font-size: 16px; font-weight: 700; letter-spacing: -.2px; cursor:pointer; transition:.15s ease;
+  }
+  .primary { border: 1px solid var(--accent); color: var(--on-accent); background: var(--accent); }
+  .primary:hover { filter: brightness(.96); transform: translateY(-1px); }
+  .secondary { border: 1px solid var(--line); color: var(--coral); background: transparent; }
+  .secondary:hover { background:var(--coral-soft); border-color:var(--coral); }
+  .microcopy { min-height: 24px; text-align:center; margin: 11px 4px 0; color:var(--muted); font-size:12px; line-height:1.45; }
+  .home-indicator { position:absolute; width:118px; height:4px; border-radius:5px; background:var(--text); opacity:.75; bottom:9px; left:127px; }
+  .toast { position:absolute; left:24px; right:24px; bottom:28px; min-height:48px; padding:13px 16px; display:flex; align-items:center; justify-content:center; text-align:center; color:var(--bg); background:var(--text); border-radius:10px; font-size:13px; line-height:1.35; opacity:0; transform:translateY(12px); pointer-events:none; transition:.2s ease; z-index:8; }
+  .toast.show { opacity:1; transform:translateY(0); }
+  .sheet { position:absolute; inset:0; display:none; background:var(--bg); z-index:7; }
+  .sheet.open { display:block; }
+  .sheet-head { height:96px; padding:45px 22px 0 15px; display:flex; align-items:center; gap:7px; border-bottom:1px solid var(--line); }
+  .sheet-head .icon-btn { flex:none; }
+  .sheet-head strong { font-size:19px; }
+  .settings { padding:18px 24px; }
+  .setting-section { color:var(--accent); font-size:12px; font-weight:750; margin:14px 0 8px; letter-spacing:.25px; }
+  .row { min-height:63px; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid var(--line); font-size:15px; }
+  .row span:last-child { color:var(--muted); font-size:14px; }
+  .danger { color:var(--coral); }
+  .modal { position:absolute; inset:0; display:none; align-items:flex-end; background:rgba(0,0,0,.28); z-index:9; }
+  .modal.open { display:flex; }
+  .panel { width:100%; min-height:290px; background:var(--bg); border-radius:24px 24px 0 0; padding:26px 25px 38px; }
+  .panel h3 { margin:0 0 10px; font-size:22px; }
+  .panel p { margin:0 0 22px; color:var(--muted); line-height:1.55; font-size:14px; }
+  .panel .secondary { margin-top:10px; color:var(--text); }
+  @media (max-width: 900px) {
+    .board { width: 430px; padding: 34px 29px; }
+    .board-head { display:block; }
+    .legend { margin-top:16px; }
+    .grid { grid-template-columns:1fr; gap:30px; }
+  }
+</style>
+</head>
+<body>
+<div class="board">
+  <header class="board-head">
+    <div>
+      <h1>Quiet Recorder</h1>
+      <p>Floating Voice · 상태 중심 홈 목업 · 2026-08-11</p>
+    </div>
+    <div class="legend"><i class="sage"></i> 주 행동 <i class="coral"></i> 녹음·중지·오류</div>
+  </header>
+  <main class="grid" id="grid"></main>
+</div>
+<script>
+const states = [
+  {
+    key:'setup', label:'설정 전', eyebrow:'처음 설정',
+    title:'Telegram을\n연결해 주세요',
+    support:'음성 기록을 보낼 계정과\n대상을 먼저 연결합니다.',
+    action:'Telegram 연결하기', note:'약 2분 정도 걸려요', icon:'link'
+  },
+  {
+    key:'ready', label:'준비 완료', eyebrow:'준비 완료',
+    title:'바로 기록할 수\n있어요',
+    support:'플로팅 버튼을 켜면 다른 앱 위에서\n음성과 텍스트를 보낼 수 있습니다.',
+    action:'플로팅 버튼 켜기', note:'버튼은 화면 가장자리로 옮길 수 있어요', icon:'mic', target:'@my_hermes_bot'
+  },
+  {
+    key:'running', label:'실행 중', eyebrow:'사용 중',
+    title:'플로팅 버튼을\n사용 중이에요',
+    support:'다른 앱으로 돌아가 플로팅 버튼을\n눌러 기록을 시작하세요.',
+    action:'플로팅 버튼 중지', note:'중지해도 Telegram 연결은 유지됩니다', icon:'wave', target:'@my_hermes_bot'
+  }
+];
+const gear=`<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-1.86 1.86-.06-.06A1.7 1.7 0 0 0 16 18.4a1.7 1.7 0 0 0-1 .6 1.7 1.7 0 0 0-.4 1.1V20h-2.64v-.1A1.7 1.7 0 0 0 10.9 18.4a1.7 1.7 0 0 0-1.88.34l-.06.06-1.86-1.86.06-.06A1.7 1.7 0 0 0 7.5 15a1.7 1.7 0 0 0-1.6-1H5.8v-2.64h.1a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.34-1.88l-.06-.06 1.86-1.86.06.06A1.7 1.7 0 0 0 10.9 7a1.7 1.7 0 0 0 1-1.6v-.1h2.64v.1A1.7 1.7 0 0 0 16 7a1.7 1.7 0 0 0 1.88-.34l.06-.06 1.86 1.86-.06.06A1.7 1.7 0 0 0 19.4 10a1.7 1.7 0 0 0 1.6 1h.1v2.64H21a1.7 1.7 0 0 0-1.6 1.36Z"/></svg>`;
+const back=`<svg viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg>`;
+const icons={
+ link:`<svg viewBox="0 0 64 64"><path d="M27 38 21.5 43.5a10 10 0 0 1-14-14L18 19a10 10 0 0 1 14 0"/><path d="m37 26 5.5-5.5a10 10 0 0 1 14 14L46 45a10 10 0 0 1-14 0"/><path d="m23 41 18-18"/></svg>`,
+ mic:`<svg viewBox="0 0 64 64"><rect x="23" y="10" width="18" height="31" rx="9"/><path d="M16 30a16 16 0 0 0 32 0M32 46v9M24 55h16"/></svg>`,
+ wave:`<svg viewBox="0 0 64 64"><path d="M13 37V27M23 43V21M32 49V15M41 42V22M51 36V28"/></svg>`
+};
+function systemBar(){return `<div class="statusbar"><span>9:41</span><span class="sysicons"><span class="signal"><i></i><i></i><i></i><i></i></span><span class="wifi"></span><span class="battery"></span></span></div>`}
+function settingsSheet(){return `<div class="sheet"><div class="sheet-head"><button class="icon-btn back" aria-label="뒤로">${back}</button><strong>설정</strong></div><div class="settings"><div class="setting-section">사용 환경</div><div class="row"><span>언어</span><span>한국어 ›</span></div><div class="row"><span>플로팅 버튼 크기</span><span>보통 ›</span></div><div class="setting-section">TELEGRAM</div><div class="row"><span>API 정보</span><span>연결됨 ›</span></div><div class="row danger"><span>로그아웃</span><span>›</span></div></div></div>`}
+function phone(s, theme){
+  const id=`${s.key}-${theme}`;
+  const target=s.target?`<div class="target"><i></i><span>보낼 곳 · ${s.target}</span></div>`:'';
+  const glyphClass=s.key==='ready'?'ready':s.key==='running'?'running':'';
+  const buttonClass=s.key==='running'?'secondary':'primary';
+  return `<article class="specimen"><div class="label"><strong>${s.label}</strong><span>${theme}</span></div><section class="phone ${theme}" id="${id}" data-state="${s.key}">${systemBar()}<div class="topbar"><span class="brand">플로팅 보이스</span><button class="icon-btn settings-btn" aria-label="설정 열기">${gear}</button></div><div class="content"><div class="state-main"><div class="glyph ${glyphClass}">${icons[s.icon]}</div><div class="eyebrow">${s.eyebrow}</div><h2>${s.title.replace('\n','<br>')}</h2><p class="support">${s.support.replace('\n','<br>')}</p>${target}</div><button class="${buttonClass} action">${s.action}</button><div class="microcopy">${s.note}</div></div><div class="toast"></div>${settingsSheet()}<div class="modal"><div class="panel"><h3>플로팅 버튼을 중지할까요?</h3><p>진행 중인 녹음이 있다면 안전하게 보관하고 전송하지 않습니다.</p><button class="primary confirm-stop">중지하기</button><button class="secondary cancel-stop">계속 사용</button></div></div><div class="home-indicator"></div></section></article>`;
+}
+document.querySelector('#grid').innerHTML=['light','dark'].flatMap(t=>states.map(s=>phone(s,t))).join('');
+document.querySelectorAll('.settings-btn').forEach(b=>b.onclick=()=>b.closest('.phone').querySelector('.sheet').classList.add('open'));
+document.querySelectorAll('.back').forEach(b=>b.onclick=()=>b.closest('.sheet').classList.remove('open'));
+document.querySelectorAll('.action').forEach(b=>b.onclick=()=>{
+ const p=b.closest('.phone'), state=p.dataset.state;
+ if(state==='running'){p.querySelector('.modal').classList.add('open');return;}
+ const toast=p.querySelector('.toast'); toast.textContent=state==='setup'?'Telegram 연결 설정을 시작합니다':'플로팅 버튼을 시작하는 중입니다…'; toast.classList.add('show'); setTimeout(()=>toast.classList.remove('show'),1500);
+});
+document.querySelectorAll('.cancel-stop').forEach(b=>b.onclick=()=>b.closest('.modal').classList.remove('open'));
+document.querySelectorAll('.confirm-stop').forEach(b=>b.onclick=()=>{const p=b.closest('.phone');p.querySelector('.modal').classList.remove('open');const t=p.querySelector('.toast');t.textContent='플로팅 버튼을 종료했습니다';t.classList.add('show');setTimeout(()=>t.classList.remove('show'),1500)});
+</script>
+</body>
+</html>

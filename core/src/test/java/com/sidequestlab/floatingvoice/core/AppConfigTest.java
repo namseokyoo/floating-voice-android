@@ -30,6 +30,29 @@ class AppConfigTest {
     }
 
     @Test
+    void acceptsConnectionBeforeTargetSelection() {
+        AppConfig.ValidationResult result = AppConfig.validateConnection(
+                "123456", "0123456789abcdef0123456789abcdef", "+821012345678");
+
+        assertTrue(result.isValid());
+        assertFalse(result.config().hasBotUsername());
+        assertEquals("", result.config().botUsername());
+    }
+
+    @Test
+    void connectionIdentityExcludesTargetButIncludesAccountInputs() {
+        AppConfig a = new AppConfig(1, "0123456789abcdef0123456789abcdef",
+                "+821012345678", "first_bot");
+        AppConfig sameConnection = new AppConfig(1, "0123456789ABCDEF0123456789ABCDEF",
+                "+821012345678", "second_bot");
+        AppConfig otherPhone = new AppConfig(1, "0123456789abcdef0123456789abcdef",
+                "+821087654321", "first_bot");
+
+        assertTrue(a.hasSameConnection(sameConnection));
+        assertFalse(a.hasSameConnection(otherPhone));
+    }
+
+    @Test
     void validationErrorsAreLanguageNeutralCodes() {
         for (AppConfig.ValidationError error : AppConfig.ValidationError.values()) {
             assertTrue(error.name().matches("[A-Z_]+"));

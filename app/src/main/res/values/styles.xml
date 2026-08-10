@@ -14,6 +14,10 @@
         <item name="colorOnSurface">@color/fv_on_surface</item>
         <item name="colorOnSurfaceVariant">@color/fv_on_surface_variant</item>
         <item name="colorOutline">@color/fv_outline</item>
+        <item name="colorOutlineVariant">@color/fv_outline_variant</item>
+        <item name="colorError">@color/fv_recording</item>
+        <item name="colorOnError">@color/fv_on_recording</item>
+        <item name="colorErrorContainer">@color/fv_recording_container</item>
         <item name="android:navigationBarColor">@color/fv_surface</item>
         <item name="android:statusBarColor">@color/fv_surface</item>
         <item name="android:windowBackground">@color/fv_surface</item>
@@ -31,7 +35,7 @@
         <item name="windowNoTitle">true</item>
     </style>
 
-    <!-- Overlay-only M3 theme remains isolated from activity dynamic color. -->
+    <!-- Deterministic M3 theme shared by overlay and activity surfaces. -->
     <style name="Theme.FloatingVoice.OverlayMaterial3" parent="Theme.Material3.DayNight.NoActionBar">
         <item name="colorPrimary">@color/fv_primary</item>
         <item name="colorOnPrimary">@color/fv_on_primary</item>
@@ -45,6 +49,10 @@
         <item name="colorOnSurface">@color/fv_on_surface</item>
         <item name="colorOnSurfaceVariant">@color/fv_on_surface_variant</item>
         <item name="colorOutline">@color/fv_outline</item>
+        <item name="colorOutlineVariant">@color/fv_outline_variant</item>
+        <item name="colorError">@color/fv_recording</item>
+        <item name="colorOnError">@color/fv_on_recording</item>
+        <item name="colorErrorContainer">@color/fv_recording_container</item>
         <item name="android:fontFamily">sans</item>
     </style>
 
@@ -63,20 +71,24 @@
         <item name="cornerSize">16dp</item>
     </style>
 
-    <style name="FloatingVoice.SectionTitle" parent="TextAppearance.Material3.TitleMedium">
+    <style name="FloatingVoice.QuietPrimaryButton" parent="Widget.Material3.Button">
         <item name="android:layout_width">match_parent</item>
         <item name="android:layout_height">wrap_content</item>
-        <item name="android:layout_marginTop">24dp</item>
-        <item name="android:layout_marginBottom">8dp</item>
-        <item name="android:textColor">?attr/colorOnSurface</item>
+        <item name="android:minHeight">54dp</item>
+        <item name="cornerRadius">12dp</item>
     </style>
 
-    <style name="FloatingVoice.SectionCard" parent="Widget.Material3.CardView.Elevated">
+    <style name="FloatingVoice.QuietOutlinedButton" parent="Widget.Material3.Button.OutlinedButton">
         <item name="android:layout_width">match_parent</item>
         <item name="android:layout_height">wrap_content</item>
-        <item name="cardCornerRadius">16dp</item>
-        <item name="cardElevation">1dp</item>
-        <item name="cardBackgroundColor">?attr/colorSurfaceContainer</item>
+        <item name="android:minHeight">52dp</item>
+        <item name="cornerRadius">12dp</item>
+    </style>
+
+    <style name="FloatingVoice.QuietDivider" parent="">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">1dp</item>
+        <item name="android:background">?attr/colorOutlineVariant</item>
     </style>
 
     <style name="FloatingVoice.StatusText" parent="TextAppearance.Material3.TitleMedium">

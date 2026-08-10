@@ -43,7 +43,9 @@ public final class SecureSettingsStore {
             String apiHash = get("api_hash");
             String phone = get("phone");
             String bot = get("bot_username");
-            AppConfig.ValidationResult result = AppConfig.validate(apiId, apiHash, phone, bot);
+            AppConfig.ValidationResult result = bot == null || bot.isBlank()
+                    ? AppConfig.validateConnection(apiId, apiHash, phone)
+                    : AppConfig.validate(apiId, apiHash, phone, bot);
             return result.isValid() ? Optional.of(result.config()) : Optional.empty();
         } catch (Exception e) {
             return Optional.empty();

@@ -1,22 +1,24 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="launcher_background">#315CDB</color>
+    <color name="launcher_background">#52746C</color>
 
-    <!-- Floating Voice Material 3 fallback tokens. Dynamic Color is a V5-09 gate. -->
-    <color name="fv_primary">#5556D7</color>
-    <color name="fv_on_primary">#FFFFFF</color>
-    <color name="fv_primary_container">#E1E0FF</color>
-    <color name="fv_on_primary_container">#17164B</color>
-    <color name="fv_secondary_container">#E5E1F9</color>
-    <color name="fv_on_secondary_container">#1C1B20</color>
-    <color name="fv_surface">#FCF8FF</color>
-    <color name="fv_surface_container">#F2ECF4</color>
-    <color name="fv_surface_container_high">#ECE6EE</color>
-    <color name="fv_on_surface">#1C1B20</color>
-    <color name="fv_on_surface_variant">#49454F</color>
-    <color name="fv_outline">#79747E</color>
-    <color name="fv_recording">#B3261E</color>
+    <!-- Quiet Recorder: deterministic warm-neutral activity + overlay tokens. -->
+    <color name="fv_primary">#52746C</color>
+    <color name="fv_on_primary">#F8FBF8</color>
+    <color name="fv_primary_container">#DCE7E2</color>
+    <color name="fv_on_primary_container">#203A34</color>
+    <color name="fv_secondary_container">#DCE7E2</color>
+    <color name="fv_on_secondary_container">#203A34</color>
+    <color name="fv_surface">#F4F2EC</color>
+    <color name="fv_surface_container">#EEECE5</color>
+    <color name="fv_surface_container_high">#E7E4DC</color>
+    <color name="fv_on_surface">#222622</color>
+    <color name="fv_on_surface_variant">#686E68</color>
+    <color name="fv_outline">#A5A69F</color>
+    <color name="fv_outline_variant">#D8D6CE</color>
+    <color name="fv_recording">#A4473F</color>
     <color name="fv_on_recording">#FFFFFF</color>
-    <color name="fv_cancel_container">#E7E0EC</color>
-    <color name="fv_on_cancel_container">#322F35</color>
+    <color name="fv_recording_container">#F2DED9</color>
+    <color name="fv_cancel_container">#E7E4DC</color>
+    <color name="fv_on_cancel_container">#343834</color>
 </resources>

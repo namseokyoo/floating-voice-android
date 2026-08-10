@@ -1,22 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Floating Voice</string>
-    <string name="app_description">Send voice messages to a verified target bot using your Telegram account. Saving settings or signing in never sends a message.</string>
-    <string name="dashboard_setup_needed">Setup needed</string>
-    <string name="dashboard_setup_supporting">Complete Telegram, target, and permission setup before starting the floating button.</string>
-    <string name="dashboard_ready">Ready to start</string>
-    <string name="dashboard_ready_supporting">Telegram, the fixed target, and required permissions are ready.</string>
-    <string name="dashboard_running">Floating button is running</string>
-    <string name="dashboard_running_supporting">Return to another app and use the floating button for voice or text.</string>
-    <string name="dashboard_running_chip">Running</string>
-    <string name="dashboard_target_not_ready">Telegram target: not confirmed</string>
-    <string name="dashboard_target_format">Telegram target: %1$s</string>
-    <string name="section_readiness">Readiness</string>
-    <string name="section_preferences">Preferences</string>
-    <string name="section_connection">Telegram connection</string>
-    <string name="section_authentication">Current authentication step</string>
-    <string name="section_target_permissions">Target and permissions</string>
-    <string name="section_recent_status">Recent status</string>
+
     <string name="connection_supporting">Credentials and the phone number are encrypted on this device. Authentication codes and passwords are never saved.</string>
     <string name="authentication_waiting">Start the Telegram connection to see the next required authentication step.</string>
     <string name="authentication_complete">Telegram authentication is complete.</string>
@@ -37,7 +22,7 @@
     <string name="hint_api_hash">Telegram API Hash (32 characters)</string>
     <string name="hint_phone">Phone number (example: +8210XXXXXXXX)</string>
     <string name="hint_bot_username">Target bot username (the @ is optional)</string>
-    <string name="button_save_start">Save encrypted settings / Start Telegram connection</string>
+
     <string name="auth_status_initial">Authentication status: Not started</string>
     <string name="account_not_authenticated">Signed-in account: Not authenticated</string>
     <string name="button_submit_phone">Submit phone number</string>
@@ -50,9 +35,9 @@
     <string name="button_submit_email_address">Submit email address</string>
     <string name="hint_email_code">Email authentication code (not saved)</string>
     <string name="button_submit_email_code">Submit email authentication code</string>
-    <string name="button_resolve_bot">Find target bot and confirm recipient</string>
+
     <string name="target_not_confirmed">Send target: Not confirmed</string>
-    <string name="button_permissions">Allow / Check required permissions</string>
+
 
     <string name="permission_overlay_initial">Display over other apps: checking</string>
     <string name="permission_microphone_initial">Microphone: checking</string>
@@ -60,8 +45,7 @@
     <string name="permission_overlay_format">Display over other apps: %1$s</string>
     <string name="permission_microphone_format">Microphone: %1$s</string>
     <string name="permission_notification_format">Notifications: %1$s</string>
-    <string name="button_start_overlay">Start floating voice button</string>
-    <string name="button_stop_overlay">Stop floating voice button</string>
+
     <string name="button_logout">Log out of Telegram / Revoke session</string>
     <string name="operation_status_initial">Progress appears here.</string>
 
@@ -110,8 +94,7 @@
     <string name="content_description_recording_dock">Recording controls. Drag from the center to move.</string>
     <string name="content_description_recording_elapsed">Recording elapsed time: %1$s</string>
     <string name="content_description_recording_status_elapsed">Recording. Elapsed time: %1$s. Drag here to move.</string>
-    <string name="show_connection_settings">Show connection settings</string>
-    <string name="hide_connection_settings">Hide connection settings</string>
+
     <string name="overlay_text_action_title">Send text</string>
     <string name="overlay_text_action_supporting">Compose, then review</string>
     <string name="content_description_open_text_composer">Open text composer</string>
@@ -199,4 +182,71 @@
     <string name="repo_files_folder_failed">Could not create the Telegram files folder.</string>
     <string name="repo_parameters_submitted">Telegram connection information submitted.</string>
     <string name="repo_error_format">Telegram error %1$d: %2$s</string>
+
+    <!-- Quiet Recorder information architecture -->
+    <string name="navigation_back">Back</string>
+    <string name="open_settings">Open settings</string>
+    <string name="screen_connection">Telegram connection</string>
+    <string name="screen_settings">Settings</string>
+    <string name="home_connect_eyebrow">First setup</string>
+    <string name="home_connect_title">Connect Telegram</string>
+    <string name="home_connect_supporting">Connect the account and destination that will receive your voice recordings.</string>
+    <string name="home_connect_action">Connect Telegram</string>
+    <string name="home_connect_note">Usually takes about two minutes</string>
+    <string name="home_auth_eyebrow">Authentication in progress</string>
+    <string name="home_auth_title">Continue authentication</string>
+    <string name="home_auth_supporting">Continue from the Telegram authentication step you last reached.</string>
+    <string name="home_auth_action">Continue authentication</string>
+    <string name="home_auth_note">Codes and passwords are not saved</string>
+    <string name="home_target_eyebrow">Choose destination</string>
+    <string name="home_target_title">Choose where to send</string>
+    <string name="home_target_supporting">Set the verified Telegram bot that should receive recordings.</string>
+    <string name="home_target_action">Choose destination</string>
+    <string name="home_target_note">The destination is locked when sending starts</string>
+    <string name="home_permission_eyebrow">One step left</string>
+    <string name="home_permission_title">Allow required permissions</string>
+    <string name="home_permission_supporting">Microphone, notification, and display-over-apps access are required.</string>
+    <string name="home_permission_action">Allow required permissions</string>
+    <string name="home_permission_note">Permissions are used only while you operate the feature</string>
+    <string name="home_ready_eyebrow">Ready</string>
+    <string name="home_ready_title">Ready to record</string>
+    <string name="home_ready_supporting">Turn on the floating button to send voice or text from another app.</string>
+    <string name="home_ready_action">Turn on floating button</string>
+    <string name="home_ready_note">You can move the button along the screen edge</string>
+    <string name="home_running_eyebrow">In use</string>
+    <string name="home_running_title">Floating button is on</string>
+    <string name="home_running_supporting">Return to another app and tap the floating button to start recording.</string>
+    <string name="home_running_action">Stop floating button</string>
+    <string name="home_running_note">Stopping keeps your Telegram connection</string>
+    <string name="home_target_format">Destination · %1$s</string>
+    <string name="connection_step_format">%1$d of 4 · Telegram connection</string>
+    <string name="connection_api_title">Connection information</string>
+    <string name="connection_api_supporting">Enter Telegram API information and your account phone number.</string>
+    <string name="connection_auth_title">Telegram authentication</string>
+    <string name="connection_auth_supporting">Only the input required for the current authentication step is shown.</string>
+    <string name="connection_target_title">Choose destination</string>
+    <string name="connection_target_supporting">Enter the username of the bot that should receive recordings.</string>
+    <string name="connection_permission_title">Required permissions</string>
+    <string name="connection_permission_supporting">Allow microphone, notification, and display-over-apps access.</string>
+    <string name="connection_complete_title">Connection is ready</string>
+    <string name="connection_complete_supporting">Telegram, destination, and required permissions are ready.</string>
+    <string name="button_save_connection">Save and start connection</string>
+    <string name="button_confirm_target">Verify destination</string>
+    <string name="button_back_home">Back to home</string>
+    <string name="settings_appearance">Appearance</string>
+    <string name="settings_telegram">Telegram</string>
+    <string name="settings_api_info">API information</string>
+    <string name="settings_api_info_supporting">Review or change encrypted connection information</string>
+    <string name="home_error_title">Needs attention</string>
+    <string name="stop_overlay_title">Stop the floating button?</string>
+    <string name="stop_overlay_message">If a recording is in progress, it will be retained safely and will not be sent.</string>
+    <string name="keep_running">Keep using</string>
+    <string name="connection_change_requires_logout">Log out of Telegram before changing API information or the account phone number.</string>
+    <string name="button_retry_connection">Retry connection</string>
+    <string name="repo_restarting_session">Restarting the Telegram connection…</string>
+    <string name="repo_restart_failed">Could not restart the Telegram connection: Telegram error %1$d: %2$s</string>
+    <string name="permission_settings_title">Allow permission in Settings</string>
+    <string name="permission_settings_message">Android is no longer showing the permission prompt. Open app settings and allow microphone and notification access.</string>
+    <string name="open_app_settings">Open app settings</string>
+    <string name="dismiss_error">Dismiss</string>
 </resources>

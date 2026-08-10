@@ -1,22 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">플로팅 보이스</string>
-    <string name="app_description">내 Telegram 계정으로 확인된 대상 봇에게 음성을 전송합니다. 설정 저장이나 로그인만으로는 메시지가 전송되지 않습니다.</string>
-    <string name="dashboard_setup_needed">설정이 필요해요</string>
-    <string name="dashboard_setup_supporting">Telegram 연결, 전송 대상, 필수 권한을 완료하면 플로팅 버튼을 시작할 수 있습니다.</string>
-    <string name="dashboard_ready">시작할 준비가 됐어요</string>
-    <string name="dashboard_ready_supporting">Telegram, 고정 전송 대상, 필수 권한이 모두 준비되었습니다.</string>
-    <string name="dashboard_running">플로팅 버튼 실행 중</string>
-    <string name="dashboard_running_supporting">다른 앱으로 돌아가 플로팅 버튼에서 음성이나 텍스트를 사용할 수 있습니다.</string>
-    <string name="dashboard_running_chip">실행 중</string>
-    <string name="dashboard_target_not_ready">Telegram 대상: 확인되지 않음</string>
-    <string name="dashboard_target_format">Telegram 대상: %1$s</string>
-    <string name="section_readiness">준비 상태</string>
-    <string name="section_preferences">사용 환경</string>
-    <string name="section_connection">Telegram 연결</string>
-    <string name="section_authentication">현재 인증 단계</string>
-    <string name="section_target_permissions">전송 대상과 권한</string>
-    <string name="section_recent_status">최근 상태</string>
+
     <string name="connection_supporting">인증 정보와 전화번호는 이 기기에 암호화되어 저장됩니다. 인증번호와 비밀번호는 저장하지 않습니다.</string>
     <string name="authentication_waiting">Telegram 연결을 시작하면 필요한 인증 단계만 여기에 표시됩니다.</string>
     <string name="authentication_complete">Telegram 인증이 완료되었습니다.</string>
@@ -37,7 +22,7 @@
     <string name="hint_api_hash">Telegram API Hash (32자리)</string>
     <string name="hint_phone">전화번호 (예: +8210XXXXXXXX)</string>
     <string name="hint_bot_username">대상 봇 username (@ 제외 가능)</string>
-    <string name="button_save_start">설정 암호화 저장 / Telegram 연결 시작</string>
+
     <string name="auth_status_initial">인증 상태: 시작 전</string>
     <string name="account_not_authenticated">로그인 계정: 인증되지 않음</string>
     <string name="button_submit_phone">전화번호 제출</string>
@@ -50,9 +35,9 @@
     <string name="button_submit_email_address">이메일 주소 제출</string>
     <string name="hint_email_code">이메일 인증번호 (저장되지 않음)</string>
     <string name="button_submit_email_code">이메일 인증번호 제출</string>
-    <string name="button_resolve_bot">대상 봇 찾기 및 수신 대상 확정</string>
+
     <string name="target_not_confirmed">전송 대상: 확정되지 않음</string>
-    <string name="button_permissions">필수 권한 허용 / 확인</string>
+
 
     <string name="permission_overlay_initial">다른 앱 위 표시: 확인 중</string>
     <string name="permission_microphone_initial">마이크: 확인 중</string>
@@ -60,8 +45,7 @@
     <string name="permission_overlay_format">다른 앱 위 표시: %1$s</string>
     <string name="permission_microphone_format">마이크: %1$s</string>
     <string name="permission_notification_format">알림: %1$s</string>
-    <string name="button_start_overlay">플로팅 음성 버튼 시작</string>
-    <string name="button_stop_overlay">플로팅 음성 버튼 종료</string>
+
     <string name="button_logout">Telegram 로그아웃 / 세션 해제</string>
     <string name="operation_status_initial">진행 상태가 여기에 표시됩니다.</string>
 
@@ -111,8 +95,7 @@
     <string name="content_description_recording_dock">녹음 제어. 가운데 영역을 끌어 이동할 수 있습니다.</string>
     <string name="content_description_recording_elapsed">녹음 시간: %1$s</string>
     <string name="content_description_recording_status_elapsed">녹음 중. 녹음 시간: %1$s. 이 영역을 끌어 이동할 수 있습니다.</string>
-    <string name="show_connection_settings">연결 설정 보기</string>
-    <string name="hide_connection_settings">연결 설정 숨기기</string>
+
     <string name="overlay_text_action_title">텍스트 보내기</string>
     <string name="overlay_text_action_supporting">작성 후 확인</string>
     <string name="content_description_open_text_composer">텍스트 작성 화면 열기</string>
@@ -200,4 +183,71 @@
     <string name="repo_files_folder_failed">Telegram 파일 폴더를 만들 수 없습니다.</string>
     <string name="repo_parameters_submitted">Telegram 연결 정보를 제출했습니다.</string>
     <string name="repo_error_format">Telegram 오류 %1$d: %2$s</string>
+
+    <!-- Quiet Recorder 정보구조 -->
+    <string name="navigation_back">뒤로</string>
+    <string name="open_settings">설정 열기</string>
+    <string name="screen_connection">Telegram 연결</string>
+    <string name="screen_settings">설정</string>
+    <string name="home_connect_eyebrow">처음 설정</string>
+    <string name="home_connect_title">Telegram을 연결해 주세요</string>
+    <string name="home_connect_supporting">음성 기록을 보낼 계정과 대상을 먼저 연결합니다.</string>
+    <string name="home_connect_action">Telegram 연결하기</string>
+    <string name="home_connect_note">약 2분 정도 걸려요</string>
+    <string name="home_auth_eyebrow">인증 진행 중</string>
+    <string name="home_auth_title">인증을 이어서 완료해 주세요</string>
+    <string name="home_auth_supporting">마지막으로 진행한 Telegram 인증 단계부터 계속합니다.</string>
+    <string name="home_auth_action">인증 계속하기</string>
+    <string name="home_auth_note">인증번호와 비밀번호는 저장하지 않아요</string>
+    <string name="home_target_eyebrow">대상 선택</string>
+    <string name="home_target_title">보낼 곳을 선택해 주세요</string>
+    <string name="home_target_supporting">음성 기록을 받을 Telegram 봇을 확인해 고정합니다.</string>
+    <string name="home_target_action">보낼 곳 선택하기</string>
+    <string name="home_target_note">전송 시작 시 선택한 대상이 고정됩니다</string>
+    <string name="home_permission_eyebrow">한 단계 남음</string>
+    <string name="home_permission_title">필수 권한을 허용해 주세요</string>
+    <string name="home_permission_supporting">마이크, 알림, 다른 앱 위 표시 권한이 필요합니다.</string>
+    <string name="home_permission_action">필수 권한 허용하기</string>
+    <string name="home_permission_note">기능을 직접 사용할 때만 권한을 사용해요</string>
+    <string name="home_ready_eyebrow">준비 완료</string>
+    <string name="home_ready_title">바로 기록할 수 있어요</string>
+    <string name="home_ready_supporting">플로팅 버튼을 켜면 다른 앱 위에서 음성과 텍스트를 보낼 수 있습니다.</string>
+    <string name="home_ready_action">플로팅 버튼 켜기</string>
+    <string name="home_ready_note">버튼은 화면 가장자리로 옮길 수 있어요</string>
+    <string name="home_running_eyebrow">사용 중</string>
+    <string name="home_running_title">플로팅 버튼을 사용 중이에요</string>
+    <string name="home_running_supporting">다른 앱으로 돌아가 플로팅 버튼을 눌러 기록을 시작하세요.</string>
+    <string name="home_running_action">플로팅 버튼 중지</string>
+    <string name="home_running_note">중지해도 Telegram 연결은 유지됩니다</string>
+    <string name="home_target_format">보낼 곳 · %1$s</string>
+    <string name="connection_step_format">%1$d/4 · Telegram 연결</string>
+    <string name="connection_api_title">연결 정보</string>
+    <string name="connection_api_supporting">Telegram API 정보와 계정 전화번호를 입력합니다.</string>
+    <string name="connection_auth_title">Telegram 인증</string>
+    <string name="connection_auth_supporting">현재 인증 단계에 필요한 입력만 표시합니다.</string>
+    <string name="connection_target_title">보낼 곳 선택</string>
+    <string name="connection_target_supporting">음성 기록을 받을 봇의 username을 입력합니다.</string>
+    <string name="connection_permission_title">필수 권한</string>
+    <string name="connection_permission_supporting">마이크, 알림, 다른 앱 위 표시 권한을 허용합니다.</string>
+    <string name="connection_complete_title">연결 준비가 끝났어요</string>
+    <string name="connection_complete_supporting">Telegram, 전송 대상, 필수 권한이 모두 준비되었습니다.</string>
+    <string name="button_save_connection">저장하고 연결 시작</string>
+    <string name="button_confirm_target">보낼 곳 확인하기</string>
+    <string name="button_back_home">홈으로 돌아가기</string>
+    <string name="settings_appearance">화면과 버튼</string>
+    <string name="settings_telegram">Telegram</string>
+    <string name="settings_api_info">API 정보</string>
+    <string name="settings_api_info_supporting">암호화된 연결 정보를 확인하거나 변경합니다</string>
+    <string name="home_error_title">확인이 필요해요</string>
+    <string name="stop_overlay_title">플로팅 버튼을 중지할까요?</string>
+    <string name="stop_overlay_message">진행 중인 녹음이 있다면 안전하게 보관하고 전송하지 않습니다.</string>
+    <string name="keep_running">계속 사용</string>
+    <string name="connection_change_requires_logout">API 정보나 계정 전화번호를 바꾸려면 먼저 Telegram에서 로그아웃해 주세요.</string>
+    <string name="button_retry_connection">연결 다시 시도</string>
+    <string name="repo_restarting_session">Telegram 연결을 다시 시작합니다…</string>
+    <string name="repo_restart_failed">Telegram 연결을 다시 시작하지 못했습니다: Telegram 오류 %1$d: %2$s</string>
+    <string name="permission_settings_title">설정에서 권한을 허용해 주세요</string>
+    <string name="permission_settings_message">Android가 권한 요청창을 더 이상 표시하지 않습니다. 앱 설정을 열어 마이크와 알림 권한을 허용해 주세요.</string>
+    <string name="open_app_settings">앱 설정 열기</string>
+    <string name="dismiss_error">확인</string>
 </resources>
