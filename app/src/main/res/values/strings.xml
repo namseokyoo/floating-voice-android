@@ -72,6 +72,13 @@
     <string name="content_description_stop_and_send">Stop recording and send</string>
     <string name="recording_in_progress">Recording — tap again to stop and send</string>
     <string name="content_description_cancel_recording">Cancel recording without sending</string>
+    <string name="overlay_recording_status">Recording</string>
+    <string name="overlay_timer_initial" translatable="false">00:00</string>
+    <string name="content_description_recording_dock">Recording controls. Drag from the center to move.</string>
+    <string name="content_description_recording_elapsed">Recording elapsed time: %1$s</string>
+    <string name="overlay_text_action_title">Send text</string>
+    <string name="overlay_text_action_supporting">Compose, then review</string>
+    <string name="content_description_open_text_composer">Open text composer</string>
     <string name="recording_in_progress_cancel_unavailable">Recording — tap again to stop and send. The cancel button could not be shown.</string>
     <string name="recording_cancelled_no_message">Recording canceled. No message was sent.</string>
     <string name="recording_cancel_failed_retained">Could not cancel the recording safely. No message was sent. File retained at: %1$s</string>

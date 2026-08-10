@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/overlay_action_palette"
+    android:layout_width="@dimen/overlay_palette_width"
+    android:layout_height="@dimen/overlay_palette_height"
+    android:theme="@style/Theme.FloatingVoice.OverlayMaterial3"
+    app:cardBackgroundColor="@color/fv_surface_container_high"
+    app:cardElevation="6dp"
+    app:shapeAppearance="@style/ShapeAppearance.FloatingVoice.Dock"
+    app:strokeWidth="0dp">
+
+    <LinearLayout
+        android:id="@+id/overlay_text_action"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="?attr/selectableItemBackground"
+        android:clickable="true"
+        android:contentDescription="@string/content_description_open_text_composer"
+        android:focusable="true"
+        android:gravity="center_vertical"
+        android:minHeight="64dp"
+        android:orientation="horizontal"
+        android:paddingHorizontal="16dp">
+
+        <ImageView
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:contentDescription="@null"
+            android:importantForAccessibility="no"
+            android:src="@drawable/ic_overlay_text"
+            app:tint="@color/fv_on_surface" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="12dp"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/overlay_text_action_title"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/overlay_text_action_title"
+                android:textColor="@color/fv_on_surface"
+                android:textSize="16sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/overlay_text_action_supporting"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/overlay_text_action_supporting"
+                android:textColor="@color/fv_on_surface_variant"
+                android:textSize="12sp" />
+        </LinearLayout>
+    </LinearLayout>
+</com.google.android.material.card.MaterialCardView>

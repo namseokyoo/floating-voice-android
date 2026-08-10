@@ -146,6 +146,8 @@ public final class OverlayStateMachine {
                 if (event == OverlayEvent.SUBMIT_TEXT) {
                     state = State.TEXT_QUEUEING;
                     effects = List.of(Effect.SEND_TEXT);
+                } else if (event == OverlayEvent.CLOSE_COMPOSER) {
+                    state = State.IDLE;
                 }
             }
             case TEXT_QUEUEING -> {

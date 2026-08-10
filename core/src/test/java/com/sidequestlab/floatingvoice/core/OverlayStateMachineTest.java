@@ -237,6 +237,16 @@ class OverlayStateMachineTest {
     }
 
     @Test
+    void closingComposerReturnsToIdleWithoutTransportEffects() {
+        OverlayStateMachine machine = textComposingMachine();
+
+        OverlayStateMachine.Transition closed = machine.accept(OverlayEvent.CLOSE_COMPOSER);
+
+        assertEquals(OverlayStateMachine.State.IDLE, closed.nextState());
+        assertEquals(List.of(), closed.effects());
+    }
+
+    @Test
     void callbackAttemptMustMatchCurrentRecordingGeneration() {
         OverlayStateMachine machine = recordingMachine();
         long firstAttempt = machine.attemptId();
@@ -352,7 +362,8 @@ class OverlayStateMachineTest {
                 OverlayEvent.VOICE_QUEUED, OverlayEvent.VOICE_REJECTED, OverlayEvent.TAP));
         legal.put(OverlayStateMachine.State.VOICE_PENDING, EnumSet.of(
                 OverlayEvent.VOICE_REJECTED, OverlayEvent.TAP));
-        legal.put(OverlayStateMachine.State.TEXT_COMPOSING, EnumSet.of(OverlayEvent.SUBMIT_TEXT));
+        legal.put(OverlayStateMachine.State.TEXT_COMPOSING, EnumSet.of(
+                OverlayEvent.SUBMIT_TEXT, OverlayEvent.CLOSE_COMPOSER));
         legal.put(OverlayStateMachine.State.TEXT_QUEUEING, EnumSet.of(
                 OverlayEvent.TEXT_QUEUED, OverlayEvent.TEXT_REJECTED));
         legal.put(OverlayStateMachine.State.TEXT_PENDING, EnumSet.of(

@@ -1,5 +1,6 @@
 package com.sidequestlab.floatingvoice;
 
+import android.content.Intent;
 import android.os.Bundle;
 import android.view.View;
 import android.view.WindowManager;
@@ -32,5 +33,13 @@ public final class TextComposerActivity extends AppCompatActivity {
         });
 
         editor.requestFocus();
+    }
+
+    @Override protected void onDestroy() {
+        if (isFinishing()) {
+            sendBroadcast(new Intent(FloatingVoiceService.ACTION_COMPOSER_CLOSED)
+                    .setPackage(getPackageName()));
+        }
+        super.onDestroy();
     }
 }

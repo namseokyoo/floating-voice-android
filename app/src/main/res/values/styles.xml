@@ -17,4 +17,36 @@
         <item name="android:windowNoTitle">true</item>
         <item name="windowNoTitle">true</item>
     </style>
+
+    <!-- Overlay-only M3 theme. MainActivity stays on the existing AppCompat theme until V5-08. -->
+    <style name="Theme.FloatingVoice.OverlayMaterial3" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/fv_primary</item>
+        <item name="colorOnPrimary">@color/fv_on_primary</item>
+        <item name="colorPrimaryContainer">@color/fv_primary_container</item>
+        <item name="colorOnPrimaryContainer">@color/fv_on_primary_container</item>
+        <item name="colorSecondaryContainer">@color/fv_secondary_container</item>
+        <item name="colorOnSecondaryContainer">@color/fv_on_secondary_container</item>
+        <item name="colorSurface">@color/fv_surface</item>
+        <item name="colorSurfaceContainer">@color/fv_surface_container</item>
+        <item name="colorSurfaceContainerHigh">@color/fv_surface_container_high</item>
+        <item name="colorOnSurface">@color/fv_on_surface</item>
+        <item name="colorOnSurfaceVariant">@color/fv_on_surface_variant</item>
+        <item name="colorOutline">@color/fv_outline</item>
+        <item name="android:fontFamily">sans</item>
+    </style>
+
+    <style name="ShapeAppearance.FloatingVoice.Fab" parent="ShapeAppearance.Material3.LargeComponent">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">20dp</item>
+    </style>
+
+    <style name="ShapeAppearance.FloatingVoice.Dock" parent="ShapeAppearance.Material3.LargeComponent">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">24dp</item>
+    </style>
+
+    <style name="ShapeAppearance.FloatingVoice.Cancel" parent="ShapeAppearance.Material3.MediumComponent">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">16dp</item>
+    </style>
 </resources>

@@ -6,4 +6,22 @@
     <color name="recording">#C62828</color>
     <color name="idle">#256D3A</color>
     <color name="surface">#FAFAFA</color>
+
+    <!-- Floating Voice Material 3 fallback tokens. Dynamic Color is a V5-09 gate. -->
+    <color name="fv_primary">#5556D7</color>
+    <color name="fv_on_primary">#FFFFFF</color>
+    <color name="fv_primary_container">#E1E0FF</color>
+    <color name="fv_on_primary_container">#17164B</color>
+    <color name="fv_secondary_container">#E5E1F9</color>
+    <color name="fv_on_secondary_container">#1C1B20</color>
+    <color name="fv_surface">#FCF8FF</color>
+    <color name="fv_surface_container">#F2ECF4</color>
+    <color name="fv_surface_container_high">#ECE6EE</color>
+    <color name="fv_on_surface">#1C1B20</color>
+    <color name="fv_on_surface_variant">#49454F</color>
+    <color name="fv_outline">#79747E</color>
+    <color name="fv_recording">#B3261E</color>
+    <color name="fv_on_recording">#FFFFFF</color>
+    <color name="fv_cancel_container">#E7E0EC</color>
+    <color name="fv_on_cancel_container">#322F35</color>
 </resources>

@@ -14,6 +14,7 @@ public enum OverlayEvent {
     VOICE_QUEUED,
     VOICE_REJECTED,
     COMPOSE_TEXT,
+    CLOSE_COMPOSER,
     SUBMIT_TEXT,
     TEXT_QUEUED,
     TEXT_REJECTED,
