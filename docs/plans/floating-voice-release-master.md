@@ -2,11 +2,11 @@
 
 > **For Hermes:** 이 문서는 재시작 후에도 유지되는 단일 릴리즈 로드맵이다. 한 번에 한 버전만 구현하고, 각 버전의 선행검증·구현·실기기·릴리즈 게이트가 모두 통과한 뒤 사용자 승인으로 다음 버전으로 이동한다.
 
-**기준 시각:** 2026-08-11 21:36 KST<br>
+**기준 시각:** 2026-08-11 22:19 KST<br>
 **현재 안정 기준선:** `v0.6.4` (`808e7942e618e2aaaf3527b27d89bac9256e2601`)<br>
-**current_stage:** `V7-01-VERIFIED / NEXT=V7-01-COMMIT`<br>
-**status:** `automated_pass_uncommitted` — V7-01은 자동검증·독립 follow-up review를 통과했으며 commit/push 승인 대기<br>
-**구현 상태:** v0.5.0 인터랙션 기반, v0.6.0 Quiet Recorder, v0.6.1 플로팅 스타일·safe area, v0.6.2 Telegram 세션 유지 대상 변경, v0.6.3 개별 설정 페이지, v0.6.4 연결정보 인라인·톱니 anchored PopupMenu까지 완료. v0.6.4는 tests 110/fail 0, lint 오류 0, 공식 인증서·v2/v3·ZIP/ELF 16KB 검증과 local/origin/GitHub 일치를 통과함. V7-01은 legacy account/target pure migration model, explicit default `NEEDS_REVERIFY` candidate, account-only recovery, additive write/read-back/marker contract를 TDD로 구현했으며 전체 tests 123/fail 0, lint 오류 0, follow-up review Blocker/High/Medium 0을 통과함. 실제 Android encrypted store 연결과 update-install 검증은 V7-03/V7-09 범위로 유지함.
+**current_stage:** `V7-02-VERIFIED / NEXT=V7-02-COMMIT`<br>
+**status:** `automated_review_pass_uncommitted` — V7-01은 로컬 커밋 `f1d45e4`, V7-02는 전체 회귀와 독립 follow-up review PASS 후 로컬 커밋 대기<br>
+**구현 상태:** v0.5.0 인터랙션 기반, v0.6.0 Quiet Recorder, v0.6.1 플로팅 스타일·safe area, v0.6.2 Telegram 세션 유지 대상 변경, v0.6.3 개별 설정 페이지, v0.6.4 연결정보 인라인·톱니 anchored PopupMenu까지 완료. v0.6.4는 tests 110/fail 0, lint 오류 0, 공식 인증서·v2/v3·ZIP/ELF 16KB 검증과 local/origin/GitHub 일치를 통과함. V7-01은 legacy account/target pure migration model을 커밋 `f1d45e4`로 고정함. V7-02는 destination/catalog/scope/route state machine/dispatch snapshot과 default·next-one·current-recording·FREEZING·no-fallback 계약을 TDD로 구현함. latest catalog identity/revision revalidation, route-attempt-bound completion/abort, scalar-only snapshot, local-ID 재바인딩 차단까지 보완했으며 전체 tests 140/fail 0, lint 오류 0, debug/release assembly와 독립 follow-up review Blocker/High 0을 통과함. 실제 Android 저장소·UI 연결은 건드리지 않음.
 
 ## 1. 목표와 제품 원칙
 
