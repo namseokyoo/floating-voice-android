@@ -195,7 +195,7 @@
     <string name="open_settings">Open settings</string>
     <string name="screen_connection">Telegram connection</string>
     <string name="screen_destination">Transfer destination</string>
-    <string name="screen_settings">Settings</string>
+
     <string name="home_connect_eyebrow">First setup</string>
     <string name="home_connect_title">Connect Telegram</string>
     <string name="home_connect_supporting">Connect the account and destination that will receive your voice recordings.</string>
@@ -249,11 +249,18 @@
     <string name="settings_set_target">Set transfer destination</string>
     <string name="settings_change_target">Change transfer destination</string>
     <string name="settings_target_supporting">Change the receiving bot without logging out of Telegram</string>
-    <string name="settings_telegram_connection">Telegram connection</string>
+
+    <string name="settings_menu_app">App</string>
+    <string name="settings_menu_destination">Destination</string>
+    <string name="settings_menu_telegram">Telegram</string>
     <string name="settings_connection_not_ready">Telegram authentication is not ready</string>
     <string name="settings_connection_ready">Telegram authentication is ready</string>
-    <string name="settings_api_info">API information</string>
-    <string name="settings_api_info_supporting">Review or change encrypted connection information</string>
+    <string name="settings_connection_info_title">Connection information</string>
+    <string name="settings_api_id_label">Telegram API ID</string>
+    <string name="settings_api_hash_label">Telegram API Hash</string>
+    <string name="settings_phone_label">Telegram account phone number</string>
+    <string name="settings_api_hash_accessibility_format">Telegram API Hash, ending in %1$s</string>
+    <string name="settings_connection_value_unavailable">Not saved</string>
     <string name="target_change_stop_title">Stop the floating button and change destination?</string>
     <string name="target_change_stop_message">If recording is active, it will be retained and not sent. Destination editing opens after the floating button stops.</string>
     <string name="target_change_stop_action">Stop and change</string>

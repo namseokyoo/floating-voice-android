@@ -25,6 +25,7 @@ import androidx.activity.OnBackPressedCallback;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.app.AppCompatDelegate;
+import androidx.appcompat.widget.PopupMenu;
 import androidx.core.content.ContextCompat;
 import androidx.core.graphics.Insets;
 import androidx.core.os.LocaleListCompat;
@@ -33,9 +34,9 @@ import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsCompat;
 
 import com.google.android.material.button.MaterialButton;
-import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.google.android.material.snackbar.Snackbar;
 import com.sidequestlab.floatingvoice.core.AppConfig;
+import com.sidequestlab.floatingvoice.core.ConnectionInfoFormatter;
 import com.sidequestlab.floatingvoice.core.DashboardReadiness;
 import com.sidequestlab.floatingvoice.core.OverlayColorPreset;
 import com.sidequestlab.floatingvoice.core.OverlaySizePreset;
@@ -108,6 +109,9 @@ public final class MainActivity extends AppCompatActivity implements TelegramRep
     private TextView appBarTitle;
     private TextView settingsTargetSummary;
     private TextView settingsConnectionSummary;
+    private TextView settingsApiIdValue;
+    private TextView settingsApiHashValue;
+    private TextView settingsPhoneValue;
     private ImageView dashboardIcon;
     private View homeScreen;
     private View connectionScreen;
@@ -124,9 +128,7 @@ public final class MainActivity extends AppCompatActivity implements TelegramRep
     private View permissionStep;
     private View connectionComplete;
     private MaterialButton dashboardPrimaryAction;
-    private MaterialButton connectionSettingsToggle;
     private MaterialButton targetSettingsToggle;
-    private BottomSheetDialog settingsMenuDialog;
     private TelegramRepository telegram;
     private SecureSettingsStore settingsStore;
     private OverlayUiPreferences overlayUiPreferences;
@@ -249,6 +251,9 @@ public final class MainActivity extends AppCompatActivity implements TelegramRep
         appBarTitle = findViewById(R.id.app_bar_title);
         settingsTargetSummary = findViewById(R.id.settings_target_summary);
         settingsConnectionSummary = findViewById(R.id.settings_connection_summary);
+        settingsApiIdValue = findViewById(R.id.settings_api_id_value);
+        settingsApiHashValue = findViewById(R.id.settings_api_hash_value);
+        settingsPhoneValue = findViewById(R.id.settings_phone_value);
         dashboardIcon = findViewById(R.id.dashboard_icon);
         homeScreen = findViewById(R.id.home_screen);
         connectionScreen = findViewById(R.id.connection_screen);
@@ -265,7 +270,6 @@ public final class MainActivity extends AppCompatActivity implements TelegramRep
         permissionStep = findViewById(R.id.permission_step);
         connectionComplete = findViewById(R.id.connection_complete);
         dashboardPrimaryAction = findViewById(R.id.dashboard_primary_action);
-        connectionSettingsToggle = findViewById(R.id.connection_settings_toggle);
         targetSettingsToggle = findViewById(R.id.target_settings_toggle);
         apiId.setInputType(InputType.TYPE_CLASS_NUMBER);
     }
@@ -299,8 +303,6 @@ public final class MainActivity extends AppCompatActivity implements TelegramRep
         findViewById(R.id.dismiss_error).setOnClickListener(v -> dismissPersistentStatus());
         findViewById(R.id.logout).setOnClickListener(v -> confirmLogout());
         dashboardPrimaryAction.setOnClickListener(v -> handlePrimaryAction());
-        connectionSettingsToggle.setOnClickListener(
-                v -> showPage(Page.CONNECTION, ConnectionMode.EDIT_API));
         targetSettingsToggle.setOnClickListener(v -> requestTargetEditor());
         navigationButton.setOnClickListener(v -> navigateBack());
         settingsButton.setOnClickListener(v -> showSettingsMenu());
@@ -337,10 +339,6 @@ public final class MainActivity extends AppCompatActivity implements TelegramRep
     }
 
     @Override protected void onDestroy() {
-        if (settingsMenuDialog != null) {
-            settingsMenuDialog.dismiss();
-            settingsMenuDialog = null;
-        }
         if (telegram != null) telegram.removeListener(this);
         super.onDestroy();
     }
@@ -459,29 +457,25 @@ public final class MainActivity extends AppCompatActivity implements TelegramRep
     }
 
     private void showSettingsMenu() {
-        if (settingsMenuDialog != null) settingsMenuDialog.dismiss();
-        BottomSheetDialog dialog = new BottomSheetDialog(this);
-        settingsMenuDialog = dialog;
-        dialog.setContentView(R.layout.bottom_sheet_settings_menu);
-        View sheet = dialog.findViewById(R.id.settings_menu_root);
-        if (sheet == null) throw new IllegalStateException("Missing settings menu root");
-        ViewCompat.setAccessibilityPaneTitle(sheet, getString(R.string.screen_settings));
-        sheet.findViewById(R.id.menu_app_settings).setOnClickListener(v -> {
-            dialog.dismiss();
-            showPage(Page.APP_SETTINGS, ConnectionMode.RESUME);
+        PopupMenu menu = new PopupMenu(this, settingsButton);
+        menu.inflate(R.menu.settings_menu);
+        menu.setOnMenuItemClickListener(item -> {
+            int id = item.getItemId();
+            if (id == R.id.menu_app_settings) {
+                showPage(Page.APP_SETTINGS, ConnectionMode.RESUME);
+                return true;
+            }
+            if (id == R.id.menu_destination_settings) {
+                showPage(Page.DESTINATION_SETTINGS, ConnectionMode.RESUME);
+                return true;
+            }
+            if (id == R.id.menu_telegram_settings) {
+                showPage(Page.TELEGRAM_SETTINGS, ConnectionMode.RESUME);
+                return true;
+            }
+            return false;
         });
-        sheet.findViewById(R.id.menu_destination_settings).setOnClickListener(v -> {
-            dialog.dismiss();
-            showPage(Page.DESTINATION_SETTINGS, ConnectionMode.RESUME);
-        });
-        sheet.findViewById(R.id.menu_telegram_settings).setOnClickListener(v -> {
-            dialog.dismiss();
-            showPage(Page.TELEGRAM_SETTINGS, ConnectionMode.RESUME);
-        });
-        dialog.setOnDismissListener(ignored -> {
-            if (settingsMenuDialog == dialog) settingsMenuDialog = null;
-        });
-        dialog.show();
+        menu.show();
     }
 
     private void navigateBack() {
@@ -711,7 +705,9 @@ public final class MainActivity extends AppCompatActivity implements TelegramRep
     }
 
     private void refreshSettingsSummary() {
-        if (settingsTargetSummary == null || settingsConnectionSummary == null) return;
+        if (settingsTargetSummary == null || settingsConnectionSummary == null
+                || settingsApiIdValue == null || settingsApiHashValue == null
+                || settingsPhoneValue == null) return;
         TargetChat target = telegram.target();
         settingsTargetSummary.setText(target == null
                 ? getString(R.string.settings_target_not_set)
@@ -720,6 +716,20 @@ public final class MainActivity extends AppCompatActivity implements TelegramRep
                 ? R.string.settings_set_target : R.string.settings_change_target);
         settingsConnectionSummary.setText(telegram.authStage() == TelegramRepository.AuthStage.READY
                 ? R.string.settings_connection_ready : R.string.settings_connection_not_ready);
+        if (savedConfig == null) {
+            settingsApiIdValue.setText(R.string.settings_connection_value_unavailable);
+            settingsApiHashValue.setText(R.string.settings_connection_value_unavailable);
+            settingsApiHashValue.setContentDescription(null);
+            settingsPhoneValue.setText(R.string.settings_connection_value_unavailable);
+        } else {
+            settingsApiIdValue.setText(String.format(Locale.ROOT, "%d", savedConfig.apiId()));
+            settingsApiHashValue.setText(
+                    ConnectionInfoFormatter.maskApiHash(savedConfig.apiHash()));
+            settingsApiHashValue.setContentDescription(getString(
+                    R.string.settings_api_hash_accessibility_format,
+                    ConnectionInfoFormatter.apiHashSuffix(savedConfig.apiHash())));
+            settingsPhoneValue.setText(savedConfig.phoneNumber());
+        }
     }
 
     private void refreshDashboard() {

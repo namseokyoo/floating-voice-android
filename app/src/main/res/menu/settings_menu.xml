@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:id="@+id/menu_app_settings"
+        android:title="@string/settings_menu_app" />
+    <item
+        android:id="@+id/menu_destination_settings"
+        android:title="@string/settings_menu_destination" />
+    <item
+        android:id="@+id/menu_telegram_settings"
+        android:title="@string/settings_menu_telegram" />
+</menu>

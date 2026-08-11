@@ -710,7 +710,7 @@
                     android:id="@+id/settings_connection_summary"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginBottom="12dp"
+                    android:layout_marginBottom="28dp"
                     android:text="@string/settings_connection_not_ready"
                     android:textAppearance="?attr/textAppearanceTitleMedium"
                     android:textColor="?attr/colorOnSurface" />
@@ -718,20 +718,72 @@
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginBottom="24dp"
-                    android:text="@string/settings_api_info_supporting"
-                    android:textAppearance="?attr/textAppearanceBodyMedium"
+                    android:accessibilityHeading="true"
+                    android:layout_marginBottom="20dp"
+                    android:text="@string/settings_connection_info_title"
+                    android:textAppearance="?attr/textAppearanceTitleMedium"
+                    android:textColor="?attr/colorOnSurface" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/settings_api_id_label"
+                    android:textAppearance="?attr/textAppearanceLabelMedium"
                     android:textColor="?attr/colorOnSurfaceVariant" />
 
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/connection_settings_toggle"
-                    style="@style/FloatingVoice.QuietOutlinedButton"
-                    android:text="@string/settings_api_info" />
+                <TextView
+                    android:id="@+id/settings_api_id_value"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:layout_marginBottom="20dp"
+                    android:text="@string/settings_connection_value_unavailable"
+                    android:textAppearance="?attr/textAppearanceBodyLarge"
+                    android:textColor="?attr/colorOnSurface" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/settings_api_hash_label"
+                    android:textAppearance="?attr/textAppearanceLabelMedium"
+                    android:textColor="?attr/colorOnSurfaceVariant" />
+
+                <TextView
+                    android:id="@+id/settings_api_hash_value"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:layout_marginBottom="20dp"
+                    android:text="@string/settings_connection_value_unavailable"
+                    android:textAppearance="?attr/textAppearanceBodyLarge"
+                    android:textColor="?attr/colorOnSurface" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/settings_phone_label"
+                    android:textAppearance="?attr/textAppearanceLabelMedium"
+                    android:textColor="?attr/colorOnSurfaceVariant" />
+
+                <TextView
+                    android:id="@+id/settings_phone_value"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:text="@string/settings_connection_value_unavailable"
+                    android:textAppearance="?attr/textAppearanceBodyLarge"
+                    android:textColor="?attr/colorOnSurface" />
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:layout_marginTop="32dp"
+                    android:layout_marginBottom="24dp"
+                    android:background="?attr/colorOutlineVariant" />
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/logout"
                     style="@style/FloatingVoice.QuietOutlinedButton"
-                    android:layout_marginTop="20dp"
                     android:text="@string/button_logout"
                     android:textColor="?attr/colorError"
                     app:strokeColor="?attr/colorError" />

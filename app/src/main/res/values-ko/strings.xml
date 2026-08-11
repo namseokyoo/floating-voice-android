@@ -196,7 +196,7 @@
     <string name="open_settings">설정 열기</string>
     <string name="screen_connection">Telegram 연결</string>
     <string name="screen_destination">전송 대상</string>
-    <string name="screen_settings">설정</string>
+
     <string name="home_connect_eyebrow">처음 설정</string>
     <string name="home_connect_title">Telegram을 연결해 주세요</string>
     <string name="home_connect_supporting">음성 기록을 보낼 계정과 대상을 먼저 연결합니다.</string>
@@ -250,11 +250,18 @@
     <string name="settings_set_target">전송 대상 설정</string>
     <string name="settings_change_target">전송 대상 변경</string>
     <string name="settings_target_supporting">Telegram에서 로그아웃하지 않고 받을 봇을 변경합니다</string>
-    <string name="settings_telegram_connection">Telegram 연결</string>
+
+    <string name="settings_menu_app">앱 설정</string>
+    <string name="settings_menu_destination">전송 대상</string>
+    <string name="settings_menu_telegram">Telegram 연결</string>
     <string name="settings_connection_not_ready">Telegram 인증이 준비되지 않았습니다</string>
     <string name="settings_connection_ready">Telegram 인증이 완료되었습니다</string>
-    <string name="settings_api_info">API 정보</string>
-    <string name="settings_api_info_supporting">암호화된 연결 정보를 확인하거나 변경합니다</string>
+    <string name="settings_connection_info_title">연결 정보</string>
+    <string name="settings_api_id_label">Telegram API ID</string>
+    <string name="settings_api_hash_label">Telegram API Hash</string>
+    <string name="settings_phone_label">Telegram 계정 전화번호</string>
+    <string name="settings_api_hash_accessibility_format">Telegram API Hash, 끝 4자리 %1$s</string>
+    <string name="settings_connection_value_unavailable">저장되지 않음</string>
     <string name="target_change_stop_title">플로팅 버튼을 중지하고 전송 대상을 바꿀까요?</string>
     <string name="target_change_stop_message">녹음 중이라면 파일을 보관하고 전송하지 않습니다. 플로팅 버튼이 중지된 뒤 대상 변경 화면을 엽니다.</string>
     <string name="target_change_stop_action">중지하고 변경</string>
