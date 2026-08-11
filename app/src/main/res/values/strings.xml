@@ -242,6 +242,7 @@
     <string name="button_confirm_target">Verify destination</string>
     <string name="button_back_home">Back to home</string>
     <string name="settings_app">App settings</string>
+    <string name="app_settings_supporting">Choose the app language and floating button appearance</string>
     <string name="settings_destination">Transfer destination</string>
     <string name="settings_target_not_set">No destination has been verified</string>
     <string name="settings_current_target_format">Current destination · %1$s</string>

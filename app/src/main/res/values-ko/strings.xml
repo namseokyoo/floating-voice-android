@@ -243,6 +243,7 @@
     <string name="button_confirm_target">전송 대상 확인</string>
     <string name="button_back_home">홈으로 돌아가기</string>
     <string name="settings_app">앱 설정</string>
+    <string name="app_settings_supporting">앱 언어와 플로팅 버튼 모양을 설정합니다</string>
     <string name="settings_destination">전송 대상</string>
     <string name="settings_target_not_set">확인된 전송 대상이 없습니다</string>
     <string name="settings_current_target_format">현재 전송 대상 · %1$s</string>

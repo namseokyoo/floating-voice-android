@@ -33,6 +33,7 @@ import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsCompat;
 
 import com.google.android.material.button.MaterialButton;
+import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.google.android.material.snackbar.Snackbar;
 import com.sidequestlab.floatingvoice.core.AppConfig;
 import com.sidequestlab.floatingvoice.core.DashboardReadiness;
@@ -54,7 +55,9 @@ public final class MainActivity extends AppCompatActivity implements TelegramRep
     private static final String STATE_PENDING_TARGET_USERNAME = "pending_target_username";
     private static final String STATE_PENDING_TARGET_OPERATION = "pending_target_operation";
 
-    private enum Page { HOME, CONNECTION, SETTINGS }
+    private enum Page {
+        HOME, CONNECTION, APP_SETTINGS, DESTINATION_SETTINGS, TELEGRAM_SETTINGS
+    }
     private enum ConnectionMode { RESUME, EDIT_API, EDIT_TARGET }
 
     private enum LanguageOption {
@@ -108,7 +111,9 @@ public final class MainActivity extends AppCompatActivity implements TelegramRep
     private ImageView dashboardIcon;
     private View homeScreen;
     private View connectionScreen;
-    private View settingsScreen;
+    private View appSettingsScreen;
+    private View destinationSettingsScreen;
+    private View telegramSettingsScreen;
     private View navigationButton;
     private View settingsButton;
     private View operationStatusPanel;
@@ -121,6 +126,7 @@ public final class MainActivity extends AppCompatActivity implements TelegramRep
     private MaterialButton dashboardPrimaryAction;
     private MaterialButton connectionSettingsToggle;
     private MaterialButton targetSettingsToggle;
+    private BottomSheetDialog settingsMenuDialog;
     private TelegramRepository telegram;
     private SecureSettingsStore settingsStore;
     private OverlayUiPreferences overlayUiPreferences;
@@ -174,10 +180,12 @@ public final class MainActivity extends AppCompatActivity implements TelegramRep
                     boolean running = FloatingVoiceService.isRunning();
                     presentLocalStatus(running
                             ? R.string.overlay_started : R.string.overlay_stopped, false, true);
-                    if (!running && pendingTargetEditor) {
+                    if (!running && pendingTargetEditor
+                            && currentPage == Page.DESTINATION_SETTINGS) {
                         pendingTargetEditor = false;
                         openTargetEditor();
                     } else {
+                        if (!running) pendingTargetEditor = false;
                         refreshUi();
                     }
                 }
@@ -244,7 +252,9 @@ public final class MainActivity extends AppCompatActivity implements TelegramRep
         dashboardIcon = findViewById(R.id.dashboard_icon);
         homeScreen = findViewById(R.id.home_screen);
         connectionScreen = findViewById(R.id.connection_screen);
-        settingsScreen = findViewById(R.id.settings_screen);
+        appSettingsScreen = findViewById(R.id.app_settings_screen);
+        destinationSettingsScreen = findViewById(R.id.destination_settings_screen);
+        telegramSettingsScreen = findViewById(R.id.telegram_settings_screen);
         navigationButton = findViewById(R.id.navigation_button);
         settingsButton = findViewById(R.id.settings_button);
         operationStatusPanel = findViewById(R.id.operation_status_panel);
@@ -293,7 +303,7 @@ public final class MainActivity extends AppCompatActivity implements TelegramRep
                 v -> showPage(Page.CONNECTION, ConnectionMode.EDIT_API));
         targetSettingsToggle.setOnClickListener(v -> requestTargetEditor());
         navigationButton.setOnClickListener(v -> navigateBack());
-        settingsButton.setOnClickListener(v -> showPage(Page.SETTINGS, ConnectionMode.RESUME));
+        settingsButton.setOnClickListener(v -> showSettingsMenu());
         permissionStatus.setOnClickListener(v -> requestRequiredPermissions());
         permissionMicrophoneStatus.setOnClickListener(v -> requestRequiredPermissions());
         permissionNotificationStatus.setOnClickListener(v -> requestRequiredPermissions());
@@ -311,9 +321,12 @@ public final class MainActivity extends AppCompatActivity implements TelegramRep
                 new IntentFilter(FloatingVoiceService.ACTION_RUNNING_STATE_CHANGED),
                 ContextCompat.RECEIVER_NOT_EXPORTED);
         refreshUi();
-        if (pendingTargetEditor && !FloatingVoiceService.isRunning()) {
+        if (pendingTargetEditor && !FloatingVoiceService.isRunning()
+                && currentPage == Page.DESTINATION_SETTINGS) {
             pendingTargetEditor = false;
             openTargetEditor();
+        } else if (!FloatingVoiceService.isRunning()) {
+            pendingTargetEditor = false;
         }
     }
 
@@ -324,6 +337,10 @@ public final class MainActivity extends AppCompatActivity implements TelegramRep
     }
 
     @Override protected void onDestroy() {
+        if (settingsMenuDialog != null) {
+            settingsMenuDialog.dismiss();
+            settingsMenuDialog = null;
+        }
         if (telegram != null) telegram.removeListener(this);
         super.onDestroy();
     }
@@ -397,23 +414,79 @@ public final class MainActivity extends AppCompatActivity implements TelegramRep
         connectionMode = page == Page.CONNECTION ? mode : ConnectionMode.RESUME;
         homeScreen.setVisibility(page == Page.HOME ? View.VISIBLE : View.GONE);
         connectionScreen.setVisibility(page == Page.CONNECTION ? View.VISIBLE : View.GONE);
-        settingsScreen.setVisibility(page == Page.SETTINGS ? View.VISIBLE : View.GONE);
+        appSettingsScreen.setVisibility(page == Page.APP_SETTINGS ? View.VISIBLE : View.GONE);
+        destinationSettingsScreen.setVisibility(
+                page == Page.DESTINATION_SETTINGS ? View.VISIBLE : View.GONE);
+        telegramSettingsScreen.setVisibility(
+                page == Page.TELEGRAM_SETTINGS ? View.VISIBLE : View.GONE);
         navigationButton.setVisibility(page == Page.HOME ? View.GONE : View.VISIBLE);
         settingsButton.setVisibility(page == Page.HOME ? View.VISIBLE : View.GONE);
-        int title = page == Page.CONNECTION
-                ? (mode == ConnectionMode.EDIT_TARGET
-                        ? R.string.screen_destination : R.string.screen_connection)
-                : page == Page.SETTINGS ? R.string.screen_settings : R.string.app_name;
+        int title;
+        switch (page) {
+            case CONNECTION:
+                title = mode == ConnectionMode.EDIT_TARGET
+                        ? R.string.screen_destination : R.string.screen_connection;
+                break;
+            case APP_SETTINGS:
+                title = R.string.settings_app;
+                break;
+            case DESTINATION_SETTINGS:
+                title = R.string.screen_destination;
+                break;
+            case TELEGRAM_SETTINGS:
+                title = R.string.screen_connection;
+                break;
+            case HOME:
+            default:
+                title = R.string.app_name;
+                break;
+        }
         appBarTitle.setText(title);
-        View visibleScreen = page == Page.HOME ? homeScreen
-                : page == Page.CONNECTION ? connectionScreen : settingsScreen;
+        View visibleScreen;
+        switch (page) {
+            case CONNECTION: visibleScreen = connectionScreen; break;
+            case APP_SETTINGS: visibleScreen = appSettingsScreen; break;
+            case DESTINATION_SETTINGS: visibleScreen = destinationSettingsScreen; break;
+            case TELEGRAM_SETTINGS: visibleScreen = telegramSettingsScreen; break;
+            case HOME:
+            default: visibleScreen = homeScreen; break;
+        }
         ViewCompat.setAccessibilityPaneTitle(visibleScreen, getString(title));
         if (page == Page.CONNECTION) refreshConnectionFlow();
-        if (page == Page.SETTINGS) refreshSettingsSummary();
+        if (page == Page.DESTINATION_SETTINGS || page == Page.TELEGRAM_SETTINGS) {
+            refreshSettingsSummary();
+        }
+    }
+
+    private void showSettingsMenu() {
+        if (settingsMenuDialog != null) settingsMenuDialog.dismiss();
+        BottomSheetDialog dialog = new BottomSheetDialog(this);
+        settingsMenuDialog = dialog;
+        dialog.setContentView(R.layout.bottom_sheet_settings_menu);
+        View sheet = dialog.findViewById(R.id.settings_menu_root);
+        if (sheet == null) throw new IllegalStateException("Missing settings menu root");
+        ViewCompat.setAccessibilityPaneTitle(sheet, getString(R.string.screen_settings));
+        sheet.findViewById(R.id.menu_app_settings).setOnClickListener(v -> {
+            dialog.dismiss();
+            showPage(Page.APP_SETTINGS, ConnectionMode.RESUME);
+        });
+        sheet.findViewById(R.id.menu_destination_settings).setOnClickListener(v -> {
+            dialog.dismiss();
+            showPage(Page.DESTINATION_SETTINGS, ConnectionMode.RESUME);
+        });
+        sheet.findViewById(R.id.menu_telegram_settings).setOnClickListener(v -> {
+            dialog.dismiss();
+            showPage(Page.TELEGRAM_SETTINGS, ConnectionMode.RESUME);
+        });
+        dialog.setOnDismissListener(ignored -> {
+            if (settingsMenuDialog == dialog) settingsMenuDialog = null;
+        });
+        dialog.show();
     }
 
     private void navigateBack() {
         boolean committedTargetEdit = false;
+        if (currentPage == Page.DESTINATION_SETTINGS) pendingTargetEditor = false;
         if (currentPage == Page.CONNECTION && connectionMode == ConnectionMode.EDIT_TARGET) {
             if (pendingTargetOperation > 0L) {
                 committedTargetEdit = telegram.cancelTargetResolution(pendingTargetOperation);
@@ -421,8 +494,12 @@ public final class MainActivity extends AppCompatActivity implements TelegramRep
             pendingTargetUsername = null;
             pendingTargetOperation = 0L;
         }
-        Page destination = currentPage == Page.CONNECTION
-                && connectionMode != ConnectionMode.RESUME ? Page.SETTINGS : Page.HOME;
+        Page destination = Page.HOME;
+        if (currentPage == Page.CONNECTION && connectionMode == ConnectionMode.EDIT_TARGET) {
+            destination = Page.DESTINATION_SETTINGS;
+        } else if (currentPage == Page.CONNECTION && connectionMode == ConnectionMode.EDIT_API) {
+            destination = Page.TELEGRAM_SETTINGS;
+        }
         showPage(destination, ConnectionMode.RESUME);
         if (committedTargetEdit) showTargetChangeSuccess();
     }
@@ -479,7 +556,7 @@ public final class MainActivity extends AppCompatActivity implements TelegramRep
         connectionMode = ConnectionMode.RESUME;
         presentLocalStatus(R.string.settings_saved_no_message, false, true);
         if (returnToSettings) {
-            showPage(Page.SETTINGS, ConnectionMode.RESUME);
+            showPage(Page.TELEGRAM_SETTINGS, ConnectionMode.RESUME);
         } else {
             refreshUi();
         }
@@ -982,7 +1059,7 @@ public final class MainActivity extends AppCompatActivity implements TelegramRep
             if (completedTargetEdit) {
                 pendingTargetUsername = null;
                 pendingTargetOperation = 0L;
-                showPage(Page.SETTINGS, ConnectionMode.RESUME);
+                showPage(Page.DESTINATION_SETTINGS, ConnectionMode.RESUME);
                 showTargetChangeSuccess();
             } else {
                 refreshUi();
