@@ -20,4 +20,8 @@ The authenticated TDLib account/session plus API ID, API Hash, and account phone
 
 ## Current non-goals
 
-Multiple saved destinations, a default destination among many, and per-send destination selection are not part of this version.
+Multiple saved destinations, a default destination among many, and per-send destination selection are not part of v0.6.4. They belong to the planned v0.7.0 multi-destination milestone and must not be backported into the completed baseline.
+
+## Canonical roadmap
+
+The tracked source of truth is `docs/plans/floating-voice-release-master.md`. Future detailed plans are `docs/plans/floating-voice-v0.7.0-multi-destination.md` and `docs/plans/floating-voice-v0.8.0-stt-sharing.md`. README store-preparation checklists are not product roadmap authority.

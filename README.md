@@ -354,19 +354,26 @@ floating-voice-android/
 - 공식 APK 서명 인증서 SHA-256 fingerprint는 `FD:97:82:9D:19:F8:B0:57:5B:79:EC:1E:8B:7A:26:16:A0:69:7C:EE:86:5D:29:B0:B5:28:78:3C:39:88:AB:A6`이다.
 - APK 파일의 SHA-256은 각 Release Notes에 별도로 기록한다.
 
-## 다음 단계
+## 제품 개발 로드맵
 
-- [x] 한국어·영어 앱 리소스
-- [x] 시스템 기본값·앱 내 언어 선택
-- [x] 한국어·영어 저장소 문서
-- [x] GitHub Release용 release 서명 arm64 APK
+버전별 범위·선행검증·리스크·완료 게이트의 단일 기준은 [Floating Voice Release Master Plan](docs/plans/floating-voice-release-master.md)이다.
+
+- 현재 안정 기준선: `v0.6.4` — 실기기 테스트 완료
+- `v0.7.0`: 여러 private bot 목적지와 불변 dispatch
+- `v0.8.0`: 시스템 STT 텍스트 공유·Android Sharesheet·로컬 OGG 출력
+- `v0.9.0`: 메인 버튼 역할 지정
+- `v0.10.x+`: 실사용 안정화
+- `v1.0.0`: 안정성 게이트 충족 후에만 진입
+
+### 출시 준비 참고 — 제품 기능 로드맵 아님
+
+아래 항목은 Play Store나 공개 배포를 결정했을 때 사용하는 별도 체크리스트다. 버전별 기능 순서나 다음 개발 범위를 결정하지 않는다.
+
+- [x] 한국어·영어 리소스·문서·개인정보 안내
+- [x] release 서명 `arm64-v8a` APK 체계
 - [ ] AAB와 Play App Signing 구성
-- [x] 저장소용 한국어·영어 개인정보 안내
-- [ ] 스토어용 Data Safety·권한 고지 작성
-- [ ] 로그아웃 + 모든 로컬 데이터 삭제 기능
-- [ ] 실패 녹음 목록·재전송·삭제 UI
-- [ ] 대상 선택 범위 확장 여부 검토
-- [ ] 실제 설정 화면과 플로팅 버튼 스크린샷 추가
+- [ ] 스토어용 Data Safety·권한 고지
+- [ ] 실제 설정 화면·플로팅 버튼 스크린샷
 - [ ] 기기·Android 버전별 UI 테스트 확대
 
 ## TDLib 호환성 주의
