@@ -13,6 +13,7 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.content.pm.ServiceInfo;
+import android.content.res.Configuration;
 import android.graphics.PixelFormat;
 import android.graphics.Rect;
 import android.media.MediaRecorder;
@@ -32,7 +33,9 @@ import androidx.core.content.ContextCompat;
 
 import com.sidequestlab.floatingvoice.core.AnchoredPanelPlacement;
 import com.sidequestlab.floatingvoice.core.GestureClassifier;
+import com.sidequestlab.floatingvoice.core.OverlayColorPreset;
 import com.sidequestlab.floatingvoice.core.OverlayEvent;
+import com.sidequestlab.floatingvoice.core.OverlayReflowPolicy;
 import com.sidequestlab.floatingvoice.core.OverlayStateMachine;
 
 import java.io.File;
@@ -113,7 +116,12 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
         overlayUiPreferences = new OverlayUiPreferences(this);
         currentFabSizePx = dp(overlayUiPreferences.sizePreset().sizeDp());
         uiPreferenceListener = (preferences, key) -> {
-            if (!OverlayUiPreferences.KEY_SIZE.equals(key) || isTearingDown()) return;
+            if (isTearingDown()) return;
+            if (OverlayUiPreferences.KEY_COLOR.equals(key)) {
+                applyIdleColor();
+                return;
+            }
+            if (!OverlayUiPreferences.KEY_SIZE.equals(key)) return;
             OverlayStateMachine.State state = overlayStateMachine.state();
             if (!showsIdleBubble(state) && state != OverlayStateMachine.State.MENU_OPEN) return;
             currentFabSizePx = dp(overlayUiPreferences.sizePreset().sizeDp());
@@ -151,6 +159,12 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
         ContextCompat.registerReceiver(this, composerClosedReceiver, composerFilter,
                 ContextCompat.RECEIVER_NOT_EXPORTED);
         createNotificationChannel();
+    }
+
+    @Override public void onConfigurationChanged(Configuration newConfig) {
+        super.onConfigurationChanged(newConfig);
+        if (mainHandler == null || isTearingDown()) return;
+        mainHandler.post(this::reflowVisibleOverlay);
     }
 
     @Override public int onStartCommand(Intent intent, int flags, int startId) {
@@ -282,6 +296,7 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
         });
         primaryOverlay = overlayViewController.root();
         overlayViewController.setIdleSize(currentFabSizePx);
+        applyIdleColor();
         int size = currentFabSizePx;
         layoutParams = new WindowManager.LayoutParams(size, size,
                 WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
@@ -467,14 +482,20 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
     }
 
     private boolean showRecordingDock() {
+        return showRecordingDock(true);
+    }
+
+    private boolean showRecordingDock(boolean captureIdleAnchor) {
         if (overlayViewController == null || primaryOverlay == null || layoutParams == null
                 || windowRegistry == null || !primaryOverlayAttached) {
             cancelRecordingFallback();
             return false;
         }
         hideActionMenu();
-        idleAnchorX = layoutParams.x;
-        idleAnchorY = layoutParams.y;
+        if (captureIdleAnchor) {
+            idleAnchorX = layoutParams.x;
+            idleAnchorY = layoutParams.y;
+        }
         int dockWidth = px(R.dimen.overlay_dock_width);
         int dockHeight = px(R.dimen.overlay_dock_height);
         int stopSize = px(R.dimen.overlay_stop_size);
@@ -521,6 +542,7 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
         }
         overlayViewController.showIdle();
         overlayViewController.setIdleSize(currentFabSizePx);
+        applyIdleColor();
         layoutParams.width = currentFabSizePx;
         layoutParams.height = currentFabSizePx;
         Rect display = currentDisplayBounds();
@@ -531,8 +553,25 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
                 Math.max(minX, display.right - margin - layoutParams.width));
         layoutParams.y = clamp(idleAnchorY, minY,
                 Math.max(minY, display.bottom - margin - layoutParams.height));
+        idleAnchorX = layoutParams.x;
+        idleAnchorY = layoutParams.y;
         try { windowRegistry.update(primaryOverlay, layoutParams); }
         catch (RuntimeException ignored) { }
+    }
+
+    private void reflowVisibleOverlay() {
+        if (isTearingDown() || !primaryOverlayAttached || layoutParams == null) return;
+        switch (OverlayReflowPolicy.actionFor(overlayStateMachine.state())) {
+            case REFLOW_IDLE -> showIdleOverlay();
+            case REFLOW_RECORDING -> showRecordingDock(false);
+            case CLOSE_MENU_AND_REFLOW_IDLE -> {
+                dispatchOverlayEvent(OverlayEvent.GESTURE_CANCELED);
+                showIdleOverlay();
+            }
+            case NONE -> {
+                // Transient and hidden states have no visible window to reflow.
+            }
+        }
     }
 
     private void showActionMenu() {
@@ -603,6 +642,23 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
 
     private Rect currentDisplayBounds() {
         return DisplaySafeBounds.from(this);
+    }
+
+    private void applyIdleColor() {
+        if (overlayViewController == null || overlayUiPreferences == null) return;
+        int background = ContextCompat.getColor(
+                this, overlayColorResource(overlayUiPreferences.colorPreset()));
+        int foreground = ContextCompat.getColor(this, R.color.overlay_button_on_color);
+        overlayViewController.setIdleColors(background, foreground);
+    }
+
+    private static int overlayColorResource(OverlayColorPreset preset) {
+        return switch (preset) {
+            case SAGE -> R.color.overlay_button_sage;
+            case OCEAN -> R.color.overlay_button_ocean;
+            case VIOLET -> R.color.overlay_button_violet;
+            case AMBER -> R.color.overlay_button_amber;
+        };
     }
 
     private static int clamp(int value, int min, int max) {

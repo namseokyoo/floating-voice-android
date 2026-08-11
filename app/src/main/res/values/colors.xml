@@ -1,6 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="launcher_background">#52746C</color>
+    <color name="overlay_button_sage">#52746C</color>
+    <color name="overlay_button_ocean">#386D88</color>
+    <color name="overlay_button_violet">#665A8B</color>
+    <color name="overlay_button_amber">#95642E</color>
+    <color name="overlay_button_on_color">#FFFFFF</color>
 
     <!-- Quiet Recorder activity tokens. -->
     <color name="quiet_primary">#52746C</color>

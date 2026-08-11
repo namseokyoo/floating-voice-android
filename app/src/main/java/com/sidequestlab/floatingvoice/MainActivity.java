@@ -26,12 +26,17 @@ import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.app.AppCompatDelegate;
 import androidx.core.content.ContextCompat;
+import androidx.core.graphics.Insets;
 import androidx.core.os.LocaleListCompat;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowCompat;
+import androidx.core.view.WindowInsetsCompat;
 
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.snackbar.Snackbar;
 import com.sidequestlab.floatingvoice.core.AppConfig;
 import com.sidequestlab.floatingvoice.core.DashboardReadiness;
+import com.sidequestlab.floatingvoice.core.OverlayColorPreset;
 import com.sidequestlab.floatingvoice.core.OverlaySizePreset;
 
 import java.util.ArrayList;
@@ -118,11 +123,14 @@ public final class MainActivity extends AppCompatActivity implements TelegramRep
 
     @Override protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
         setContentView(R.layout.activity_main);
+        applySystemBarInsets();
         bindViews();
         overlayUiPreferences = new OverlayUiPreferences(this);
         setupLanguageSelector();
         setupOverlaySizeSelector();
+        setupOverlayColorSelector();
 
         FloatingVoiceApp app = (FloatingVoiceApp) getApplication();
         telegram = app.telegram();
@@ -298,6 +306,36 @@ public final class MainActivity extends AppCompatActivity implements TelegramRep
 
             @Override public void onNothingSelected(AdapterView<?> parent) { }
         });
+    }
+
+    private void setupOverlayColorSelector() {
+        Spinner selector = findViewById(R.id.overlay_color_selector);
+        selector.setSelection(overlayUiPreferences.colorPreset().ordinal(), false);
+        selector.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override public void onItemSelected(AdapterView<?> parent, View view,
+                                                 int position, long id) {
+                overlayUiPreferences.setColorPreset(OverlayColorPreset.fromPosition(position));
+            }
+
+            @Override public void onNothingSelected(AdapterView<?> parent) { }
+        });
+    }
+
+    private void applySystemBarInsets() {
+        View root = findViewById(R.id.root);
+        int start = root.getPaddingStart();
+        int top = root.getPaddingTop();
+        int end = root.getPaddingEnd();
+        int bottom = root.getPaddingBottom();
+        ViewCompat.setOnApplyWindowInsetsListener(root, (view, windowInsets) -> {
+            Insets safe = windowInsets.getInsets(
+                    WindowInsetsCompat.Type.systemBars()
+                            | WindowInsetsCompat.Type.displayCutout());
+            view.setPaddingRelative(start + safe.left, top + safe.top,
+                    end + safe.right, bottom + safe.bottom);
+            return windowInsets;
+        });
+        ViewCompat.requestApplyInsets(root);
     }
 
     private void showPage(Page page, boolean editApi) {

@@ -57,7 +57,7 @@
 
     <style name="ShapeAppearance.FloatingVoice.Fab" parent="ShapeAppearance.Material3.LargeComponent">
         <item name="cornerFamily">rounded</item>
-        <item name="cornerSize">20dp</item>
+        <item name="cornerSize">50%</item>
     </style>
 
     <style name="ShapeAppearance.FloatingVoice.Dock" parent="ShapeAppearance.Material3.LargeComponent">

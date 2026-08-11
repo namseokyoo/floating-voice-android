@@ -12,6 +12,13 @@
         <item>Medium</item>
         <item>Large</item>
     </string-array>
+    <string name="overlay_color_label">Floating button color</string>
+    <string-array name="overlay_color_options">
+        <item>App Sage</item>
+        <item>Ocean</item>
+        <item>Violet</item>
+        <item>Amber</item>
+    </string-array>
     <string-array name="language_options" translatable="false">
         <item>System default</item>
         <item>한국어</item>

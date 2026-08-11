@@ -10,8 +10,8 @@ android {
         applicationId "com.sidequestlab.floatingvoice"
         minSdk 29
         targetSdk 36
-        versionCode 10
-        versionName "0.6.0"
+        versionCode 11
+        versionName "0.6.1"
 
         testInstrumentationRunner "android.app.Instrumentation"
 
@@ -23,7 +23,7 @@ android {
     buildTypes {
         debug {
             applicationIdSuffix ".debug"
-            versionNameSuffix "-quiet-recorder-device-test"
+            versionNameSuffix "-overlay-style-safe-area-device-test"
         }
         release {
             minifyEnabled false

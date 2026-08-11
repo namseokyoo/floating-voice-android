@@ -22,12 +22,12 @@
         android:minHeight="0dp"
         android:padding="0dp"
         android:text=""
-        app:backgroundTint="@color/fv_primary_container"
-        app:icon="@drawable/ic_overlay_mic"
+        app:backgroundTint="@color/overlay_button_sage"
+        app:icon="@mipmap/ic_launcher_foreground"
         app:iconGravity="textStart"
         app:iconPadding="0dp"
-        app:iconSize="28dp"
-        app:iconTint="@color/fv_on_primary_container"
+        app:iconSize="@dimen/overlay_fab_size"
+        app:iconTint="@color/overlay_button_on_color"
         app:shapeAppearance="@style/ShapeAppearance.FloatingVoice.Fab" />
 
     <com.google.android.material.card.MaterialCardView

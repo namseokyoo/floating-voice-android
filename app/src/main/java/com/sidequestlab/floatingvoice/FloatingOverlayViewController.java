@@ -2,6 +2,7 @@ package com.sidequestlab.floatingvoice;
 
 import android.annotation.SuppressLint;
 import android.content.Context;
+import android.content.res.ColorStateList;
 import android.view.ContextThemeWrapper;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -78,8 +79,14 @@ final class FloatingOverlayViewController {
         params.height = sizePx;
         idleAction.setLayoutParams(params);
         if (idleAction instanceof MaterialButton button) {
-            button.setIconSize(Math.max(24, Math.round(sizePx * 0.44f)));
+            button.setIconSize(sizePx);
         }
+    }
+
+    void setIdleColors(int backgroundColor, int foregroundColor) {
+        if (!(idleAction instanceof MaterialButton button)) return;
+        button.setBackgroundTintList(ColorStateList.valueOf(backgroundColor));
+        button.setIconTint(ColorStateList.valueOf(foregroundColor));
     }
 
     void setIdleClickListener(View.OnClickListener listener) {

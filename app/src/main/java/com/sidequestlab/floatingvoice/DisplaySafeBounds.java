@@ -20,10 +20,9 @@ import java.util.Objects;
  * Deterministic safe placement bounds for overlay windows.
  *
  * <p>The overlay uses {@code FLAG_LAYOUT_NO_LIMITS}, so it can be laid out under system UI.
- * Placement therefore clamps against display bounds reduced by the display cutout plus
- * resource-sourced status/navigation bar heights. This avoids guessing and avoids any
- * asynchronous WindowInsets dispatch, which is unavailable to a Service-owned window at
- * the moment placement is computed.
+ * Placement therefore clamps against the current display bounds reduced by system-bar and
+ * cutout insets. This avoids asynchronous inset dispatch, which is unavailable to a
+ * Service-owned window at the moment placement is computed.
  */
 final class DisplaySafeBounds {
     private static final int DEFAULT_NAVIGATION_BAR_DP = 48;
@@ -37,7 +36,7 @@ final class DisplaySafeBounds {
         WindowManager windowManager =
                 (WindowManager) context.getSystemService(Context.WINDOW_SERVICE);
         if (windowManager != null && Build.VERSION.SDK_INT >= 30) {
-            WindowMetrics metrics = windowManager.getMaximumWindowMetrics();
+            WindowMetrics metrics = windowManager.getCurrentWindowMetrics();
             Rect metricsBounds = metrics.getBounds();
             Insets insets = metrics.getWindowInsets().getInsetsIgnoringVisibility(
                     WindowInsets.Type.systemBars() | WindowInsets.Type.displayCutout());

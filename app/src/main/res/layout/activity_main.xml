@@ -630,6 +630,22 @@
                     android:layout_height="52dp"
                     android:entries="@array/overlay_size_options" />
 
+                <View
+                    style="@style/FloatingVoice.QuietDivider"
+                    android:layout_marginBottom="16dp" />
+
+                <TextView
+                    android:id="@+id/overlay_color_selector_label"
+                    style="@style/FloatingVoice.FieldLabel"
+                    android:labelFor="@id/overlay_color_selector"
+                    android:text="@string/overlay_color_label" />
+
+                <Spinner
+                    android:id="@+id/overlay_color_selector"
+                    android:layout_width="match_parent"
+                    android:layout_height="52dp"
+                    android:entries="@array/overlay_color_options" />
+
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
