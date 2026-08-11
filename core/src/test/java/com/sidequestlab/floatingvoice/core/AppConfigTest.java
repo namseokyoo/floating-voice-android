@@ -53,6 +53,18 @@ class AppConfigTest {
     }
 
     @Test
+    void targetReplacementPreservesTelegramConnectionIdentity() {
+        AppConfig original = new AppConfig(123456,
+                "0123456789abcdef0123456789abcdef", "+821****5678", "first_bot");
+
+        AppConfig replacement = original.withBotUsername("https://t.me/Second_Bot");
+
+        assertTrue(original.hasSameConnection(replacement));
+        assertEquals("second_bot", replacement.botUsername());
+        assertEquals("first_bot", original.botUsername());
+    }
+
+    @Test
     void validationErrorsAreLanguageNeutralCodes() {
         for (AppConfig.ValidationError error : AppConfig.ValidationError.values()) {
             assertTrue(error.name().matches("[A-Z_]+"));

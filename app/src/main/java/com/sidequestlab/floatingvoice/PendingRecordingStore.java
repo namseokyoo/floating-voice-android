@@ -3,10 +3,11 @@ package com.sidequestlab.floatingvoice;
 import android.content.Context;
 import android.content.SharedPreferences;
 
-import java.util.HashMap;
+import com.sidequestlab.floatingvoice.core.PendingMessageKey;
+
 import java.util.Map;
 
-/** Persists temporary TDLib message-id to recording-path mappings across process restarts. */
+/** Persists chat-scoped TDLib temporary-message IDs to recording paths. */
 public final class PendingRecordingStore {
     private static final String PREFIX = "message_";
     private final SharedPreferences preferences;
@@ -15,31 +16,40 @@ public final class PendingRecordingStore {
         preferences = context.getSharedPreferences("pending_voice_recordings", Context.MODE_PRIVATE);
     }
 
-    public synchronized void put(long temporaryMessageId, String absolutePath) {
-        preferences.edit().putString(PREFIX + temporaryMessageId, absolutePath).apply();
+    public synchronized void put(PendingMessageKey message, String absolutePath) {
+        preferences.edit().putString(key(message), absolutePath).apply();
     }
 
-    public synchronized String take(long temporaryMessageId) {
-        String key = PREFIX + temporaryMessageId;
+    public synchronized String take(PendingMessageKey message) {
+        String key = key(message);
         String value = preferences.getString(key, null);
         if (value != null) preferences.edit().remove(key).apply();
         return value;
     }
 
-    public synchronized String peek(long temporaryMessageId) {
-        return preferences.getString(PREFIX + temporaryMessageId, null);
+    /** Migrates v0.6.1's single-target keys before the Telegram client starts. */
+    public synchronized void migrateLegacy(long chatId) {
+        SharedPreferences.Editor editor = preferences.edit();
+        boolean changed = false;
+        for (Map.Entry<String, ?> entry : preferences.getAll().entrySet()) {
+            String legacyKey = entry.getKey();
+            if (!legacyKey.startsWith(PREFIX)
+                    || legacyKey.substring(PREFIX.length()).contains("_")
+                    || !(entry.getValue() instanceof String)) continue;
+            try {
+                long temporaryId = Long.parseLong(legacyKey.substring(PREFIX.length()));
+                String scopedKey = key(new PendingMessageKey(chatId, temporaryId));
+                if (!preferences.contains(scopedKey)) {
+                    editor.putString(scopedKey, (String) entry.getValue());
+                }
+                editor.remove(legacyKey);
+                changed = true;
+            } catch (NumberFormatException ignored) { }
+        }
+        if (changed) editor.apply();
     }
 
-    public synchronized Map<Long, String> all() {
-        Map<Long, String> result = new HashMap<>();
-        for (Map.Entry<String, ?> entry : preferences.getAll().entrySet()) {
-            if (entry.getKey().startsWith(PREFIX) && entry.getValue() instanceof String) {
-                try {
-                    result.put(Long.parseLong(entry.getKey().substring(PREFIX.length())),
-                            (String) entry.getValue());
-                } catch (NumberFormatException ignored) { }
-            }
-        }
-        return result;
+    private static String key(PendingMessageKey message) {
+        return PREFIX + message.storageSuffix();
     }
 }

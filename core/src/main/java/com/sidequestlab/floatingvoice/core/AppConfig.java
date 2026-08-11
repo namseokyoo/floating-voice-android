@@ -78,6 +78,9 @@ public final class AppConfig {
     public String apiHash() { return apiHash; }
     public String phoneNumber() { return phoneNumber; }
     public String botUsername() { return botUsername; }
+    public AppConfig withBotUsername(String username) {
+        return new AppConfig(apiId, apiHash, phoneNumber, username);
+    }
     public boolean hasBotUsername() { return UsernameNormalizer.isValid(botUsername); }
     public boolean hasSameConnection(AppConfig other) {
         return other != null && apiId == other.apiId

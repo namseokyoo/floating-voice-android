@@ -38,6 +38,8 @@ import com.sidequestlab.floatingvoice.core.AppConfig;
 import com.sidequestlab.floatingvoice.core.DashboardReadiness;
 import com.sidequestlab.floatingvoice.core.OverlayColorPreset;
 import com.sidequestlab.floatingvoice.core.OverlaySizePreset;
+import com.sidequestlab.floatingvoice.core.TargetChangePolicy;
+import com.sidequestlab.floatingvoice.core.TargetEditCompletionPolicy;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -46,8 +48,14 @@ import java.util.Locale;
 public final class MainActivity extends AppCompatActivity implements TelegramRepository.Listener {
     private static final int PERMISSION_REQUEST = 100;
     private static final String PERMISSION_PREFS = "permission_request_history";
+    private static final String STATE_PENDING_TARGET_EDITOR = "pending_target_editor";
+    private static final String STATE_PAGE = "page";
+    private static final String STATE_CONNECTION_MODE = "connection_mode";
+    private static final String STATE_PENDING_TARGET_USERNAME = "pending_target_username";
+    private static final String STATE_PENDING_TARGET_OPERATION = "pending_target_operation";
 
     private enum Page { HOME, CONNECTION, SETTINGS }
+    private enum ConnectionMode { RESUME, EDIT_API, EDIT_TARGET }
 
     private enum LanguageOption {
         SYSTEM(""), KOREAN("ko"), ENGLISH("en");
@@ -95,6 +103,8 @@ public final class MainActivity extends AppCompatActivity implements TelegramRep
     private TextView connectionTitle;
     private TextView connectionSupporting;
     private TextView appBarTitle;
+    private TextView settingsTargetSummary;
+    private TextView settingsConnectionSummary;
     private ImageView dashboardIcon;
     private View homeScreen;
     private View connectionScreen;
@@ -110,6 +120,7 @@ public final class MainActivity extends AppCompatActivity implements TelegramRep
     private View connectionComplete;
     private MaterialButton dashboardPrimaryAction;
     private MaterialButton connectionSettingsToggle;
+    private MaterialButton targetSettingsToggle;
     private TelegramRepository telegram;
     private SecureSettingsStore settingsStore;
     private OverlayUiPreferences overlayUiPreferences;
@@ -117,7 +128,10 @@ public final class MainActivity extends AppCompatActivity implements TelegramRep
     private AppConfig savedConfig;
     private DashboardReadiness.State dashboardState = DashboardReadiness.State.CONNECT_TELEGRAM;
     private Page currentPage = Page.HOME;
-    private boolean editingApiSettings;
+    private ConnectionMode connectionMode = ConnectionMode.RESUME;
+    private boolean pendingTargetEditor;
+    private String pendingTargetUsername;
+    private long pendingTargetOperation;
     private boolean statusCallbacksReady;
     private String persistentStatus;
 
@@ -125,6 +139,21 @@ public final class MainActivity extends AppCompatActivity implements TelegramRep
         super.onCreate(savedInstanceState);
         WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
         setContentView(R.layout.activity_main);
+        pendingTargetEditor = savedInstanceState != null
+                && savedInstanceState.getBoolean(STATE_PENDING_TARGET_EDITOR, false);
+        if (savedInstanceState != null) {
+            try {
+                currentPage = Page.valueOf(savedInstanceState.getString(
+                        STATE_PAGE, Page.HOME.name()));
+                connectionMode = ConnectionMode.valueOf(savedInstanceState.getString(
+                        STATE_CONNECTION_MODE, ConnectionMode.RESUME.name()));
+            } catch (IllegalArgumentException ignored) {
+                currentPage = Page.HOME;
+                connectionMode = ConnectionMode.RESUME;
+            }
+            pendingTargetUsername = savedInstanceState.getString(STATE_PENDING_TARGET_USERNAME);
+            pendingTargetOperation = savedInstanceState.getLong(STATE_PENDING_TARGET_OPERATION);
+        }
         applySystemBarInsets();
         bindViews();
         overlayUiPreferences = new OverlayUiPreferences(this);
@@ -142,9 +171,15 @@ public final class MainActivity extends AppCompatActivity implements TelegramRep
             @Override public void onReceive(Context context, Intent intent) {
                 if (intent != null && FloatingVoiceService.ACTION_RUNNING_STATE_CHANGED
                         .equals(intent.getAction())) {
-                    presentLocalStatus(FloatingVoiceService.isRunning()
+                    boolean running = FloatingVoiceService.isRunning();
+                    presentLocalStatus(running
                             ? R.string.overlay_started : R.string.overlay_stopped, false, true);
-                    refreshUi();
+                    if (!running && pendingTargetEditor) {
+                        pendingTargetEditor = false;
+                        openTargetEditor();
+                    } else {
+                        refreshUi();
+                    }
                 }
             }
         };
@@ -156,7 +191,7 @@ public final class MainActivity extends AppCompatActivity implements TelegramRep
                     setEnabled(false);
                     getOnBackPressedDispatcher().onBackPressed();
                 } else {
-                    showPage(Page.HOME, false);
+                    navigateBack();
                 }
             }
         });
@@ -165,7 +200,16 @@ public final class MainActivity extends AppCompatActivity implements TelegramRep
         telegram.addListener(this);
         statusCallbacksReady = true;
         refreshPermissionStatus();
-        showPage(Page.HOME, false);
+        showPage(currentPage, connectionMode);
+    }
+
+    @Override protected void onSaveInstanceState(Bundle outState) {
+        outState.putBoolean(STATE_PENDING_TARGET_EDITOR, pendingTargetEditor);
+        outState.putString(STATE_PAGE, currentPage.name());
+        outState.putString(STATE_CONNECTION_MODE, connectionMode.name());
+        outState.putString(STATE_PENDING_TARGET_USERNAME, pendingTargetUsername);
+        outState.putLong(STATE_PENDING_TARGET_OPERATION, pendingTargetOperation);
+        super.onSaveInstanceState(outState);
     }
 
     private void bindViews() {
@@ -195,6 +239,8 @@ public final class MainActivity extends AppCompatActivity implements TelegramRep
         connectionTitle = findViewById(R.id.connection_title);
         connectionSupporting = findViewById(R.id.connection_supporting);
         appBarTitle = findViewById(R.id.app_bar_title);
+        settingsTargetSummary = findViewById(R.id.settings_target_summary);
+        settingsConnectionSummary = findViewById(R.id.settings_connection_summary);
         dashboardIcon = findViewById(R.id.dashboard_icon);
         homeScreen = findViewById(R.id.home_screen);
         connectionScreen = findViewById(R.id.connection_screen);
@@ -210,6 +256,7 @@ public final class MainActivity extends AppCompatActivity implements TelegramRep
         connectionComplete = findViewById(R.id.connection_complete);
         dashboardPrimaryAction = findViewById(R.id.dashboard_primary_action);
         connectionSettingsToggle = findViewById(R.id.connection_settings_toggle);
+        targetSettingsToggle = findViewById(R.id.target_settings_toggle);
         apiId.setInputType(InputType.TYPE_CLASS_NUMBER);
     }
 
@@ -235,15 +282,18 @@ public final class MainActivity extends AppCompatActivity implements TelegramRep
         });
         findViewById(R.id.resolve_bot).setOnClickListener(v -> saveTargetAndResolve());
         findViewById(R.id.permissions).setOnClickListener(v -> requestRequiredPermissions());
-        findViewById(R.id.connection_done).setOnClickListener(v -> showPage(Page.HOME, false));
+        findViewById(R.id.connection_done).setOnClickListener(
+                v -> showPage(Page.HOME, ConnectionMode.RESUME));
         findViewById(R.id.restart_auth).setOnClickListener(
                 v -> telegram.restartCurrentConfiguration());
         findViewById(R.id.dismiss_error).setOnClickListener(v -> dismissPersistentStatus());
         findViewById(R.id.logout).setOnClickListener(v -> confirmLogout());
         dashboardPrimaryAction.setOnClickListener(v -> handlePrimaryAction());
-        connectionSettingsToggle.setOnClickListener(v -> showPage(Page.CONNECTION, true));
-        navigationButton.setOnClickListener(v -> showPage(Page.HOME, false));
-        settingsButton.setOnClickListener(v -> showPage(Page.SETTINGS, false));
+        connectionSettingsToggle.setOnClickListener(
+                v -> showPage(Page.CONNECTION, ConnectionMode.EDIT_API));
+        targetSettingsToggle.setOnClickListener(v -> requestTargetEditor());
+        navigationButton.setOnClickListener(v -> navigateBack());
+        settingsButton.setOnClickListener(v -> showPage(Page.SETTINGS, ConnectionMode.RESUME));
         permissionStatus.setOnClickListener(v -> requestRequiredPermissions());
         permissionMicrophoneStatus.setOnClickListener(v -> requestRequiredPermissions());
         permissionNotificationStatus.setOnClickListener(v -> requestRequiredPermissions());
@@ -261,6 +311,10 @@ public final class MainActivity extends AppCompatActivity implements TelegramRep
                 new IntentFilter(FloatingVoiceService.ACTION_RUNNING_STATE_CHANGED),
                 ContextCompat.RECEIVER_NOT_EXPORTED);
         refreshUi();
+        if (pendingTargetEditor && !FloatingVoiceService.isRunning()) {
+            pendingTargetEditor = false;
+            openTargetEditor();
+        }
     }
 
     @Override protected void onStop() {
@@ -338,17 +392,39 @@ public final class MainActivity extends AppCompatActivity implements TelegramRep
         ViewCompat.requestApplyInsets(root);
     }
 
-    private void showPage(Page page, boolean editApi) {
+    private void showPage(Page page, ConnectionMode mode) {
         currentPage = page;
-        editingApiSettings = page == Page.CONNECTION && editApi;
+        connectionMode = page == Page.CONNECTION ? mode : ConnectionMode.RESUME;
         homeScreen.setVisibility(page == Page.HOME ? View.VISIBLE : View.GONE);
         connectionScreen.setVisibility(page == Page.CONNECTION ? View.VISIBLE : View.GONE);
         settingsScreen.setVisibility(page == Page.SETTINGS ? View.VISIBLE : View.GONE);
         navigationButton.setVisibility(page == Page.HOME ? View.GONE : View.VISIBLE);
         settingsButton.setVisibility(page == Page.HOME ? View.VISIBLE : View.GONE);
-        appBarTitle.setText(page == Page.CONNECTION ? R.string.screen_connection
-                : page == Page.SETTINGS ? R.string.screen_settings : R.string.app_name);
+        int title = page == Page.CONNECTION
+                ? (mode == ConnectionMode.EDIT_TARGET
+                        ? R.string.screen_destination : R.string.screen_connection)
+                : page == Page.SETTINGS ? R.string.screen_settings : R.string.app_name;
+        appBarTitle.setText(title);
+        View visibleScreen = page == Page.HOME ? homeScreen
+                : page == Page.CONNECTION ? connectionScreen : settingsScreen;
+        ViewCompat.setAccessibilityPaneTitle(visibleScreen, getString(title));
         if (page == Page.CONNECTION) refreshConnectionFlow();
+        if (page == Page.SETTINGS) refreshSettingsSummary();
+    }
+
+    private void navigateBack() {
+        boolean committedTargetEdit = false;
+        if (currentPage == Page.CONNECTION && connectionMode == ConnectionMode.EDIT_TARGET) {
+            if (pendingTargetOperation > 0L) {
+                committedTargetEdit = telegram.cancelTargetResolution(pendingTargetOperation);
+            }
+            pendingTargetUsername = null;
+            pendingTargetOperation = 0L;
+        }
+        Page destination = currentPage == Page.CONNECTION
+                && connectionMode != ConnectionMode.RESUME ? Page.SETTINGS : Page.HOME;
+        showPage(destination, ConnectionMode.RESUME);
+        if (committedTargetEdit) showTargetChangeSuccess();
     }
 
     private void handlePrimaryAction() {
@@ -356,10 +432,10 @@ public final class MainActivity extends AppCompatActivity implements TelegramRep
             case CONNECT_TELEGRAM:
             case AUTHENTICATING:
             case SELECT_TARGET:
-                showPage(Page.CONNECTION, false);
+                showPage(Page.CONNECTION, ConnectionMode.RESUME);
                 break;
             case GRANT_PERMISSIONS:
-                showPage(Page.CONNECTION, false);
+                showPage(Page.CONNECTION, ConnectionMode.RESUME);
                 requestRequiredPermissions();
                 break;
             case READY:
@@ -374,6 +450,7 @@ public final class MainActivity extends AppCompatActivity implements TelegramRep
     }
 
     private void saveConnectionAndStart() {
+        boolean returnToSettings = connectionMode == ConnectionMode.EDIT_API;
         AppConfig.ValidationResult result = AppConfig.validateConnection(
                 apiId.getText().toString(), apiHash.getText().toString(),
                 connectionPhone.getText().toString());
@@ -399,14 +476,18 @@ public final class MainActivity extends AppCompatActivity implements TelegramRep
         savedConfig = config;
         showConfig(config);
         telegram.start(config);
-        editingApiSettings = false;
+        connectionMode = ConnectionMode.RESUME;
         presentLocalStatus(R.string.settings_saved_no_message, false, true);
-        refreshUi();
+        if (returnToSettings) {
+            showPage(Page.SETTINGS, ConnectionMode.RESUME);
+        } else {
+            refreshUi();
+        }
     }
 
     private void saveTargetAndResolve() {
         if (savedConfig == null) {
-            showPage(Page.CONNECTION, true);
+            showPage(Page.CONNECTION, ConnectionMode.EDIT_API);
             return;
         }
         AppConfig.ValidationResult result = AppConfig.validate(
@@ -416,11 +497,14 @@ public final class MainActivity extends AppCompatActivity implements TelegramRep
             presentValidationErrors(result.errors());
             return;
         }
-        savedConfig = result.config();
-        settingsStore.saveConfig(savedConfig);
-        showConfig(savedConfig);
-        telegram.start(savedConfig);
-        telegram.resolveConfiguredBot();
+        String candidate = result.config().botUsername();
+        boolean targetEdit = connectionMode == ConnectionMode.EDIT_TARGET;
+        pendingTargetUsername = targetEdit ? candidate : null;
+        pendingTargetOperation = telegram.resolveTargetUsername(candidate);
+        if (!targetEdit || pendingTargetOperation == 0L) {
+            pendingTargetUsername = null;
+            pendingTargetOperation = 0L;
+        }
     }
 
     private void presentValidationErrors(List<AppConfig.ValidationError> errors) {
@@ -545,7 +629,20 @@ public final class MainActivity extends AppCompatActivity implements TelegramRep
     private void refreshUi() {
         if (telegram == null || dashboardHeadline == null) return;
         refreshDashboard();
+        refreshSettingsSummary();
         if (currentPage == Page.CONNECTION) refreshConnectionFlow();
+    }
+
+    private void refreshSettingsSummary() {
+        if (settingsTargetSummary == null || settingsConnectionSummary == null) return;
+        TargetChat target = telegram.target();
+        settingsTargetSummary.setText(target == null
+                ? getString(R.string.settings_target_not_set)
+                : getString(R.string.settings_current_target_format, target));
+        targetSettingsToggle.setText(target == null
+                ? R.string.settings_set_target : R.string.settings_change_target);
+        settingsConnectionSummary.setText(telegram.authStage() == TelegramRepository.AuthStage.READY
+                ? R.string.settings_connection_ready : R.string.settings_connection_not_ready);
     }
 
     private void refreshDashboard() {
@@ -640,9 +737,24 @@ public final class MainActivity extends AppCompatActivity implements TelegramRep
         connectionComplete.setVisibility(View.GONE);
 
         TelegramRepository.AuthStage authStage = telegram.authStage();
+        if (connectionMode == ConnectionMode.EDIT_TARGET
+                && authStage == TelegramRepository.AuthStage.READY) {
+            connectionStep.setText(R.string.settings_destination);
+            connectionTitle.setText(R.string.connection_target_title);
+            connectionSupporting.setText(R.string.connection_target_supporting);
+            targetPermissionsCard.setVisibility(View.VISIBLE);
+            targetStep.setVisibility(View.VISIBLE);
+            return;
+        } else if (connectionMode == ConnectionMode.EDIT_TARGET) {
+            connectionMode = ConnectionMode.RESUME;
+            pendingTargetUsername = null;
+            pendingTargetOperation = 0L;
+            appBarTitle.setText(R.string.screen_connection);
+        }
         boolean connectionEntryStage = authStage == TelegramRepository.AuthStage.NOT_STARTED
                 || authStage == TelegramRepository.AuthStage.CLOSED;
-        if (editingApiSettings || dashboardState == DashboardReadiness.State.CONNECT_TELEGRAM
+        if (connectionMode == ConnectionMode.EDIT_API
+                || dashboardState == DashboardReadiness.State.CONNECT_TELEGRAM
                 || connectionEntryStage) {
             setConnectionStage(1, R.string.connection_api_title, R.string.connection_api_supporting);
             connectionSettingsCard.setVisibility(View.VISIBLE);
@@ -670,6 +782,64 @@ public final class MainActivity extends AppCompatActivity implements TelegramRep
         connectionStep.setText(getString(R.string.connection_step_format, step));
         connectionTitle.setText(title);
         connectionSupporting.setText(supporting);
+    }
+
+    private void requestTargetEditor() {
+        TargetChangePolicy.Action action = TargetChangePolicy.evaluate(
+                telegram.authStage() == TelegramRepository.AuthStage.READY,
+                FloatingVoiceService.isRunning());
+        switch (action) {
+            case RESUME_CONNECTION:
+                showPage(Page.CONNECTION, ConnectionMode.RESUME);
+                break;
+            case STOP_OVERLAY_THEN_EDIT:
+                confirmStopOverlayForTargetChange();
+                break;
+            case OPEN_TARGET_EDITOR:
+                openTargetEditor();
+                break;
+            default:
+                throw new IllegalStateException(action.name());
+        }
+    }
+
+    private void confirmStopOverlayForTargetChange() {
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.target_change_stop_title)
+                .setMessage(R.string.target_change_stop_message)
+                .setNegativeButton(R.string.cancel, null)
+                .setPositiveButton(R.string.target_change_stop_action,
+                        (dialog, which) -> stopOverlayThenOpenTargetEditor())
+                .show();
+    }
+
+    private void stopOverlayThenOpenTargetEditor() {
+        pendingTargetEditor = true;
+        boolean requested = stopService(new Intent(this, FloatingVoiceService.class));
+        if (requested) {
+            if (pendingTargetEditor) {
+                presentLocalStatus(R.string.target_change_waiting, false, true);
+            }
+        } else {
+            pendingTargetEditor = false;
+            openTargetEditor();
+        }
+    }
+
+    private void openTargetEditor() {
+        if (telegram.authStage() != TelegramRepository.AuthStage.READY) {
+            showPage(Page.CONNECTION, ConnectionMode.RESUME);
+            return;
+        }
+        TargetChat currentTarget = telegram.target();
+        if (currentTarget != null) {
+            username.setText(currentTarget.username());
+        } else if (savedConfig != null) {
+            username.setText(savedConfig.botUsername());
+        }
+        pendingTargetUsername = null;
+        pendingTargetOperation = 0L;
+        showPage(Page.CONNECTION, ConnectionMode.EDIT_TARGET);
     }
 
     private void startOverlay() {
@@ -733,6 +903,18 @@ public final class MainActivity extends AppCompatActivity implements TelegramRep
         return Math.round(value * getResources().getDisplayMetrics().density);
     }
 
+    private void showTargetChangeSuccess() {
+        String status = getString(R.string.target_change_complete);
+        presentStatus(status, false, false);
+        View root = findViewById(R.id.root);
+        root.post(() -> {
+            root.announceForAccessibility(status);
+            if (!isFinishing() && !isDestroyed()) {
+                Snackbar.make(root, status, Snackbar.LENGTH_SHORT).show();
+            }
+        });
+    }
+
     private void presentLocalStatus(int resourceId, boolean persistent, boolean transientFeedback) {
         presentStatus(getString(resourceId), persistent, transientFeedback);
     }
@@ -783,10 +965,28 @@ public final class MainActivity extends AppCompatActivity implements TelegramRep
 
     @Override public void onTargetChanged(TargetChat target) {
         runOnUiThread(() -> {
+            boolean completedTargetEdit = TargetEditCompletionPolicy.shouldComplete(
+                    currentPage == Page.CONNECTION
+                            && connectionMode == ConnectionMode.EDIT_TARGET,
+                    pendingTargetUsername,
+                    target == null ? null : target.username(),
+                    telegram.isTargetResolutionCommitted(pendingTargetOperation));
+            AppConfig currentConfig = telegram.currentConfig();
+            if (target != null && currentConfig != null) {
+                savedConfig = currentConfig;
+                showConfig(currentConfig);
+            }
             targetStatus.setText(target == null
                     ? getString(R.string.target_not_confirmed)
                     : getString(R.string.target_confirmed_format, target));
-            refreshUi();
+            if (completedTargetEdit) {
+                pendingTargetUsername = null;
+                pendingTargetOperation = 0L;
+                showPage(Page.SETTINGS, ConnectionMode.RESUME);
+                showTargetChangeSuccess();
+            } else {
+                refreshUi();
+            }
         });
     }
 
@@ -799,7 +999,7 @@ public final class MainActivity extends AppCompatActivity implements TelegramRep
                 presentStatus(localizedPersistentStatus, true, false);
             }
             refreshUi();
-            showPage(currentPage, editingApiSettings);
+            showPage(currentPage, connectionMode);
         });
     }
 

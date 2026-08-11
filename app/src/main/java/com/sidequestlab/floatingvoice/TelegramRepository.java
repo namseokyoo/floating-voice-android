@@ -4,6 +4,7 @@ import android.content.Context;
 import android.os.Build;
 
 import com.sidequestlab.floatingvoice.core.AppConfig;
+import com.sidequestlab.floatingvoice.core.PendingMessageKey;
 
 import org.drinkless.tdlib.Client;
 import org.drinkless.tdlib.TdApi;
@@ -57,7 +58,7 @@ public final class TelegramRepository {
     private final SecureSettingsStore settingsStore;
     private final PendingRecordingStore pendingRecordings;
     private final PendingTextSendStore pendingTextMessages;
-    private final ConcurrentHashMap<Long, TextSendCallback> pendingTextSends =
+    private final ConcurrentHashMap<PendingMessageKey, TextSendCallback> pendingTextSends =
             new ConcurrentHashMap<>();
     private final List<Listener> listeners = new CopyOnWriteArrayList<>();
     private final Object clientLock = new Object();
@@ -74,6 +75,8 @@ public final class TelegramRepository {
     private volatile AccountState accountState = AccountState.NOT_AUTHENTICATED;
     private volatile String accountName;
     private volatile long accountUserId;
+    private long targetResolutionGeneration;
+    private long lastCommittedTargetResolutionGeneration;
 
     public TelegramRepository(Context context, SecureSettingsStore settingsStore,
                               PendingRecordingStore pendingRecordings,
@@ -83,6 +86,10 @@ public final class TelegramRepository {
         this.pendingRecordings = pendingRecordings;
         this.pendingTextMessages = pendingTextMessages;
         this.target = settingsStore.loadTarget().orElse(null);
+        if (target != null) {
+            pendingRecordings.migrateLegacy(target.chatId());
+            pendingTextMessages.migrateLegacy(target.chatId());
+        }
     }
 
     public void addListener(Listener listener) {
@@ -101,6 +108,7 @@ public final class TelegramRepository {
 
     public void removeListener(Listener listener) { listeners.remove(listener); }
     public AuthStage authStage() { return authStage; }
+    public AppConfig currentConfig() { return config; }
     public TargetChat target() { return target; }
     public String lastStatus() {
         synchronized (stateDeliveryLock) {
@@ -133,6 +141,9 @@ public final class TelegramRepository {
             start(current);
             return;
         }
+        synchronized (configurationLock) {
+            targetResolutionGeneration++;
+        }
         restartAfterClose = true;
         status(R.string.repo_restarting_session);
         active.send(new TdApi.Close(), result -> {
@@ -153,6 +164,7 @@ public final class TelegramRepository {
     public void start(AppConfig newConfig) {
         boolean clearedTarget = false;
         synchronized (configurationLock) {
+            targetResolutionGeneration++;
             config = newConfig;
             TargetChat existingTarget = target;
             if (existingTarget != null && !existingTarget.username().equals(newConfig.botUsername())) {
@@ -231,19 +243,33 @@ public final class TelegramRepository {
         send(request, R.string.repo_password_submitted);
     }
 
-    public void resolveConfiguredBot() {
-        AppConfig current = config;
-        if (authStage != AuthStage.READY || current == null) {
-            status(R.string.repo_login_before_resolve);
-            return;
+    /** Resolves and commits a replacement only after the candidate is verified as a bot. */
+    public long resolveTargetUsername(String username) {
+        final AppConfig expectedConfig;
+        final AppConfig candidateConfig;
+        final Client expectedClient;
+        final long generation;
+        synchronized (configurationLock) {
+            expectedConfig = config;
+            expectedClient = client;
+            if (authStage != AuthStage.READY || expectedConfig == null || expectedClient == null) {
+                status(R.string.repo_login_before_resolve);
+                return 0L;
+            }
+            candidateConfig = expectedConfig.withBotUsername(username);
+            if (!candidateConfig.hasBotUsername()) {
+                status(R.string.validation_invalid_username);
+                return 0L;
+            }
+            generation = ++targetResolutionGeneration;
         }
-        String expectedUsername = current.botUsername();
-        Client expectedClient = requireClient();
+
+        String expectedUsername = candidateConfig.botUsername();
         status(R.string.repo_searching_bot, expectedUsername);
         TdApi.SearchPublicChat request = new TdApi.SearchPublicChat();
         request.username = expectedUsername;
         expectedClient.send(request, result -> {
-            if (!isResolutionCurrent(expectedUsername, expectedClient)) {
+            if (!isResolutionCurrent(generation, expectedConfig, expectedClient)) {
                 status(R.string.repo_stale_search_ignored);
                 return;
             }
@@ -265,7 +291,7 @@ public final class TelegramRepository {
             TdApi.GetUser getUser = new TdApi.GetUser();
             getUser.userId = userId;
             expectedClient.send(getUser, userResult -> {
-                if (!isResolutionCurrent(expectedUsername, expectedClient)) {
+                if (!isResolutionCurrent(generation, expectedConfig, expectedClient)) {
                     status(R.string.repo_stale_confirmation_ignored);
                     return;
                 }
@@ -276,12 +302,19 @@ public final class TelegramRepository {
                         && ((TdApi.User) userResult).type instanceof TdApi.UserTypeBot) {
                     TargetChat confirmed = new TargetChat(chat.id, chat.title, expectedUsername);
                     synchronized (configurationLock) {
-                        if (!isResolutionCurrent(expectedUsername, expectedClient)) {
+                        if (!isResolutionCurrent(generation, expectedConfig, expectedClient)) {
                             status(R.string.repo_stale_confirmation_ignored);
                             return;
                         }
-                        settingsStore.saveTarget(confirmed);
+                        try {
+                            settingsStore.saveConfigAndTarget(candidateConfig, confirmed);
+                        } catch (RuntimeException e) {
+                            status(R.string.repo_target_save_failed);
+                            return;
+                        }
+                        config = candidateConfig;
                         target = confirmed;
+                        lastCommittedTargetResolutionGeneration = generation;
                     }
                     status(R.string.repo_target_confirmed, confirmed);
                     notifyTargetChanged(confirmed);
@@ -290,6 +323,25 @@ public final class TelegramRepository {
                 }
             });
         });
+        return generation;
+    }
+
+    /** Invalidates an in-flight destination lookup without changing the active route. */
+    public boolean cancelTargetResolution(long generation) {
+        synchronized (configurationLock) {
+            boolean committed = generation > 0L
+                    && lastCommittedTargetResolutionGeneration == generation;
+            if (!committed && targetResolutionGeneration == generation) {
+                targetResolutionGeneration++;
+            }
+            return committed;
+        }
+    }
+
+    public boolean isTargetResolutionCommitted(long generation) {
+        synchronized (configurationLock) {
+            return generation > 0L && lastCommittedTargetResolutionGeneration == generation;
+        }
     }
 
     public void sendVoiceNote(File recording, int durationSeconds, SendCallback callback) {
@@ -333,8 +385,10 @@ public final class TelegramRepository {
             status(R.string.repo_queuing_for_target, fixedTarget.title());
             requireClient().send(request, result -> {
                 if (result instanceof TdApi.Message) {
-                    long temporaryId = ((TdApi.Message) result).id;
-                    pendingRecordings.put(temporaryId, recording.getAbsolutePath());
+                    TdApi.Message sent = (TdApi.Message) result;
+                    long temporaryId = sent.id;
+                    pendingRecordings.put(new PendingMessageKey(sent.chatId, temporaryId),
+                            recording.getAbsolutePath());
                     status(R.string.repo_queued_temporary, temporaryId);
                     callback.onQueued(temporaryId);
                 } else if (result instanceof TdApi.Error) {
@@ -384,8 +438,9 @@ public final class TelegramRepository {
             status(R.string.repo_text_queuing, fixedTarget.title());
             requireClient().send(request, result -> {
                 if (result instanceof TdApi.Message sent) {
-                    pendingTextMessages.put(sent.id);
-                    pendingTextSends.put(sent.id, callback);
+                    PendingMessageKey pending = new PendingMessageKey(sent.chatId, sent.id);
+                    pendingTextMessages.put(pending);
+                    pendingTextSends.put(pending, callback);
                     status(R.string.repo_text_queued);
                     callback.onQueued(sent.id);
                 } else if (result instanceof TdApi.Error error) {
@@ -420,13 +475,13 @@ public final class TelegramRepository {
         });
     }
 
-    private boolean isResolutionCurrent(String expectedUsername, Client expectedClient) {
+    private boolean isResolutionCurrent(long generation, AppConfig expectedConfig,
+                                        Client expectedClient) {
         synchronized (configurationLock) {
-            AppConfig current = config;
-            return authStage == AuthStage.READY
+            return targetResolutionGeneration == generation
+                    && authStage == AuthStage.READY
                     && client == expectedClient
-                    && current != null
-                    && expectedUsername.equals(current.botUsername());
+                    && config == expectedConfig;
         }
     }
 
@@ -435,39 +490,52 @@ public final class TelegramRepository {
             handleAuthorizationState(((TdApi.UpdateAuthorizationState) object).authorizationState);
         } else if (object instanceof TdApi.UpdateMessageSendSucceeded) {
             TdApi.UpdateMessageSendSucceeded update = (TdApi.UpdateMessageSendSucceeded) object;
-            TextSendCallback textCallback = pendingTextSends.remove(update.oldMessageId);
-            boolean persistedTextSend = pendingTextMessages.take(update.oldMessageId);
-            if (textCallback != null || persistedTextSend) {
-                status(R.string.repo_text_delivered);
-                if (textCallback != null) textCallback.onDelivered();
-                return;
-            }
-            String path = pendingRecordings.take(update.oldMessageId);
-            if (path != null) {
-                File recording = new File(path);
-                if (!recording.exists() || recording.delete()) {
-                    status(R.string.repo_send_complete_deleted);
-                } else {
-                    status(R.string.repo_send_complete_delete_failed, path);
+            TdApi.Message message = update.message;
+            if (message == null) return;
+            PendingMessageKey pending = new PendingMessageKey(message.chatId, update.oldMessageId);
+            if (message.content instanceof TdApi.MessageText
+                    || message.content instanceof TdApi.MessageAnimatedEmoji) {
+                TextSendCallback textCallback = pendingTextSends.remove(pending);
+                boolean persistedTextSend = pendingTextMessages.take(pending);
+                if (textCallback != null || persistedTextSend) {
+                    status(R.string.repo_text_delivered);
+                    if (textCallback != null) textCallback.onDelivered();
+                }
+            } else if (message.content instanceof TdApi.MessageVoiceNote) {
+                String path = pendingRecordings.take(pending);
+                if (path != null) {
+                    File recording = new File(path);
+                    if (!recording.exists() || recording.delete()) {
+                        status(R.string.repo_send_complete_deleted);
+                    } else {
+                        status(R.string.repo_send_complete_delete_failed, path);
+                    }
                 }
             }
         } else if (object instanceof TdApi.UpdateMessageSendFailed) {
             TdApi.UpdateMessageSendFailed update = (TdApi.UpdateMessageSendFailed) object;
-            TextSendCallback textCallback = pendingTextSends.remove(update.oldMessageId);
-            boolean persistedTextSend = pendingTextMessages.take(update.oldMessageId);
-            if (textCallback != null || persistedTextSend) {
-                String reason = text(R.string.repo_text_failed,
-                        update.error.code, update.error.message);
-                status(R.string.repo_text_failed, update.error.code, update.error.message);
-                if (textCallback != null) textCallback.onRejected(reason);
-                return;
-            }
-            String path = pendingRecordings.take(update.oldMessageId);
-            if (path == null) {
-                status(R.string.repo_send_failed_no_path, update.error.code, update.error.message);
-            } else {
-                status(R.string.repo_send_failed_retained,
-                        update.error.code, update.error.message, path);
+            TdApi.Message message = update.message;
+            if (message == null) return;
+            PendingMessageKey pending = new PendingMessageKey(message.chatId, update.oldMessageId);
+            if (message.content instanceof TdApi.MessageText
+                    || message.content instanceof TdApi.MessageAnimatedEmoji) {
+                TextSendCallback textCallback = pendingTextSends.remove(pending);
+                boolean persistedTextSend = pendingTextMessages.take(pending);
+                if (textCallback != null || persistedTextSend) {
+                    String reason = text(R.string.repo_text_failed,
+                            update.error.code, update.error.message);
+                    status(R.string.repo_text_failed, update.error.code, update.error.message);
+                    if (textCallback != null) textCallback.onRejected(reason);
+                }
+            } else if (message.content instanceof TdApi.MessageVoiceNote) {
+                String path = pendingRecordings.take(pending);
+                if (path == null) {
+                    status(R.string.repo_send_failed_no_path,
+                            update.error.code, update.error.message);
+                } else {
+                    status(R.string.repo_send_failed_retained,
+                            update.error.code, update.error.message, path);
+                }
             }
         }
     }
@@ -621,8 +689,13 @@ public final class TelegramRepository {
     }
 
     private void stage(AuthStage next) {
-        synchronized (stateDeliveryLock) {
+        synchronized (configurationLock) {
+            if (authStage == AuthStage.READY && next != AuthStage.READY) {
+                targetResolutionGeneration++;
+            }
             authStage = next;
+        }
+        synchronized (stateDeliveryLock) {
             for (Listener listener : listeners) listener.onAuthStage(next);
         }
     }
@@ -652,6 +725,7 @@ public final class TelegramRepository {
                 || resourceId == R.string.repo_send_rejected_retained
                 || resourceId == R.string.repo_unexpected_send_response_retained
                 || resourceId == R.string.repo_logout_failed
+                || resourceId == R.string.repo_target_save_failed
                 || resourceId == R.string.repo_send_complete_delete_failed
                 || resourceId == R.string.repo_send_failed_no_path
                 || resourceId == R.string.repo_send_failed_retained
