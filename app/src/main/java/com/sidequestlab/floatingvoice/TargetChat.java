@@ -2,6 +2,8 @@ package com.sidequestlab.floatingvoice;
 
 import java.util.Objects;
 
+/** @deprecated Compatibility model for the pre-v0.7.0 single-target runtime path. */
+@Deprecated(since = "0.7.0", forRemoval = false)
 public final class TargetChat {
     private final long chatId;
     private final String title;

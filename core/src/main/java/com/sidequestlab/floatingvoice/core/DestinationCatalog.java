@@ -55,6 +55,11 @@ public final class DestinationCatalog {
         return new DestinationCatalog(List.of());
     }
 
+    public static DestinationCatalog restore(List<Destination> destinations,
+                                             String defaultLocalId) {
+        return new DestinationCatalog(destinations, defaultLocalId);
+    }
+
     public List<Destination> destinations() {
         return destinations;
     }
@@ -85,6 +90,64 @@ public final class DestinationCatalog {
             throw new IllegalArgumentException("default destination is not selectable: " + localId);
         }
         return new DestinationCatalog(destinations, localId);
+    }
+
+    public DestinationCatalog withDestination(Destination destination) {
+        Destination replacement = Objects.requireNonNull(destination, "destination");
+        Destination existing = byLocalId.get(replacement.localId());
+        List<Destination> updated = new ArrayList<>(destinations);
+        if (existing == null) {
+            updated.add(replacement);
+        } else {
+            requireCompatibleIdentity(existing, replacement);
+            if (replacement.verificationRevision() < existing.verificationRevision()) {
+                throw new IllegalArgumentException("verification revision cannot move backward");
+            }
+            updated.set(updated.indexOf(existing), replacement);
+        }
+        return new DestinationCatalog(updated, defaultLocalId);
+    }
+
+    public DestinationCatalog withoutDestination(String localId) {
+        Destination existing = byLocalId.get(Objects.requireNonNull(localId, "localId"));
+        if (existing == null) {
+            throw new IllegalArgumentException("destination is missing: " + localId);
+        }
+        List<Destination> updated = new ArrayList<>(destinations);
+        updated.remove(existing);
+        return new DestinationCatalog(updated,
+                localId.equals(defaultLocalId) ? null : defaultLocalId);
+    }
+
+    public DestinationCatalog reordered(List<String> orderedLocalIds) {
+        Objects.requireNonNull(orderedLocalIds, "orderedLocalIds");
+        if (orderedLocalIds.size() != destinations.size()) {
+            throw new IllegalArgumentException("reorder must contain every destination");
+        }
+        List<Destination> reordered = new ArrayList<>(destinations.size());
+        Set<String> seen = new HashSet<>();
+        for (String localId : orderedLocalIds) {
+            Destination destination = byLocalId.get(localId);
+            if (destination == null || !seen.add(localId)) {
+                throw new IllegalArgumentException("invalid reorder destination: " + localId);
+            }
+            reordered.add(destination);
+        }
+        return new DestinationCatalog(reordered, defaultLocalId);
+    }
+
+    private static void requireCompatibleIdentity(Destination existing,
+                                                  Destination replacement) {
+        if (!identityCanBeFilled(existing.accountUserId(), replacement.accountUserId())
+                || !identityCanBeFilled(existing.chatId(), replacement.chatId())
+                || !identityCanBeFilled(existing.peerUserId(), replacement.peerUserId())) {
+            throw new IllegalArgumentException("destination identity cannot be rebound: "
+                    + existing.localId());
+        }
+    }
+
+    private static boolean identityCanBeFilled(long previous, long next) {
+        return previous == 0 || previous == next;
     }
 
     private record AccountIdentity(long accountUserId, long identityId) {}
