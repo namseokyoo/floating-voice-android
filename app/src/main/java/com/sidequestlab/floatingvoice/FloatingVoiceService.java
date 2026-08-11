@@ -124,6 +124,9 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
             if (!OverlayUiPreferences.KEY_SIZE.equals(key)) return;
             OverlayStateMachine.State state = overlayStateMachine.state();
             if (!showsIdleBubble(state) && state != OverlayStateMachine.State.MENU_OPEN) return;
+            if (state == OverlayStateMachine.State.MENU_OPEN) {
+                dispatchOverlayEvent(OverlayEvent.GESTURE_CANCELED);
+            }
             currentFabSizePx = dp(overlayUiPreferences.sizePreset().sizeDp());
             if (overlayViewController != null) {
                 overlayViewController.setIdleSize(currentFabSizePx);

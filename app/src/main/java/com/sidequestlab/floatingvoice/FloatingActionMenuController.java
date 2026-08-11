@@ -35,7 +35,7 @@ final class FloatingActionMenuController {
         this.listener = Objects.requireNonNull(listener);
     }
 
-    @SuppressLint({"InflateParams", "ClickableViewAccessibility"})
+    @SuppressLint({"InflateParams", "ClickableViewAccessibility", "RtlHardcoded"})
     boolean showAt(int x, int y, int width, int height) {
         if (palette != null) {
             if (interactive) return true;
@@ -64,7 +64,7 @@ final class FloatingActionMenuController {
                         | WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH
                         | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
                 PixelFormat.TRANSLUCENT);
-        params.gravity = android.view.Gravity.TOP | android.view.Gravity.START;
+        params.gravity = android.view.Gravity.TOP | android.view.Gravity.LEFT;
         params.x = x;
         params.y = y;
         try {

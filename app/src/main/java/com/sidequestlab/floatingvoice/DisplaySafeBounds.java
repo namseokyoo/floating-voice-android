@@ -14,6 +14,8 @@ import android.view.WindowInsets;
 import android.view.WindowManager;
 import android.view.WindowMetrics;
 
+import com.sidequestlab.floatingvoice.core.LegacySystemBarInsets;
+
 import java.util.Objects;
 
 /**
@@ -54,20 +56,30 @@ final class DisplaySafeBounds {
                     : displayManager.getDisplay(Display.DEFAULT_DISPLAY);
         }
         Rect bounds = new Rect();
+        Point usableSize = new Point();
         if (display != null) {
             Point realSize = new Point();
             display.getRealSize(realSize);
             bounds.set(0, 0, realSize.x, realSize.y);
+            display.getSize(usableSize);
+            if (usableSize.x <= 0 || usableSize.y <= 0) {
+                usableSize.set(realSize.x, realSize.y);
+            }
         } else {
             bounds.set(0, 0,
                     Resources.getSystem().getDisplayMetrics().widthPixels,
                     Resources.getSystem().getDisplayMetrics().heightPixels);
+            usableSize.set(bounds.width(), bounds.height());
         }
 
-        int top = statusBarHeight(context);
-        int bottom = dp(context, DEFAULT_NAVIGATION_BAR_DP);
-        int left = 0;
-        int right = 0;
+        LegacySystemBarInsets.Insets legacyInsets = LegacySystemBarInsets.resolve(
+                bounds.width(), bounds.height(), usableSize.x, usableSize.y,
+                display == null ? 0 : display.getRotation(),
+                statusBarHeight(context), dp(context, DEFAULT_NAVIGATION_BAR_DP));
+        int top = legacyInsets.top();
+        int bottom = legacyInsets.bottom();
+        int left = legacyInsets.left();
+        int right = legacyInsets.right();
         if (display != null) {
             DisplayCutout cutout = display.getCutout();
             if (cutout != null) {
