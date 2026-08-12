@@ -8,7 +8,7 @@
 
 **Tech Stack:** Java 17, Android SDK 29–36, TDLib, Android Keystore-backed settings, private SharedPreferences dispatch metadata, AppCompat XML, JUnit 5.
 
-**현재 단계 상태 (2026-08-12):** `V7-10-FINAL-ARTIFACT-ACCEPTED / RELEASE-APPROVAL-PENDING`. RC2/versionCode 19는 commit `26b4e8a5e768d4e1e74e69ff9875d0044ad9a0e6`에서 clean build·공식 서명되었고 자동·artifact 검증을 모두 통과했다. 형이 A52s 테스트를 “테스트 완료 패스”로 승인했다. 최종 APK는 테스트된 RC2 바이트를 재빌드 없이 그대로 승격했으며 SHA-256 `c8804f36d437bfe346acf4cfc75e7baff162d14b4b4810407e61e67447bf7cf1`, 크기 36,125,719 bytes로 동일하다. `v0.7.0` tag/GitHub Release 생성은 별도 공개 승인 대기 중이다.
+**현재 단계 상태 (2026-08-12):** `V7-COMPLETE / v0.7.0-RELEASED`. RC2/versionCode 19는 commit `26b4e8a5e768d4e1e74e69ff9875d0044ad9a0e6`에서 clean build·공식 서명·자동 및 artifact 검증을 통과했고, 형의 A52s “테스트 완료 패스”와 별도 공개 승인을 받았다. 테스트된 RC2 바이트를 최종 APK로 그대로 승격해 `v0.7.0` annotated tag와 GitHub latest Release로 공개했다. 비로그인 원격 APK 재다운로드본은 로컬 최종본과 byte-for-byte 동일하며 SHA-256 `c8804f36d437bfe346acf4cfc75e7baff162d14b4b4810407e61e67447bf7cf1`, 크기 36,125,719 bytes, package/version/ABI, 공식 인증서 v2/v3, ZIP/ELF 16KB 검증을 모두 통과했다.
 
 **Non-goals:** 그룹·채널·토픽, 여러 방 동시 전송, 목적지 자동 추천, 다른 Telegram 계정 다중 로그인, 목적지 무효 시 자동 폴백, STT/로컬 archive/Android share.
 

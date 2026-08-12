@@ -4,8 +4,8 @@
 
 **기준 시각:** 2026-08-12 05:48 KST<br>
 **현재 안정 기준선:** `v0.6.4` (`808e7942e618e2aaaf3527b27d89bac9256e2601`)<br>
-**current_stage:** `V7-10 FINAL ARTIFACT ACCEPTED / RELEASE APPROVAL PENDING`<br>
-**status:** `v7_10_final_artifact_accepted_release_pending` — RC2/versionCode 19는 commit `26b4e8a5e768d4e1e74e69ff9875d0044ad9a0e6`에서 clean build·공식 서명되었고, core 165 + app Debug/Release 각 62, localization hard gate, Debug/Release Lint 오류 0, v2/v3, arm64 ABI, ZIP/ELF 16KB, credential scan을 통과했다. 형이 A52s 전체 테스트를 “테스트 완료 패스”로 승인했다. 테스트된 RC2 바이트를 재빌드하지 않고 최종 APK로 그대로 승격했으며 SHA-256은 `c8804f36d437bfe346acf4cfc75e7baff162d14b4b4810407e61e67447bf7cf1`, 크기는 36,125,719 bytes다. `v0.7.0` tag/GitHub Release 생성은 별도 공개 승인 대기 중이다.<br>
+**current_stage:** `V7 COMPLETE / v0.7.0 RELEASED`<br>
+**status:** `v7_complete_v0_7_0_released` — RC2/versionCode 19는 commit `26b4e8a5e768d4e1e74e69ff9875d0044ad9a0e6`에서 clean build·공식 서명되었고, core 165 + app Debug/Release 각 62, localization hard gate, Debug/Release Lint 오류 0, v2/v3, arm64 ABI, ZIP/ELF 16KB, credential scan을 통과했다. 형의 A52s “테스트 완료 패스”와 별도 공개 승인을 받은 뒤 테스트된 RC2 바이트를 최종 APK로 그대로 승격했다. `v0.7.0` annotated tag와 GitHub latest Release를 공개했으며, 비로그인 원격 APK를 재다운로드해 로컬 최종본과 byte-for-byte 동일성, SHA-256 `c8804f36d437bfe346acf4cfc75e7baff162d14b4b4810407e61e67447bf7cf1`, 크기 36,125,719 bytes, package/version/ABI, 공식 인증서 v2/v3, ZIP/ELF 16KB를 재검증했다.<br>
 **구현 상태:** v0.5.0 인터랙션 기반, v0.6.0 Quiet Recorder, v0.6.1 플로팅 스타일·safe area, v0.6.2 Telegram 세션 유지 대상 변경, v0.6.3 개별 설정 페이지, v0.6.4 연결정보 인라인·톱니 anchored PopupMenu까지 완료. v0.6.4는 tests 110/fail 0, lint 오류 0, 공식 인증서·v2/v3·ZIP/ELF 16KB 검증과 local/origin/GitHub 일치를 통과함. V7-01은 legacy account/target pure migration model을 커밋 `f1d45e4`로 고정함. V7-02는 destination/catalog/scope/route state machine/dispatch snapshot과 default·next-one·current-recording·FREEZING·no-fallback 계약을 TDD로 구현함. latest catalog identity/revision revalidation, route-attempt-bound completion/abort, scalar-only snapshot, local-ID 재바인딩 차단까지 보완했으며 전체 tests 140/fail 0, lint 오류 0, debug/release assembly와 독립 follow-up review Blocker/High 0을 통과함. 실제 Android 저장소·UI 연결은 건드리지 않음. V7-03은 versioned catalog codec, Android Keystore 암호화 AtomicFile, copy→validate→persist→read-back→publish, raw V7-01 migration, schema marker, backup-only/corrupt recovery, legacy·pending 보존을 구현함. 최종 clean tests 188/fail 0, lint 오류 0, debug/release assembly와 독립 follow-up review Blocker/High 0을 통과함. 공식 서명 내부 APK `r1`은 기존 앱 위 설치·실제 Telegram 전송 후 형의 “이 메시지를 받으면 테스트는 성공이야” 확인으로 A52s 실기기 PASS 처리함. V7-04는 request token, expected client/account, private-chat·bot·canonical ID 검증, duplicate/identity-change 차단, account 전환·저장 race 직렬화, disabled-state 보존, TDLib lookup adapter를 구현함. 최종 core 138 + app 42 = 고유 tests 180/fail 0, Debug/Release Lint 오류 0, 양쪽 assembly·ZIP/ELF 16KB와 독립 review Blocker/High/Medium/Low 0을 통과함. 실제 봇 2개 A52s 게이트는 사용자 결정으로 V7-06 UI 뒤로 이월하고, Hermes의 기기 조작 없이 형이 전달받은 APK로 직접 검증함.
 
 ## 1. 목표와 제품 원칙
@@ -252,6 +252,7 @@ python3 ~/.hermes/skills/software-development/android-native-app-delivery/script
 | 2026-08-10 14:22 KST | V5-02 Activity 폴백 사용자 실기기 PASS | 창 열림·텍스트 입력·창 닫힘 확인; Activity 방식을 제품 경로로 채택하고 V5-03은 승인 전 대기 |
 | 2026-08-12 | `v0.7.0`을 V7-00~V7-10의 11단계로 운영 | V7-09 공식 서명 RC의 실사용·복구 검증과 V7-10 기능 동결 최종 릴리즈를 분리하여 테스트한 APK와 배포 APK의 불일치를 방지 |
 | 2026-08-12 19:15 KST | V7-09 RC2 A52s PASS·V7-10 최종 승격 승인 | 형의 “테스트 완료 패스”를 수신하고, 테스트된 RC2 APK와 최종 APK의 byte-for-byte 동일성 및 동일 SHA-256을 확인하여 재빌드 없이 최종 릴리스로 승격 |
+| 2026-08-12 | `v0.7.0` 공개 승인·V7 완료 | annotated tag와 GitHub latest Release를 공개하고 비로그인 원격 APK 재다운로드 후 로컬 최종본과 해시·크기·서명·패키지·ABI·16KB 정렬 일치를 검증 |
 
 ## 11. 단계 완료 보고 형식
 
