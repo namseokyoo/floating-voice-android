@@ -366,6 +366,20 @@
                         android:text="@string/button_submit_auth_code"
                         android:visibility="gone" />
 
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/resend_auth_code"
+                        style="@style/FloatingVoice.QuietOutlinedButton"
+                        android:layout_marginTop="10dp"
+                        android:text="@string/button_resend_auth_code"
+                        android:visibility="gone" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/change_auth_phone"
+                        style="@style/FloatingVoice.QuietOutlinedButton"
+                        android:layout_marginTop="8dp"
+                        android:text="@string/button_change_auth_phone"
+                        android:visibility="gone" />
+
                     <com.google.android.material.textfield.TextInputLayout
                         android:id="@+id/password_field"
                         android:layout_width="match_parent"

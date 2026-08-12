@@ -113,6 +113,64 @@ public class PendingDispatchStoreTest {
     }
 
     @Test
+    public void accountCloseMarksPendingUnknownAndDetachesEveryMessageMapping() {
+        FakeBackend backend = new FakeBackend();
+        PendingDispatchStore store = new PendingDispatchStore(backend);
+        PendingMessageKey first = new PendingMessageKey(800L, -40L);
+        PendingMessageKey second = new PendingMessageKey(900L, -41L);
+        assertTrue(store.prepare(preparedFor("old-a", "old-account-a", 800L)));
+        assertTrue(store.prepare(preparedFor("old-b", "old-account-b", 900L)));
+        assertTrue(store.markQueued("old-a", first));
+        assertTrue(store.markQueued("old-b", second));
+
+        assertEquals(2, store.markUncertainAndDetachMessages());
+
+        assertEquals(DispatchState.UNKNOWN_RETAINED,
+                store.find("old-a").orElseThrow().state());
+        assertEquals(DispatchState.UNKNOWN_RETAINED,
+                store.find("old-b").orElseThrow().state());
+        assertTrue(store.findDispatchId(first).isEmpty());
+        assertTrue(store.findDispatchId(second).isEmpty());
+    }
+
+    @Test
+    public void messageKeyCollisionCannotBeReassignedToAnotherDispatch() {
+        FakeBackend backend = new FakeBackend();
+        PendingDispatchStore store = new PendingDispatchStore(backend);
+        PendingMessageKey collision = new PendingMessageKey(910L, -50L);
+        assertTrue(store.prepare(preparedFor("owner-a", "account-a", 910L)));
+        assertTrue(store.prepare(preparedFor("owner-b", "account-b", 910L)));
+        assertTrue(store.markQueued("owner-a", collision));
+
+        assertFalse(store.markQueued("owner-b", collision));
+
+        assertEquals("owner-a", store.findDispatchId(collision).orElseThrow());
+        assertEquals(DispatchState.QUEUED,
+                store.find("owner-a").orElseThrow().state());
+        assertEquals(DispatchState.PREPARED,
+                store.find("owner-b").orElseThrow().state());
+    }
+
+    @Test
+    public void finalTransitionRequiresExpectedDispatchOwner() {
+        FakeBackend backend = new FakeBackend();
+        PendingDispatchStore store = new PendingDispatchStore(backend);
+        PendingMessageKey key = new PendingMessageKey(920L, -51L);
+        assertTrue(store.prepare(preparedFor("expected-a", "account-a", 920L)));
+        assertTrue(store.prepare(preparedFor("expected-b", "account-b", 920L)));
+        assertTrue(store.markQueued("expected-a", key));
+
+        assertFalse(store.markCompleted("expected-b", key, false));
+        assertFalse(store.markFailed("expected-b", key, 500, "stale", false, 0));
+
+        assertEquals("expected-a", store.findDispatchId(key).orElseThrow());
+        assertEquals(DispatchState.QUEUED,
+                store.find("expected-a").orElseThrow().state());
+        assertEquals(DispatchState.PREPARED,
+                store.find("expected-b").orElseThrow().state());
+    }
+
+    @Test
     public void commitFailureNeverPublishesPreparedOrQueuedState() {
         FakeBackend backend = new FakeBackend();
         PendingDispatchStore store = new PendingDispatchStore(backend);

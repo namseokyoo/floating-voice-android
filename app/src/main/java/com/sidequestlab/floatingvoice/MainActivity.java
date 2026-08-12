@@ -12,6 +12,8 @@ import android.graphics.Color;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.provider.Settings;
 import android.text.InputType;
 import android.view.LayoutInflater;
@@ -141,6 +143,8 @@ public final class MainActivity extends AppCompatActivity implements TelegramRep
     private MaterialButton dashboardPrimaryAction;
     private MaterialButton destinationAddButton;
     private MaterialButton destinationOrderEditButton;
+    private MaterialButton resendAuthCodeButton;
+    private MaterialButton changeAuthPhoneButton;
     private LinearLayout destinationsListContainer;
     private TextView destinationsListEmpty;
     private TelegramRepository telegram;
@@ -157,6 +161,14 @@ public final class MainActivity extends AppCompatActivity implements TelegramRep
     private boolean statusCallbacksReady;
     private boolean destinationOrderEditing;
     private String persistentStatus;
+    private final Handler authUiHandler = new Handler(Looper.getMainLooper());
+    private boolean editingAuthPhone;
+    private final Runnable authCodeCountdown = new Runnable() {
+        @Override public void run() {
+            if (telegram == null || telegram.authStage() != TelegramRepository.AuthStage.CODE) return;
+            updateAuthControls(TelegramRepository.AuthStage.CODE);
+        }
+    };
 
     @Override protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -290,6 +302,8 @@ public final class MainActivity extends AppCompatActivity implements TelegramRep
         dashboardPrimaryAction = findViewById(R.id.dashboard_primary_action);
         destinationAddButton = findViewById(R.id.destination_add_button);
         destinationOrderEditButton = findViewById(R.id.destination_order_edit_button);
+        resendAuthCodeButton = findViewById(R.id.resend_auth_code);
+        changeAuthPhoneButton = findViewById(R.id.change_auth_phone);
         destinationsListContainer = findViewById(R.id.destinations_list_container);
         destinationsListEmpty = findViewById(R.id.destinations_list_empty);
         apiId.setInputType(InputType.TYPE_CLASS_NUMBER);
@@ -310,6 +324,14 @@ public final class MainActivity extends AppCompatActivity implements TelegramRep
         findViewById(R.id.submit_code).setOnClickListener(v -> {
             telegram.submitCode(code.getText().toString());
             code.setText("");
+        });
+        resendAuthCodeButton.setOnClickListener(v -> telegram.resendAuthenticationCode());
+        changeAuthPhoneButton.setOnClickListener(v -> {
+            editingAuthPhone = !editingAuthPhone;
+            if (editingAuthPhone && phone.getText().length() == 0 && savedConfig != null) {
+                phone.setText(savedConfig.phoneNumber());
+            }
+            updateAuthControls(telegram.authStage());
         });
         findViewById(R.id.submit_password).setOnClickListener(v -> {
             telegram.submitPassword(password.getText().toString());
@@ -358,6 +380,7 @@ public final class MainActivity extends AppCompatActivity implements TelegramRep
     }
 
     @Override protected void onStop() {
+        authUiHandler.removeCallbacks(authCodeCountdown);
         try { unregisterReceiver(serviceStateReceiver); }
         catch (IllegalArgumentException ignored) { }
         super.onStop();
@@ -1467,16 +1490,38 @@ public final class MainActivity extends AppCompatActivity implements TelegramRep
     private void updateAuthControls(TelegramRepository.AuthStage stage) {
         boolean phoneStep = stage == TelegramRepository.AuthStage.PHONE;
         boolean codeStep = stage == TelegramRepository.AuthStage.CODE;
+        if (!codeStep) editingAuthPhone = false;
+        AuthCodeRecoveryPolicy.State recovery = AuthCodeRecoveryPolicy.evaluate(
+                stage, telegram.authCodeHasNextType(), telegram.authCodeResendWaitSeconds());
         boolean passwordStep = stage == TelegramRepository.AuthStage.PASSWORD;
         boolean emailAddressStep = stage == TelegramRepository.AuthStage.EMAIL_ADDRESS;
         boolean emailCodeStep = stage == TelegramRepository.AuthStage.EMAIL_CODE;
         boolean restartAvailable = stage == TelegramRepository.AuthStage.PARAMETERS
                 || stage == TelegramRepository.AuthStage.UNSUPPORTED;
 
-        findViewById(R.id.phone_field).setVisibility(phoneStep ? View.VISIBLE : View.GONE);
-        findViewById(R.id.submit_phone).setVisibility(phoneStep ? View.VISIBLE : View.GONE);
+        boolean showPhone = phoneStep || (codeStep && editingAuthPhone);
+        findViewById(R.id.phone_field).setVisibility(showPhone ? View.VISIBLE : View.GONE);
+        findViewById(R.id.submit_phone).setVisibility(showPhone ? View.VISIBLE : View.GONE);
         findViewById(R.id.auth_code_field).setVisibility(codeStep ? View.VISIBLE : View.GONE);
         findViewById(R.id.submit_code).setVisibility(codeStep ? View.VISIBLE : View.GONE);
+        resendAuthCodeButton.setVisibility(codeStep ? View.VISIBLE : View.GONE);
+        resendAuthCodeButton.setEnabled(recovery.resendEnabled());
+        if (!telegram.authCodeHasNextType()) {
+            resendAuthCodeButton.setText(R.string.button_resend_auth_code_unavailable);
+        } else if (recovery.resendWaitSeconds() > 0L) {
+            resendAuthCodeButton.setText(getString(
+                    R.string.button_resend_auth_code_wait, recovery.resendWaitSeconds()));
+        } else {
+            resendAuthCodeButton.setText(R.string.button_resend_auth_code);
+        }
+        changeAuthPhoneButton.setVisibility(
+                recovery.phoneCorrectionAllowed() ? View.VISIBLE : View.GONE);
+        changeAuthPhoneButton.setText(editingAuthPhone
+                ? R.string.button_cancel_auth_phone_change : R.string.button_change_auth_phone);
+        authUiHandler.removeCallbacks(authCodeCountdown);
+        if (codeStep && recovery.resendWaitSeconds() > 0L) {
+            authUiHandler.postDelayed(authCodeCountdown, 1000L);
+        }
         findViewById(R.id.password_field).setVisibility(passwordStep ? View.VISIBLE : View.GONE);
         findViewById(R.id.submit_password).setVisibility(passwordStep ? View.VISIBLE : View.GONE);
         findViewById(R.id.email_help).setVisibility(

@@ -32,6 +32,11 @@ public final class PendingRecordingStore {
         return preferences.getString(key(message), null);
     }
 
+    /** Detaches closing-account message identities without deleting any recording file. */
+    public synchronized void clearMappings() {
+        preferences.edit().clear().commit();
+    }
+
     /** Migrates v0.6.1's single-target keys before the Telegram client starts. */
     public synchronized void migrateLegacy(long chatId) {
         SharedPreferences.Editor editor = preferences.edit();

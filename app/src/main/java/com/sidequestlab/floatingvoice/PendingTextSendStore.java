@@ -30,6 +30,12 @@ final class PendingTextSendStore {
         return true;
     }
 
+    /** Detaches closing-account message identities; no text body is stored here. */
+    @SuppressLint("ApplySharedPref")
+    synchronized void clearMappings() {
+        preferences.edit().clear().commit();
+    }
+
     /** Migrates v0.6.1's single-target keys before the Telegram client starts. */
     synchronized void migrateLegacy(long chatId) {
         SharedPreferences.Editor editor = preferences.edit();

@@ -58,6 +58,8 @@ public final class PendingDispatchStore {
     public synchronized boolean markQueued(String dispatchId, PendingMessageKey message) {
         Optional<PendingDispatch> current = find(dispatchId);
         if (current.isEmpty() || current.get().target().chatId() != message.chatId()) return false;
+        Optional<String> currentOwner = findDispatchId(message);
+        if (currentOwner.isPresent() && !currentOwner.get().equals(dispatchId)) return false;
         PendingDispatch queued = current.get().queued(message.temporaryMessageId());
         if (queued == current.get()) return false;
         return backend.commit(Map.of(
@@ -80,12 +82,20 @@ public final class PendingDispatchStore {
                                            String errorMessage, boolean canRetry,
                                            int retryAfterSeconds) {
         Optional<String> dispatchId = findDispatchId(message);
-        if (dispatchId.isEmpty()) return false;
-        Optional<PendingDispatch> current = find(dispatchId.get());
+        return dispatchId.isPresent() && markFailed(dispatchId.get(), message,
+                errorCode, errorMessage, canRetry, retryAfterSeconds);
+    }
+
+    public synchronized boolean markFailed(String expectedDispatchId, PendingMessageKey message,
+                                           int errorCode, String errorMessage, boolean canRetry,
+                                           int retryAfterSeconds) {
+        Optional<String> owner = findDispatchId(message);
+        if (owner.isEmpty() || !owner.get().equals(expectedDispatchId)) return false;
+        Optional<PendingDispatch> current = find(expectedDispatchId);
         if (current.isEmpty()) return false;
         PendingDispatch failed = current.get().failedRetained(
                 errorCode, errorMessage, canRetry, retryAfterSeconds);
-        return backend.commit(Map.of(recordKey(dispatchId.get()), encode(failed)),
+        return backend.commit(Map.of(recordKey(expectedDispatchId), encode(failed)),
                 Set.of(messageKey(message)));
     }
 
@@ -101,11 +111,19 @@ public final class PendingDispatchStore {
 
     public synchronized boolean markCompleted(PendingMessageKey message, boolean fileDeleted) {
         Optional<String> dispatchId = findDispatchId(message);
-        if (dispatchId.isEmpty()) return false;
-        Optional<PendingDispatch> current = find(dispatchId.get());
+        return dispatchId.isPresent()
+                && markCompleted(dispatchId.get(), message, fileDeleted);
+    }
+
+    public synchronized boolean markCompleted(String expectedDispatchId,
+                                               PendingMessageKey message,
+                                               boolean fileDeleted) {
+        Optional<String> owner = findDispatchId(message);
+        if (owner.isEmpty() || !owner.get().equals(expectedDispatchId)) return false;
+        Optional<PendingDispatch> current = find(expectedDispatchId);
         if (current.isEmpty()) return false;
         PendingDispatch completed = current.get().completed(fileDeleted);
-        return backend.commit(Map.of(recordKey(dispatchId.get()), encode(completed)),
+        return backend.commit(Map.of(recordKey(expectedDispatchId), encode(completed)),
                 Set.of(messageKey(message)));
     }
 
@@ -127,6 +145,34 @@ public final class PendingDispatchStore {
             if (uncertain != decoded.get()) updates.put(entry.getKey(), encode(uncertain));
         }
         return updates.isEmpty() || !backend.commit(updates, Set.of()) ? 0 : updates.size();
+    }
+
+    /** Marks one pre-final dispatch uncertain without attaching a message identity. */
+    public synchronized boolean markUncertain(String dispatchId) {
+        Optional<PendingDispatch> current = find(dispatchId);
+        if (current.isEmpty()) return false;
+        PendingDispatch uncertain = current.get().recoveredAfterRestart();
+        if (uncertain == current.get()) return false;
+        return backend.commit(Map.of(recordKey(dispatchId), encode(uncertain)), Set.of());
+    }
+
+    /** Separates a closing TDLib account from all durable temporary-message identities. */
+    public synchronized int markUncertainAndDetachMessages() {
+        Map<String, String> updates = new LinkedHashMap<>();
+        Set<String> removals = new java.util.HashSet<>();
+        for (Map.Entry<String, String> entry : backend.readAll().entrySet()) {
+            if (entry.getKey().startsWith(MESSAGE_PREFIX)) {
+                removals.add(entry.getKey());
+                continue;
+            }
+            if (!entry.getKey().startsWith(RECORD_PREFIX)) continue;
+            Optional<PendingDispatch> decoded = decode(entry.getValue());
+            if (decoded.isEmpty()) continue;
+            PendingDispatch uncertain = decoded.get().recoveredAfterRestart();
+            if (uncertain != decoded.get()) updates.put(entry.getKey(), encode(uncertain));
+        }
+        if (updates.isEmpty() && removals.isEmpty()) return 0;
+        return backend.commit(updates, removals) ? updates.size() : 0;
     }
 
     public synchronized int retainedCount() {

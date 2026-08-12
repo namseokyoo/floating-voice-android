@@ -93,6 +93,9 @@ public final class TelegramRepository {
     private volatile AccountState accountState = AccountState.NOT_AUTHENTICATED;
     private volatile String accountName;
     private volatile long accountUserId;
+    private volatile long clientGeneration;
+    private volatile long authCodeResendAvailableAtMillis;
+    private volatile boolean authCodeHasNextType;
     private long targetResolutionGeneration;
     private volatile long lastCommittedTargetResolutionGeneration;
     private long voiceSendGeneration = 1L;
@@ -137,6 +140,11 @@ public final class TelegramRepository {
     public void removeListener(Listener listener) { listeners.remove(listener); }
     public AuthStage authStage() { return authStage; }
     public long authenticatedAccountUserId() { return accountUserId; }
+    public boolean authCodeHasNextType() { return authCodeHasNextType; }
+    public long authCodeResendWaitSeconds() {
+        long remaining = authCodeResendAvailableAtMillis - android.os.SystemClock.elapsedRealtime();
+        return remaining <= 0L ? 0L : (remaining + 999L) / 1000L;
+    }
     public AppConfig currentConfig() { return config; }
     public TargetChat target() { return target; }
     public DestinationCatalog destinationCatalog() {
@@ -217,24 +225,34 @@ public final class TelegramRepository {
             }
             stage(AuthStage.PARAMETERS);
             status(R.string.repo_starting_session);
-            client = Client.create(this::handleUpdate,
+            long generation = ++clientGeneration;
+            client = Client.create(object -> handleUpdate(generation, object),
                     error -> status(R.string.repo_update_error, error.getMessage()),
                     error -> status(R.string.repo_connection_error, error.getMessage()));
         }
     }
 
     public void submitPhoneNumber(String phoneNumber) {
-        if (authStage != AuthStage.PHONE) {
+        if (authStage != AuthStage.PHONE && authStage != AuthStage.CODE) {
             status(R.string.repo_not_phone_stage);
             return;
         }
-        TdApi.PhoneNumberAuthenticationSettings phoneSettings =
-                new TdApi.PhoneNumberAuthenticationSettings();
-        phoneSettings.authenticationTokens = new String[0];
-        TdApi.SetAuthenticationPhoneNumber request = new TdApi.SetAuthenticationPhoneNumber();
-        request.phoneNumber = phoneNumber;
-        request.settings = phoneSettings;
+        TdApi.SetAuthenticationPhoneNumber request =
+                AuthCodeRecoveryRequests.changePhone(phoneNumber);
         send(request, R.string.repo_phone_submitted);
+    }
+
+    public void resendAuthenticationCode() {
+        if (authStage != AuthStage.CODE || !authCodeHasNextType) {
+            status(R.string.repo_auth_code_resend_unavailable);
+            return;
+        }
+        long waitSeconds = authCodeResendWaitSeconds();
+        if (waitSeconds > 0L) {
+            status(R.string.repo_auth_code_resend_wait, waitSeconds);
+            return;
+        }
+        send(AuthCodeRecoveryRequests.resend(), R.string.repo_auth_code_resent);
     }
 
     public void submitEmailAddress(String emailAddress) {
@@ -807,30 +825,11 @@ public final class TelegramRepository {
             }
             status(R.string.repo_queuing_for_target, fixedTarget.title());
             String dispatchId = prepared.dispatchId();
-            requireClient().send(request, result -> {
-                if (result instanceof TdApi.Message) {
-                    TdApi.Message sent = (TdApi.Message) result;
-                    long temporaryId = sent.id;
-                    PendingMessageKey key = new PendingMessageKey(sent.chatId, temporaryId);
-                    finishQueuePersistence(dispatchId, key,
-                            recording.getAbsolutePath(), callback);
-                } else if (result instanceof TdApi.Error) {
-                    TdApi.Error error = (TdApi.Error) result;
-                    pendingDispatches.markRejected(dispatchId, error.code, error.message);
-                    String reason = text(R.string.repo_send_rejected_retained,
-                            error.code, error.message, recording.getAbsolutePath());
-                    status(R.string.repo_send_rejected_retained,
-                            error.code, error.message, recording.getAbsolutePath());
-                    callback.onRejected(reason);
-                } else {
-                    pendingDispatches.markRejected(dispatchId, -1, "UNEXPECTED_RESPONSE");
-                    String reason = text(R.string.repo_unexpected_send_response_retained,
-                            recording.getAbsolutePath());
-                    status(R.string.repo_unexpected_send_response_retained,
-                            recording.getAbsolutePath());
-                    callback.onRejected(reason);
-                }
-            });
+            Client expectedClient = requireClient();
+            long expectedGeneration = clientGeneration;
+            expectedClient.send(request, result -> handleVoiceSendResponse(
+                    expectedClient, expectedGeneration, dispatchId,
+                    recording.getAbsolutePath(), callback, result));
         }
     }
 
@@ -864,10 +863,12 @@ public final class TelegramRepository {
         request.inputMessageContent = content;
 
         Client expectedClient;
+        long expectedGeneration;
         PendingDispatch prepared = null;
         String immediateRejection = null;
         synchronized (configurationLock) {
             expectedClient = client;
+            expectedGeneration = clientGeneration;
             if (authStage != AuthStage.READY || expectedClient == null
                     || snapshot.accountUserId() != accountUserId
                     || snapshot.chatId() == 0L) {
@@ -894,28 +895,38 @@ public final class TelegramRepository {
 
         String dispatchId = prepared.dispatchId();
         status(R.string.repo_queuing_for_target, snapshot.userAlias());
-        expectedClient.send(request, result -> {
+        expectedClient.send(request, result -> handleVoiceSendResponse(
+                expectedClient, expectedGeneration, dispatchId,
+                recording.getAbsolutePath(), callback, result));
+    }
+
+    private void handleVoiceSendResponse(Client expectedClient, long expectedGeneration,
+                                         String dispatchId, String absolutePath,
+                                         SendCallback callback, TdApi.Object result) {
+        synchronized (configurationLock) {
+            if (!currentClient(expectedClient, expectedGeneration)) {
+                pendingDispatches.markUncertain(dispatchId);
+                callback.onRejected(text(R.string.repo_target_changed_retained, absolutePath));
+                return;
+            }
             if (result instanceof TdApi.Message sent) {
-                long temporaryId = sent.id;
-                PendingMessageKey key = new PendingMessageKey(sent.chatId, temporaryId);
-                finishQueuePersistence(dispatchId, key,
-                        recording.getAbsolutePath(), callback);
+                PendingMessageKey key = new PendingMessageKey(sent.chatId, sent.id);
+                finishQueuePersistence(dispatchId, key, absolutePath, callback);
             } else if (result instanceof TdApi.Error error) {
                 pendingDispatches.markRejected(dispatchId, error.code, error.message);
                 String reason = text(R.string.repo_send_rejected_retained,
-                        error.code, error.message, recording.getAbsolutePath());
+                        error.code, error.message, absolutePath);
                 status(R.string.repo_send_rejected_retained,
-                        error.code, error.message, recording.getAbsolutePath());
+                        error.code, error.message, absolutePath);
                 callback.onRejected(reason);
             } else {
                 pendingDispatches.markRejected(dispatchId, -1, "UNEXPECTED_RESPONSE");
                 String reason = text(R.string.repo_unexpected_send_response_retained,
-                        recording.getAbsolutePath());
-                status(R.string.repo_unexpected_send_response_retained,
-                        recording.getAbsolutePath());
+                        absolutePath);
+                status(R.string.repo_unexpected_send_response_retained, absolutePath);
                 callback.onRejected(reason);
             }
-        });
+        }
     }
 
     private void finishQueuePersistence(String dispatchId, PendingMessageKey key,
@@ -954,28 +965,39 @@ public final class TelegramRepository {
         request.inputMessageContent = content;
 
         synchronized (configurationLock) {
-            if (config != currentConfig || target != fixedTarget) {
+            Client expectedClient = client;
+            long expectedGeneration = clientGeneration;
+            if (config != currentConfig || target != fixedTarget
+                    || authStage != AuthStage.READY || expectedClient == null) {
                 callback.onRejected(text(R.string.repo_text_connection_target_required));
                 return;
             }
             status(R.string.repo_text_queuing, fixedTarget.title());
-            requireClient().send(request, result -> {
-                if (result instanceof TdApi.Message sent) {
-                    PendingMessageKey pending = new PendingMessageKey(sent.chatId, sent.id);
-                    pendingTextMessages.put(pending);
-                    pendingTextSends.put(pending, callback);
-                    status(R.string.repo_text_queued);
-                    callback.onQueued(sent.id);
-                } else if (result instanceof TdApi.Error error) {
-                    String reason = text(R.string.repo_text_rejected, error.code, error.message);
-                    status(R.string.repo_text_rejected, error.code, error.message);
-                    callback.onRejected(reason);
-                } else {
-                    String reason = text(R.string.repo_text_unexpected_response);
-                    status(R.string.repo_text_unexpected_response);
-                    callback.onRejected(reason);
-                }
-            });
+            expectedClient.send(request, result -> handleTextSendResponse(
+                    expectedClient, expectedGeneration, callback, result));
+        }
+    }
+
+    private void handleTextSendResponse(Client expectedClient, long expectedGeneration,
+                                        TextSendCallback callback, TdApi.Object result) {
+        synchronized (configurationLock) {
+            if (!currentClient(expectedClient, expectedGeneration)) {
+                callback.onRejected(text(R.string.repo_text_connection_target_required));
+            } else if (result instanceof TdApi.Message sent) {
+                PendingMessageKey pending = new PendingMessageKey(sent.chatId, sent.id);
+                pendingTextMessages.put(pending);
+                pendingTextSends.put(pending, callback);
+                status(R.string.repo_text_queued);
+                callback.onQueued(sent.id);
+            } else if (result instanceof TdApi.Error error) {
+                String reason = text(R.string.repo_text_rejected, error.code, error.message);
+                status(R.string.repo_text_rejected, error.code, error.message);
+                callback.onRejected(reason);
+            } else {
+                String reason = text(R.string.repo_text_unexpected_response);
+                status(R.string.repo_text_unexpected_response);
+                callback.onRejected(reason);
+            }
         }
     }
 
@@ -1008,7 +1030,8 @@ public final class TelegramRepository {
         }
     }
 
-    private void handleUpdate(TdApi.Object object) {
+    private void handleUpdate(long generation, TdApi.Object object) {
+        if (!ClientGenerationGate.current(generation, clientGeneration)) return;
         if (object instanceof TdApi.UpdateAuthorizationState) {
             handleAuthorizationState(((TdApi.UpdateAuthorizationState) object).authorizationState);
         } else if (object instanceof TdApi.UpdateMessageSendSucceeded) {
@@ -1028,7 +1051,7 @@ public final class TelegramRepository {
                 PendingDispatch durable = pendingDispatches.findByMessage(pending).orElse(null);
                 if (durable != null) {
                     String path = durable.absolutePath();
-                    if (!pendingDispatches.markCompleted(pending, false)) {
+                    if (!pendingDispatches.markCompleted(durable.dispatchId(), pending, false)) {
                         status(R.string.repo_completion_persistence_failed_retained, path);
                         return;
                     }
@@ -1087,8 +1110,9 @@ public final class TelegramRepository {
                 }
                 int errorCode = update.error != null ? update.error.code : -1;
                 String errorMessage = update.error != null ? update.error.message : "";
-                boolean failureSaved = pendingDispatches.markFailed(
-                        pending, errorCode, errorMessage, canRetry, retryAfterSeconds);
+                boolean failureSaved = durable != null && pendingDispatches.markFailed(
+                        durable.dispatchId(), pending, errorCode, errorMessage,
+                        canRetry, retryAfterSeconds);
                 if (durable != null && !failureSaved) {
                     status(R.string.repo_failure_persistence_failed_retained,
                             path, errorCode, errorMessage);
@@ -1117,12 +1141,20 @@ public final class TelegramRepository {
             stage(AuthStage.EMAIL_CODE);
             status(R.string.repo_enter_email_code);
         } else if (state instanceof TdApi.AuthorizationStateWaitCode) {
+            TdApi.AuthenticationCodeInfo codeInfo =
+                    ((TdApi.AuthorizationStateWaitCode) state).codeInfo;
+            authCodeHasNextType = codeInfo != null && codeInfo.nextType != null;
+            int timeoutSeconds = codeInfo == null ? 0 : Math.max(0, codeInfo.timeout);
+            authCodeResendAvailableAtMillis = android.os.SystemClock.elapsedRealtime()
+                    + timeoutSeconds * 1000L;
             stage(AuthStage.CODE);
             status(R.string.repo_enter_auth_code);
         } else if (state instanceof TdApi.AuthorizationStateWaitPassword) {
             stage(AuthStage.PASSWORD);
             status(R.string.repo_enter_password);
         } else if (state instanceof TdApi.AuthorizationStateReady) {
+            authCodeHasNextType = false;
+            authCodeResendAvailableAtMillis = 0L;
             synchronized (configurationLock) {
                 accountUserId = 0L;
                 accountName = null;
@@ -1138,15 +1170,24 @@ public final class TelegramRepository {
             }
         } else if (state instanceof TdApi.AuthorizationStateLoggingOut
                 || state instanceof TdApi.AuthorizationStateClosing) {
+            authCodeHasNextType = false;
+            authCodeResendAvailableAtMillis = 0L;
             stage(AuthStage.LOGGING_OUT);
             status(R.string.repo_closing_session);
         } else if (state instanceof TdApi.AuthorizationStateClosed) {
-            synchronized (clientLock) { client = null; }
+            synchronized (clientLock) {
+                client = null;
+                clientGeneration++;
+            }
             synchronized (configurationLock) {
                 accountUserId = 0L;
                 accountName = null;
                 accountState = AccountState.CLOSED;
                 destinationResolver.cancelCurrent();
+                pendingDispatches.markUncertainAndDetachMessages();
+                pendingRecordings.clearMappings();
+                pendingTextMessages.clearMappings();
+                pendingTextSends.clear();
             }
             notifyAccountChanged();
             stage(AuthStage.CLOSED);
@@ -1231,6 +1272,12 @@ public final class TelegramRepository {
         Client active = client;
         if (active == null) throw new IllegalStateException("CLIENT_NOT_RUNNING");
         return active;
+    }
+
+    private boolean currentClient(Client expectedClient, long expectedGeneration) {
+        return expectedClient != null && client == expectedClient
+                && authStage == AuthStage.READY
+                && ClientGenerationGate.current(expectedGeneration, clientGeneration);
     }
 
 

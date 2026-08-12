@@ -761,7 +761,12 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
     private synchronized void initializeRouteState(DestinationCatalog catalog) {
         if (routeStateMachine != null || telegram == null || catalog == null) return;
         long accountUserId = telegram.authenticatedAccountUserId();
-        if (accountUserId <= 0L) {
+        boolean authReady = telegram.authStage() == TelegramRepository.AuthStage.READY;
+        if (!RouteInitializationPolicy.allowed(authReady, accountUserId)) {
+            if (!authReady) {
+                accountRouteGraceDeadline = 0L;
+                return;
+            }
             if (accountRouteGraceDeadline == 0L) {
                 accountRouteGraceDeadline = SystemClock.uptimeMillis() + ACCOUNT_ROUTE_GRACE_MS;
             }

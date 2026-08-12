@@ -35,6 +35,11 @@
     <string name="button_submit_phone">Submit phone number</string>
     <string name="hint_auth_code">Telegram authentication code (not saved)</string>
     <string name="button_submit_auth_code">Submit Telegram authentication code</string>
+    <string name="button_resend_auth_code">Resend authentication code</string>
+    <string name="button_resend_auth_code_wait">Resend in %1$d s</string>
+    <string name="button_resend_auth_code_unavailable">No additional code method available</string>
+    <string name="button_change_auth_phone">Change phone number</string>
+    <string name="button_cancel_auth_phone_change">Cancel phone number change</string>
     <string name="hint_password">Telegram two-step verification password (not saved)</string>
     <string name="button_submit_password">Submit two-step verification password</string>
     <string name="email_help">Enter the email information below only when the authentication status requests it.</string>
@@ -145,6 +150,9 @@
     <string name="repo_email_code_submitted">Email authentication code submitted.</string>
     <string name="repo_not_auth_code_stage">Telegram authentication code input is not currently requested.</string>
     <string name="repo_auth_code_submitted">Telegram authentication code submitted.</string>
+    <string name="repo_auth_code_resent">Requested another Telegram authentication code.</string>
+    <string name="repo_auth_code_resend_wait">You can request another code in %1$d seconds.</string>
+    <string name="repo_auth_code_resend_unavailable">Telegram does not currently offer another authentication-code method.</string>
     <string name="repo_not_password_stage">Two-step verification password input is not currently requested.</string>
     <string name="repo_password_submitted">Two-step verification password submitted.</string>
     <string name="repo_login_before_resolve">Complete Telegram sign-in before finding the target bot.</string>
