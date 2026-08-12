@@ -94,16 +94,56 @@ class DestinationCatalogMutationTest {
     }
 
     @Test
-    void deletingDefaultClearsItAndNeverChoosesAnotherDestination() {
+    void deletingDefaultRequiresAnExplicitRecoveryChoice() {
         DestinationCatalog catalog = DestinationCatalog.restore(List.of(
                 verified("primary", 100L, 500L, "Primary", 1L),
                 verified("secondary", 200L, 600L, "Secondary", 1L)), "primary");
 
-        DestinationCatalog removed = catalog.withoutDestination("primary");
+        assertThrows(IllegalArgumentException.class,
+                () -> catalog.withoutDestination("primary"));
+        assertThrows(IllegalArgumentException.class,
+                () -> catalog.withoutDefaultDestination("primary", 7L));
 
-        assertTrue(removed.defaultLocalId().isEmpty());
+        DestinationCatalog removed = catalog.replacingDefaultAndRemoving(
+                "primary", "secondary", 7L);
+
+        assertEquals("secondary", removed.defaultLocalId().orElseThrow());
         assertEquals(List.of("secondary"), removed.destinations().stream()
                 .map(Destination::localId).toList());
+    }
+
+    @Test
+    void deletingDefaultWithoutSelectableReplacementExplicitlyLeavesNoDefault() {
+        Destination primary = verified("primary", 100L, 500L, "Primary", 1L);
+        Destination needsReverify = new Destination(
+                "recovery", 7L, 200L, 600L,
+                "recovery_bot", "recovery_bot", "Recovery", "Recovery",
+                Destination.VerificationStatus.NEEDS_REVERIFY,
+                2L, 1_700_000_100_000L, true);
+        DestinationCatalog catalog = DestinationCatalog.restore(
+                List.of(primary, needsReverify), "primary");
+
+        DestinationCatalog removed = catalog.withoutDefaultDestination("primary", 7L);
+
+        assertTrue(removed.defaultLocalId().isEmpty());
+        assertEquals(needsReverify, removed.find("recovery").orElseThrow());
+    }
+
+    @Test
+    void replacementMustBeAnotherSelectableDestination() {
+        Destination primary = verified("primary", 100L, 500L, "Primary", 1L);
+        Destination disabled = new Destination(
+                "disabled", 7L, 200L, 600L,
+                "disabled_bot", "disabled_bot", "Disabled", "Disabled",
+                Destination.VerificationStatus.DISABLED,
+                2L, 1_700_000_100_000L, false);
+        DestinationCatalog catalog = DestinationCatalog.restore(
+                List.of(primary, disabled), "primary");
+
+        assertThrows(IllegalArgumentException.class,
+                () -> catalog.replacingDefaultAndRemoving("primary", "primary", 7L));
+        assertThrows(IllegalArgumentException.class,
+                () -> catalog.replacingDefaultAndRemoving("primary", "disabled", 7L));
     }
 
     @Test

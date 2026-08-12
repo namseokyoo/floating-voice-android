@@ -36,6 +36,10 @@
         <item name="windowNoTitle">true</item>
     </style>
 
+    <style name="Theme.FloatingVoice.DestinationPicker" parent="Theme.FloatingVoice.TextComposer">
+        <item name="android:windowSoftInputMode">adjustNothing</item>
+    </style>
+
     <!-- Overlay/composer theme keeps its v0.5.0 fixed semantic tokens. -->
     <style name="Theme.FloatingVoice.OverlayMaterial3" parent="Theme.Material3.DayNight.NoActionBar">
         <item name="colorPrimary">@color/fv_primary</item>

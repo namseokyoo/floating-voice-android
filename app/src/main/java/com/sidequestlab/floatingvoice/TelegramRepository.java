@@ -4,6 +4,12 @@ import android.content.Context;
 import android.os.Build;
 
 import com.sidequestlab.floatingvoice.core.AppConfig;
+import com.sidequestlab.floatingvoice.core.DispatchState;
+import com.sidequestlab.floatingvoice.core.DispatchTargetSnapshot;
+import com.sidequestlab.floatingvoice.core.Destination;
+import com.sidequestlab.floatingvoice.core.DestinationCatalog;
+import com.sidequestlab.floatingvoice.core.DestinationEditPolicy;
+import com.sidequestlab.floatingvoice.core.PendingDispatch;
 import com.sidequestlab.floatingvoice.core.PendingMessageKey;
 
 import org.drinkless.tdlib.Client;
@@ -12,6 +18,8 @@ import org.drinkless.tdlib.TdApi;
 import java.io.File;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 
@@ -28,8 +36,13 @@ public final class TelegramRepository {
         default void onAuthStage(AuthStage stage) { }
         default void onAccountChanged(String account) { }
         default void onTargetChanged(TargetChat target) { }
+        default void onDestinationCatalogChanged(DestinationCatalog catalog) { }
+        default void onDestinationVerificationPreview(DestinationVerificationPreview preview) { }
         default void onLocaleChanged() { }
     }
+
+    public record DestinationVerificationPreview(
+            long token, Destination previous, Destination candidate) { }
 
     public interface SendCallback {
         void onQueued(long temporaryMessageId);
@@ -56,8 +69,13 @@ public final class TelegramRepository {
 
     private final Context context;
     private final SecureSettingsStore settingsStore;
+    private final DestinationStore destinations;
+    private final DestinationResolver destinationResolver = new DestinationResolver();
+    private final DestinationLookupAdapter destinationLookupAdapter =
+            new DestinationLookupAdapter();
     private final PendingRecordingStore pendingRecordings;
     private final PendingTextSendStore pendingTextMessages;
+    private final PendingDispatchStore pendingDispatches;
     private final ConcurrentHashMap<PendingMessageKey, TextSendCallback> pendingTextSends =
             new ConcurrentHashMap<>();
     private final List<Listener> listeners = new CopyOnWriteArrayList<>();
@@ -76,20 +94,27 @@ public final class TelegramRepository {
     private volatile String accountName;
     private volatile long accountUserId;
     private long targetResolutionGeneration;
-    private long lastCommittedTargetResolutionGeneration;
+    private volatile long lastCommittedTargetResolutionGeneration;
+    private long voiceSendGeneration = 1L;
+    private volatile DestinationVerificationPreview pendingDestinationPreview;
 
     public TelegramRepository(Context context, SecureSettingsStore settingsStore,
+                              DestinationStore destinations,
                               PendingRecordingStore pendingRecordings,
-                              PendingTextSendStore pendingTextMessages) {
+                              PendingTextSendStore pendingTextMessages,
+                              PendingDispatchStore pendingDispatches) {
         this.context = context.getApplicationContext();
         this.settingsStore = settingsStore;
+        this.destinations = destinations;
         this.pendingRecordings = pendingRecordings;
         this.pendingTextMessages = pendingTextMessages;
+        this.pendingDispatches = pendingDispatches;
         this.target = settingsStore.loadTarget().orElse(null);
         if (target != null) {
             pendingRecordings.migrateLegacy(target.chatId());
             pendingTextMessages.migrateLegacy(target.chatId());
         }
+        pendingDispatches.markUncertainAfterRestart();
     }
 
     public void addListener(Listener listener) {
@@ -103,13 +128,20 @@ public final class TelegramRepository {
             listener.onAuthStage(authStage);
             listener.onAccountChanged(accountSummary());
             listener.onTargetChanged(target);
+            listener.onDestinationCatalogChanged(destinationCatalog());
+            DestinationVerificationPreview preview = pendingDestinationPreview;
+            if (preview != null) listener.onDestinationVerificationPreview(preview);
         }
     }
 
     public void removeListener(Listener listener) { listeners.remove(listener); }
     public AuthStage authStage() { return authStage; }
+    public long authenticatedAccountUserId() { return accountUserId; }
     public AppConfig currentConfig() { return config; }
     public TargetChat target() { return target; }
+    public DestinationCatalog destinationCatalog() {
+        return destinations.publishedCatalog().orElseGet(DestinationCatalog::empty);
+    }
     public String lastStatus() {
         synchronized (stateDeliveryLock) {
             return render(lastStatus);
@@ -143,6 +175,8 @@ public final class TelegramRepository {
         }
         synchronized (configurationLock) {
             targetResolutionGeneration++;
+            destinationResolver.cancelCurrent();
+            pendingDestinationPreview = null;
         }
         restartAfterClose = true;
         status(R.string.repo_restarting_session);
@@ -165,6 +199,8 @@ public final class TelegramRepository {
         boolean clearedTarget = false;
         synchronized (configurationLock) {
             targetResolutionGeneration++;
+            destinationResolver.cancelCurrent();
+            pendingDestinationPreview = null;
             config = newConfig;
             TargetChat existingTarget = target;
             if (existingTarget != null && !existingTarget.username().equals(newConfig.botUsername())) {
@@ -339,14 +375,383 @@ public final class TelegramRepository {
     }
 
     public boolean isTargetResolutionCommitted(long generation) {
+        return generation > 0L && lastCommittedTargetResolutionGeneration == generation;
+    }
+
+    /** Starts an additive private-bot lookup. It never sends a test message. */
+    public long addDestinationUsername(String username, String alias) {
+        DestinationResolver.StartResult start;
         synchronized (configurationLock) {
-            return generation > 0L && lastCommittedTargetResolutionGeneration == generation;
+            pendingDestinationPreview = null;
+            start = destinationResolver.startAdd(accountUserId, username, alias);
+        }
+        return beginDestinationResolution(start);
+    }
+
+    /** Re-verifies one stored destination without rebinding a known canonical identity. */
+    public long reverifyDestinationUsername(String localId, String username, String alias) {
+        DestinationResolver.StartResult start;
+        synchronized (configurationLock) {
+            pendingDestinationPreview = null;
+            start = destinationResolver.startReverify(accountUserId, localId, username, alias);
+        }
+        return beginDestinationResolution(start);
+    }
+
+    private long beginDestinationResolution(DestinationResolver.StartResult start) {
+        if (!start.started()) {
+            statusDestinationRejection(start.rejection());
+            return 0L;
+        }
+        DestinationResolver.Request request = start.request();
+        final Client expectedClient;
+        boolean accountMismatch = false;
+        synchronized (configurationLock) {
+            expectedClient = client;
+            if (authStage != AuthStage.READY || expectedClient == null
+                    || accountUserId != request.accountUserId()) {
+                destinationResolver.reject(request,
+                        DestinationResolver.Rejection.ACCOUNT_MISMATCH);
+                accountMismatch = true;
+            }
+        }
+        if (accountMismatch) {
+            statusDestinationRejection(DestinationResolver.Rejection.ACCOUNT_MISMATCH);
+            return 0L;
+        }
+
+        status(R.string.repo_searching_bot, request.configuredUsername());
+        destinationLookupAdapter.resolve(
+                request,
+                (function, handler) ->
+                        expectedClient.send(function, handler::onResult),
+                new DestinationLookupAdapter.Callback() {
+                    @Override
+                    public boolean isCurrent(DestinationResolver.Request candidate) {
+                        return isDestinationResolutionCurrent(candidate, expectedClient);
+                    }
+
+                    @Override
+                    public void onRejected(
+                            DestinationResolver.Request candidate,
+                            DestinationResolver.Rejection rejection,
+                            TdApi.Error error) {
+                        DestinationResolver.Rejection actual = destinationResolver.reject(
+                                candidate, rejection).rejection();
+                        if (actual == DestinationResolver.Rejection.STALE_REQUEST) {
+                            statusDestinationRejection(actual);
+                        } else if (actual == DestinationResolver.Rejection.SEARCH_FAILED
+                                && error != null) {
+                            status(R.string.repo_bot_not_found, error.code, error.message);
+                        } else if (actual == DestinationResolver.Rejection.USER_LOOKUP_FAILED
+                                && error != null) {
+                            status(R.string.repo_bot_check_failed, error.code, error.message);
+                        } else {
+                            statusDestinationRejection(actual);
+                        }
+                    }
+
+                    @Override
+                    public void onResolved(
+                            DestinationResolver.Request candidate,
+                            DestinationResolver.ResolvedPeer peer) {
+                        finishDestinationResolution(candidate, expectedClient, peer);
+                    }
+                });
+        return request.token();
+    }
+
+    private boolean isDestinationResolutionCurrent(
+            DestinationResolver.Request request, Client expectedClient) {
+        synchronized (configurationLock) {
+            return destinationResolver.isCurrent(request)
+                    && authStage == AuthStage.READY
+                    && client == expectedClient
+                    && accountUserId == request.accountUserId();
+        }
+    }
+
+    private void finishDestinationResolution(
+            DestinationResolver.Request request,
+            Client expectedClient,
+            DestinationResolver.ResolvedPeer peer) {
+        DestinationResolver.Resolution result;
+        DestinationCatalog updated = null;
+        DestinationVerificationPreview preview = null;
+        boolean saveFailed = false;
+        synchronized (configurationLock) {
+            if (!destinationResolver.isCurrent(request)
+                    || authStage != AuthStage.READY
+                    || client != expectedClient
+                    || accountUserId != request.accountUserId()) {
+                result = destinationResolver.reject(
+                        request, DestinationResolver.Rejection.STALE_REQUEST);
+            } else {
+                DestinationCatalog currentCatalog = destinationCatalog();
+                result = destinationResolver.complete(
+                        request, accountUserId, currentCatalog, peer,
+                        System.currentTimeMillis());
+                if (result.accepted()) {
+                    Destination verified = result.destination();
+                    if (request.mode() == DestinationResolver.Mode.REVERIFY) {
+                        Destination previous = currentCatalog.find(request.localId()).orElse(null);
+                        if (previous == null) {
+                            result = new DestinationResolver.Resolution(
+                                    null, DestinationResolver.Rejection.DESTINATION_MISSING);
+                        } else {
+                            preview = new DestinationVerificationPreview(
+                                    request.token(), previous, verified);
+                            pendingDestinationPreview = preview;
+                        }
+                    } else {
+                        try {
+                            updated = destinations.update(
+                                    catalog -> catalog.withDestination(verified));
+                        } catch (RuntimeException error) {
+                            saveFailed = true;
+                        }
+                    }
+                }
+            }
+        }
+        if (!result.accepted()) {
+            statusDestinationRejection(result.rejection());
+            return;
+        }
+        Destination verified = result.destination();
+        if (preview != null) {
+            status(R.string.repo_destination_preview_ready,
+                    verified.resolvedTitle(), verified.resolvedUsername());
+            notifyDestinationVerificationPreview(preview);
+            return;
+        }
+        if (saveFailed || updated == null) {
+            status(R.string.repo_target_save_failed);
+            return;
+        }
+        status(R.string.repo_destination_verified,
+                verified.resolvedTitle(), verified.resolvedUsername());
+        notifyDestinationCatalogChanged(updated);
+    }
+
+    /** Commits an explicitly accepted re-verification preview if its source row is unchanged. */
+    public boolean confirmDestinationVerificationPreview(long token) {
+        DestinationCatalog updated = null;
+        Destination verified = null;
+        int failureResource = 0;
+        synchronized (configurationLock) {
+            DestinationVerificationPreview preview = pendingDestinationPreview;
+            if (preview == null || preview.token() != token) {
+                failureResource = R.string.repo_stale_confirmation_ignored;
+            } else if (authStage != AuthStage.READY
+                    || preview.candidate().accountUserId() != accountUserId) {
+                pendingDestinationPreview = null;
+                failureResource = R.string.repo_destination_account_required;
+            } else {
+                try {
+                    updated = destinations.update(catalog -> {
+                        Destination current = catalog.find(
+                                preview.previous().localId()).orElse(null);
+                        DestinationEditPolicy.requirePreviewCurrent(
+                                preview.previous(), current);
+                        return catalog.withDestination(preview.candidate());
+                    });
+                    verified = preview.candidate();
+                    pendingDestinationPreview = null;
+                } catch (IllegalArgumentException | IllegalStateException error) {
+                    pendingDestinationPreview = null;
+                    failureResource = R.string.repo_stale_confirmation_ignored;
+                } catch (RuntimeException error) {
+                    failureResource = R.string.repo_target_save_failed;
+                }
+            }
+        }
+        if (failureResource != 0 || updated == null || verified == null) {
+            status(failureResource == 0 ? R.string.repo_target_save_failed : failureResource);
+            return false;
+        }
+        status(R.string.repo_destination_verified,
+                verified.resolvedTitle(), verified.resolvedUsername());
+        notifyDestinationCatalogChanged(updated);
+        return true;
+    }
+
+    public void cancelDestinationVerificationPreview(long token) {
+        synchronized (configurationLock) {
+            if (pendingDestinationPreview != null
+                    && pendingDestinationPreview.token() == token) {
+                pendingDestinationPreview = null;
+            }
+        }
+    }
+
+    /** Renames a stored destination. It never rebinds or touches canonical identity. */
+    public boolean setDestinationAlias(String localId, String alias) {
+        return editDestination(localId,
+                R.string.repo_destination_alias_saved,
+                R.string.repo_target_save_failed,
+                (catalog, existing) -> catalog.withDestination(
+                        DestinationEditPolicy.withAlias(existing, alias)));
+    }
+
+    /** Disables or re-enables a stored destination without touching canonical identity. */
+    public boolean setDestinationEnabled(String localId, boolean enabled) {
+        return editDestination(localId,
+                enabled ? R.string.repo_destination_enabled
+                        : R.string.repo_destination_disabled,
+                enabled ? R.string.repo_destination_enable_refused
+                        : R.string.repo_target_save_failed,
+                (catalog, existing) -> {
+                    long now = System.currentTimeMillis();
+                    Destination mutated = enabled
+                            ? DestinationEditPolicy.enable(existing, now)
+                            : DestinationEditPolicy.disable(existing, now);
+                    return catalog.withDestination(mutated);
+                });
+    }
+
+    /** Makes one stored destination the persistent default route. */
+    public boolean setDefaultDestination(String localId) {
+        return editDestination(localId,
+                R.string.repo_destination_default_saved,
+                R.string.repo_target_save_failed,
+                (catalog, existing) -> catalog.withDefault(localId, accountUserId));
+    }
+
+    /**
+     * Removes one destination without choosing a fallback. Deleting the current default is
+     * allowed only when no other selectable destination exists.
+     */
+    public boolean removeDestination(String localId) {
+        return editDestination(localId,
+                R.string.repo_destination_removed,
+                R.string.repo_target_save_failed,
+                (catalog, existing) -> catalog.defaultLocalId()
+                        .filter(localId::equals)
+                        .map(ignored -> catalog.withoutDefaultDestination(
+                                localId, accountUserId))
+                        .orElseGet(() -> catalog.withoutDestination(localId)));
+    }
+
+    /** Atomically commits an explicit replacement default and deletion under one lock/write. */
+    public boolean removeDestinationReplacingDefault(
+            String localId, String replacementLocalId) {
+        return editDestination(localId,
+                R.string.repo_destination_removed_with_replacement,
+                R.string.repo_target_save_failed,
+                (catalog, existing) -> catalog.replacingDefaultAndRemoving(
+                        localId, replacementLocalId, accountUserId));
+    }
+
+    /** Counts pending/failed/unknown dispatch records frozen to one destination snapshot. */
+    public int retainedDispatchCount(String localId) {
+        return pendingDispatches.retainedCountForDestination(localId);
+    }
+
+    /** Moves one destination one position up or down in the stored order. */
+    public boolean moveDestination(String localId, boolean up) {
+        DestinationCatalog updated = null;
+        int failureResource = 0;
+        synchronized (configurationLock) {
+            if (authStage != AuthStage.READY) {
+                failureResource = R.string.repo_destination_account_required;
+            } else {
+                DestinationCatalog catalog = destinationCatalog();
+                Destination existing = catalog.find(localId).orElse(null);
+                if (existing == null || !belongsToCurrentAccount(existing)) {
+                    failureResource = R.string.repo_destination_missing;
+                } else {
+                    List<String> order = new java.util.ArrayList<>();
+                    for (Destination destination : catalog.destinations()) {
+                        order.add(destination.localId());
+                    }
+                    int index = order.indexOf(localId);
+                    int target = up ? index - 1 : index + 1;
+                    if (index < 0 || target < 0 || target >= order.size()) return false;
+                    String displaced = order.get(target);
+                    order.set(index, displaced);
+                    order.set(target, localId);
+                    try {
+                        updated = destinations.update(c -> c.reordered(order));
+                    } catch (RuntimeException error) {
+                        failureResource = R.string.repo_target_save_failed;
+                    }
+                }
+            }
+        }
+        if (failureResource != 0 || updated == null) {
+            status(failureResource == 0 ? R.string.repo_target_save_failed : failureResource);
+            return false;
+        }
+        status(R.string.repo_destination_order_saved);
+        notifyDestinationCatalogChanged(updated);
+        return true;
+    }
+
+    private boolean editDestination(String localId, int successResource,
+                                    int policyFailureResource, CatalogEdit edit) {
+        DestinationCatalog updated = null;
+        int failureResource = 0;
+        synchronized (configurationLock) {
+            if (authStage != AuthStage.READY) {
+                failureResource = R.string.repo_destination_account_required;
+            } else {
+                Destination existing = destinationCatalog().find(localId).orElse(null);
+                if (existing == null || !belongsToCurrentAccount(existing)) {
+                    failureResource = R.string.repo_destination_missing;
+                } else {
+                    try {
+                        updated = destinations.update(catalog -> edit.apply(catalog, existing));
+                    } catch (IllegalArgumentException error) {
+                        failureResource = policyFailureResource;
+                    } catch (RuntimeException error) {
+                        failureResource = R.string.repo_target_save_failed;
+                    }
+                }
+            }
+        }
+        if (failureResource != 0 || updated == null) {
+            status(failureResource == 0 ? R.string.repo_target_save_failed : failureResource);
+            return false;
+        }
+        status(successResource);
+        notifyDestinationCatalogChanged(updated);
+        return true;
+    }
+
+    private interface CatalogEdit {
+        DestinationCatalog apply(DestinationCatalog catalog, Destination existing);
+    }
+
+    private boolean belongsToCurrentAccount(Destination destination) {
+        return destination.accountUserId() == accountUserId;
+    }
+
+    private void statusDestinationRejection(DestinationResolver.Rejection rejection) {
+        if (rejection == null) return;
+        switch (rejection) {
+            case INVALID_USERNAME -> status(R.string.validation_invalid_username);
+            case ACCOUNT_REQUIRED, ACCOUNT_MISMATCH ->
+                    status(R.string.repo_destination_account_required);
+            case STALE_REQUEST -> status(R.string.repo_stale_confirmation_ignored);
+            case NOT_PRIVATE_CHAT -> status(R.string.repo_not_private_chat);
+            case NOT_BOT -> status(R.string.repo_user_not_bot);
+            case INCOMPLETE_IDENTITY -> status(R.string.repo_destination_identity_incomplete);
+            case MISSING_CANONICAL_USERNAME ->
+                    status(R.string.repo_destination_canonical_username_missing);
+            case DESTINATION_MISSING -> status(R.string.repo_destination_missing);
+            case DUPLICATE_DESTINATION -> status(R.string.repo_destination_duplicate);
+            case IDENTITY_CHANGED -> status(R.string.repo_destination_identity_changed);
+            case SEARCH_FAILED -> status(R.string.repo_destination_search_failed);
+            case USER_LOOKUP_FAILED -> status(R.string.repo_destination_user_lookup_failed);
+            case UNEXPECTED_RESPONSE -> status(R.string.repo_unexpected_search_response);
         }
     }
 
     public void sendVoiceNote(File recording, int durationSeconds, SendCallback callback) {
         TargetChat fixedTarget = target;
         AppConfig currentConfig = config;
+        long currentAccountUserId = accountUserId;
         if (authStage != AuthStage.READY || fixedTarget == null || currentConfig == null
                 || !fixedTarget.username().equals(currentConfig.botUsername())) {
             callback.onRejected(text(R.string.repo_connection_target_incomplete_retained,
@@ -377,28 +782,48 @@ public final class TelegramRepository {
         request.inputMessageContent = content;
 
         synchronized (configurationLock) {
-            if (config != currentConfig || target != fixedTarget) {
+            if (config != currentConfig || target != fixedTarget
+                    || authStage != AuthStage.READY
+                    || accountUserId != currentAccountUserId) {
                 callback.onRejected(text(R.string.repo_target_changed_retained,
                         recording.getAbsolutePath()));
                 return;
             }
+            DispatchTargetSnapshot snapshot = DispatchTargetSnapshot.legacy(
+                    voiceSendGeneration++,
+                    fixedTarget.username(),
+                    currentAccountUserId,
+                    fixedTarget.chatId(),
+                    fixedTarget.title());
+            PendingDispatch prepared = PendingDispatch.prepare(
+                    "voice-" + UUID.randomUUID(), snapshot, recording.getAbsolutePath(),
+                    Math.max(1, durationSeconds), System.currentTimeMillis());
+            if (!pendingDispatches.prepare(prepared)) {
+                status(R.string.repo_send_rejected_retained,
+                        -1, "DISPATCH_PERSIST_FAILED", recording.getAbsolutePath());
+                callback.onRejected(text(R.string.repo_send_rejected_retained,
+                        -1, "DISPATCH_PERSIST_FAILED", recording.getAbsolutePath()));
+                return;
+            }
             status(R.string.repo_queuing_for_target, fixedTarget.title());
+            String dispatchId = prepared.dispatchId();
             requireClient().send(request, result -> {
                 if (result instanceof TdApi.Message) {
                     TdApi.Message sent = (TdApi.Message) result;
                     long temporaryId = sent.id;
-                    pendingRecordings.put(new PendingMessageKey(sent.chatId, temporaryId),
-                            recording.getAbsolutePath());
-                    status(R.string.repo_queued_temporary, temporaryId);
-                    callback.onQueued(temporaryId);
+                    PendingMessageKey key = new PendingMessageKey(sent.chatId, temporaryId);
+                    finishQueuePersistence(dispatchId, key,
+                            recording.getAbsolutePath(), callback);
                 } else if (result instanceof TdApi.Error) {
                     TdApi.Error error = (TdApi.Error) result;
+                    pendingDispatches.markRejected(dispatchId, error.code, error.message);
                     String reason = text(R.string.repo_send_rejected_retained,
                             error.code, error.message, recording.getAbsolutePath());
                     status(R.string.repo_send_rejected_retained,
                             error.code, error.message, recording.getAbsolutePath());
                     callback.onRejected(reason);
                 } else {
+                    pendingDispatches.markRejected(dispatchId, -1, "UNEXPECTED_RESPONSE");
                     String reason = text(R.string.repo_unexpected_send_response_retained,
                             recording.getAbsolutePath());
                     status(R.string.repo_unexpected_send_response_retained,
@@ -407,6 +832,104 @@ public final class TelegramRepository {
                 }
             });
         }
+    }
+
+    /** Sends to the immutable route snapshot frozen by RouteStateMachine. */
+    public void sendVoiceNote(File recording, int durationSeconds,
+                              DispatchTargetSnapshot snapshot, SendCallback callback) {
+        Objects.requireNonNull(recording, "recording");
+        Objects.requireNonNull(snapshot, "snapshot");
+        Objects.requireNonNull(callback, "callback");
+        if (!recording.isFile() || recording.length() == 0) {
+            callback.onRejected(text(R.string.repo_recording_empty));
+            return;
+        }
+
+        TdApi.InputVoiceNote voice = new TdApi.InputVoiceNote();
+        voice.voiceNote = new TdApi.InputFileLocal(recording.getAbsolutePath());
+        voice.duration = Math.max(1, durationSeconds);
+        voice.waveform = new byte[0];
+
+        TdApi.InputMessageVoiceNote content = new TdApi.InputMessageVoiceNote();
+        content.voiceNote = voice;
+        content.caption = new TdApi.FormattedText("", new TdApi.TextEntity[0]);
+        content.selfDestructType = null;
+
+        TdApi.SendMessage request = new TdApi.SendMessage();
+        request.chatId = snapshot.chatId();
+        request.topicId = null;
+        request.replyTo = null;
+        request.options = new TdApi.MessageSendOptions();
+        request.replyMarkup = null;
+        request.inputMessageContent = content;
+
+        Client expectedClient;
+        PendingDispatch prepared = null;
+        String immediateRejection = null;
+        synchronized (configurationLock) {
+            expectedClient = client;
+            if (authStage != AuthStage.READY || expectedClient == null
+                    || snapshot.accountUserId() != accountUserId
+                    || snapshot.chatId() == 0L) {
+                immediateRejection = text(R.string.repo_target_changed_retained,
+                        recording.getAbsolutePath());
+            } else {
+                PendingDispatch candidate = PendingDispatch.prepare(
+                        "voice-" + UUID.randomUUID(), snapshot, recording.getAbsolutePath(),
+                        Math.max(1, durationSeconds), System.currentTimeMillis());
+                if (pendingDispatches.prepare(candidate)) {
+                    prepared = candidate;
+                } else {
+                    immediateRejection = text(R.string.repo_send_rejected_retained,
+                            -1, "DISPATCH_PERSIST_FAILED", recording.getAbsolutePath());
+                }
+            }
+        }
+        if (immediateRejection != null || prepared == null || expectedClient == null) {
+            callback.onRejected(immediateRejection == null
+                    ? text(R.string.repo_target_changed_retained, recording.getAbsolutePath())
+                    : immediateRejection);
+            return;
+        }
+
+        String dispatchId = prepared.dispatchId();
+        status(R.string.repo_queuing_for_target, snapshot.userAlias());
+        expectedClient.send(request, result -> {
+            if (result instanceof TdApi.Message sent) {
+                long temporaryId = sent.id;
+                PendingMessageKey key = new PendingMessageKey(sent.chatId, temporaryId);
+                finishQueuePersistence(dispatchId, key,
+                        recording.getAbsolutePath(), callback);
+            } else if (result instanceof TdApi.Error error) {
+                pendingDispatches.markRejected(dispatchId, error.code, error.message);
+                String reason = text(R.string.repo_send_rejected_retained,
+                        error.code, error.message, recording.getAbsolutePath());
+                status(R.string.repo_send_rejected_retained,
+                        error.code, error.message, recording.getAbsolutePath());
+                callback.onRejected(reason);
+            } else {
+                pendingDispatches.markRejected(dispatchId, -1, "UNEXPECTED_RESPONSE");
+                String reason = text(R.string.repo_unexpected_send_response_retained,
+                        recording.getAbsolutePath());
+                status(R.string.repo_unexpected_send_response_retained,
+                        recording.getAbsolutePath());
+                callback.onRejected(reason);
+            }
+        });
+    }
+
+    private void finishQueuePersistence(String dispatchId, PendingMessageKey key,
+                                        String absolutePath, SendCallback callback) {
+        if (pendingDispatches.markQueued(dispatchId, key)) {
+            status(R.string.repo_queued_temporary, key.temporaryMessageId());
+            callback.onQueued(key.temporaryMessageId());
+            return;
+        }
+        pendingDispatches.markQueuePersistenceUnknown(
+                dispatchId, key.temporaryMessageId());
+        String reason = text(R.string.repo_queue_persistence_failed_retained, absolutePath);
+        status(R.string.repo_queue_persistence_failed_retained, absolutePath);
+        callback.onRejected(reason);
     }
 
     public void sendText(String message, TextSendCallback callback) {
@@ -502,13 +1025,38 @@ public final class TelegramRepository {
                     if (textCallback != null) textCallback.onDelivered();
                 }
             } else if (message.content instanceof TdApi.MessageVoiceNote) {
-                String path = pendingRecordings.take(pending);
-                if (path != null) {
+                PendingDispatch durable = pendingDispatches.findByMessage(pending).orElse(null);
+                if (durable != null) {
+                    String path = durable.absolutePath();
+                    if (!pendingDispatches.markCompleted(pending, false)) {
+                        status(R.string.repo_completion_persistence_failed_retained, path);
+                        return;
+                    }
+                    // Cleanup only; durable dispatch state above owns the V7 truth.
+                    pendingRecordings.take(pending);
                     File recording = new File(path);
-                    if (!recording.exists() || recording.delete()) {
-                        status(R.string.repo_send_complete_deleted);
+                    boolean deleted = !recording.exists() || recording.delete();
+                    if (deleted) {
+                        if (pendingDispatches.markFileDeleted(durable.dispatchId())) {
+                            status(R.string.repo_send_complete_deleted);
+                        } else {
+                            status(R.string.repo_send_complete_deleted_state_pending, path);
+                        }
                     } else {
                         status(R.string.repo_send_complete_delete_failed, path);
+                    }
+                    return;
+                }
+
+                // Backward compatibility for pre-dispatch-store pending mappings.
+                String legacyPath = pendingRecordings.take(pending);
+                if (legacyPath != null) {
+                    File recording = new File(legacyPath);
+                    boolean deleted = !recording.exists() || recording.delete();
+                    if (deleted) {
+                        status(R.string.repo_send_complete_deleted);
+                    } else {
+                        status(R.string.repo_send_complete_delete_failed, legacyPath);
                     }
                 }
             }
@@ -528,13 +1076,28 @@ public final class TelegramRepository {
                     if (textCallback != null) textCallback.onRejected(reason);
                 }
             } else if (message.content instanceof TdApi.MessageVoiceNote) {
-                String path = pendingRecordings.take(pending);
-                if (path == null) {
+                PendingDispatch durable = pendingDispatches.findByMessage(pending).orElse(null);
+                String path = durable == null
+                        ? pendingRecordings.get(pending) : durable.absolutePath();
+                boolean canRetry = false;
+                int retryAfterSeconds = 0;
+                if (message.sendingState instanceof TdApi.MessageSendingStateFailed failed) {
+                    canRetry = failed.canRetry;
+                    retryAfterSeconds = (int) Math.max(0, Math.ceil(failed.retryAfter));
+                }
+                int errorCode = update.error != null ? update.error.code : -1;
+                String errorMessage = update.error != null ? update.error.message : "";
+                boolean failureSaved = pendingDispatches.markFailed(
+                        pending, errorCode, errorMessage, canRetry, retryAfterSeconds);
+                if (durable != null && !failureSaved) {
+                    status(R.string.repo_failure_persistence_failed_retained,
+                            path, errorCode, errorMessage);
+                } else if (path == null) {
                     status(R.string.repo_send_failed_no_path,
-                            update.error.code, update.error.message);
+                            errorCode, errorMessage);
                 } else {
                     status(R.string.repo_send_failed_retained,
-                            update.error.code, update.error.message, path);
+                            errorCode, errorMessage, path);
                 }
             }
         }
@@ -560,6 +1123,12 @@ public final class TelegramRepository {
             stage(AuthStage.PASSWORD);
             status(R.string.repo_enter_password);
         } else if (state instanceof TdApi.AuthorizationStateReady) {
+            synchronized (configurationLock) {
+                accountUserId = 0L;
+                accountName = null;
+                accountState = AccountState.NOT_AUTHENTICATED;
+                destinationResolver.cancelCurrent();
+            }
             stage(AuthStage.READY);
             loadCurrentAccount();
             if (target == null) {
@@ -573,7 +1142,12 @@ public final class TelegramRepository {
             status(R.string.repo_closing_session);
         } else if (state instanceof TdApi.AuthorizationStateClosed) {
             synchronized (clientLock) { client = null; }
-            accountState = AccountState.CLOSED;
+            synchronized (configurationLock) {
+                accountUserId = 0L;
+                accountName = null;
+                accountState = AccountState.CLOSED;
+                destinationResolver.cancelCurrent();
+            }
             notifyAccountChanged();
             stage(AuthStage.CLOSED);
             if (restartAfterClose) {
@@ -589,13 +1163,20 @@ public final class TelegramRepository {
     }
 
     private void loadCurrentAccount() {
-        requireClient().send(new TdApi.GetMe(), result -> {
+        Client expectedClient = requireClient();
+        expectedClient.send(new TdApi.GetMe(), result -> {
             if (!(result instanceof TdApi.User)) return;
             TdApi.User user = (TdApi.User) result;
             String name = (user.firstName + " " + user.lastName).trim();
-            accountName = name;
-            accountUserId = user.id;
-            accountState = AccountState.USER;
+            synchronized (configurationLock) {
+                if (client != expectedClient || authStage != AuthStage.READY) return;
+                if (accountUserId > 0L && accountUserId != user.id) {
+                    destinationResolver.cancelCurrent();
+                }
+                accountName = name;
+                accountUserId = user.id;
+                accountState = AccountState.USER;
+            }
             notifyAccountChanged();
         });
     }
@@ -680,6 +1261,20 @@ public final class TelegramRepository {
         }
     }
 
+    private void notifyDestinationCatalogChanged(DestinationCatalog catalog) {
+        synchronized (stateDeliveryLock) {
+            for (Listener listener : listeners) listener.onDestinationCatalogChanged(catalog);
+        }
+    }
+
+    private void notifyDestinationVerificationPreview(DestinationVerificationPreview preview) {
+        synchronized (stateDeliveryLock) {
+            for (Listener listener : listeners) {
+                listener.onDestinationVerificationPreview(preview);
+            }
+        }
+    }
+
     private String text(int resourceId, Object... arguments) {
         return LocalizedStrings.get(context, resourceId, arguments);
     }
@@ -692,6 +1287,8 @@ public final class TelegramRepository {
         synchronized (configurationLock) {
             if (authStage == AuthStage.READY && next != AuthStage.READY) {
                 targetResolutionGeneration++;
+                destinationResolver.cancelCurrent();
+                pendingDestinationPreview = null;
             }
             authStage = next;
         }
@@ -736,7 +1333,15 @@ public final class TelegramRepository {
                 || resourceId == R.string.repo_database_folder_failed
                 || resourceId == R.string.repo_files_folder_failed
                 || resourceId == R.string.repo_error_format
-                || resourceId == R.string.repo_restart_failed;
+                || resourceId == R.string.repo_restart_failed
+                || resourceId == R.string.repo_destination_account_required
+                || resourceId == R.string.repo_destination_identity_incomplete
+                || resourceId == R.string.repo_destination_canonical_username_missing
+                || resourceId == R.string.repo_destination_missing
+                || resourceId == R.string.repo_destination_duplicate
+                || resourceId == R.string.repo_destination_identity_changed
+                || resourceId == R.string.repo_destination_search_failed
+                || resourceId == R.string.repo_destination_user_lookup_failed;
     }
 
 }

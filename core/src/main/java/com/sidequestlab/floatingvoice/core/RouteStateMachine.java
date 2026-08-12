@@ -26,9 +26,10 @@ public final class RouteStateMachine {
             throw new IllegalArgumentException("authenticatedAccountUserId must be positive");
         }
         this.authenticatedAccountUserId = authenticatedAccountUserId;
-        this.catalog = Objects.requireNonNull(catalog, "catalog")
-                .withDefault(Objects.requireNonNull(defaultLocalId, "defaultLocalId"),
-                        authenticatedAccountUserId);
+        DestinationCatalog supplied = Objects.requireNonNull(catalog, "catalog");
+        this.catalog = defaultLocalId == null
+                ? new DestinationCatalog(supplied.destinations())
+                : supplied.withDefault(defaultLocalId, authenticatedAccountUserId);
     }
 
     public synchronized Phase phase() {

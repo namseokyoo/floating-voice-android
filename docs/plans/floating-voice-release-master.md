@@ -2,11 +2,11 @@
 
 > **For Hermes:** 이 문서는 재시작 후에도 유지되는 단일 릴리즈 로드맵이다. 한 번에 한 버전만 구현하고, 각 버전의 선행검증·구현·실기기·릴리즈 게이트가 모두 통과한 뒤 사용자 승인으로 다음 버전으로 이동한다.
 
-**기준 시각:** 2026-08-11 23:46 KST<br>
+**기준 시각:** 2026-08-12 05:48 KST<br>
 **현재 안정 기준선:** `v0.6.4` (`808e7942e618e2aaaf3527b27d89bac9256e2601`)<br>
-**current_stage:** `V7-03-DEVICE-PASS / NEXT=V7-04`<br>
-**status:** `v7_03_device_pass` — V7-01 `f1d45e4`, V7-02 `1d0be62`는 로컬 커밋 완료; V7-03은 자동 회귀·독립 follow-up review와 공식 서명 내부 APK의 사용자 A52s 실제 Telegram 전송 검증 PASS<br>
-**구현 상태:** v0.5.0 인터랙션 기반, v0.6.0 Quiet Recorder, v0.6.1 플로팅 스타일·safe area, v0.6.2 Telegram 세션 유지 대상 변경, v0.6.3 개별 설정 페이지, v0.6.4 연결정보 인라인·톱니 anchored PopupMenu까지 완료. v0.6.4는 tests 110/fail 0, lint 오류 0, 공식 인증서·v2/v3·ZIP/ELF 16KB 검증과 local/origin/GitHub 일치를 통과함. V7-01은 legacy account/target pure migration model을 커밋 `f1d45e4`로 고정함. V7-02는 destination/catalog/scope/route state machine/dispatch snapshot과 default·next-one·current-recording·FREEZING·no-fallback 계약을 TDD로 구현함. latest catalog identity/revision revalidation, route-attempt-bound completion/abort, scalar-only snapshot, local-ID 재바인딩 차단까지 보완했으며 전체 tests 140/fail 0, lint 오류 0, debug/release assembly와 독립 follow-up review Blocker/High 0을 통과함. 실제 Android 저장소·UI 연결은 건드리지 않음. V7-03은 versioned catalog codec, Android Keystore 암호화 AtomicFile, copy→validate→persist→read-back→publish, raw V7-01 migration, schema marker, backup-only/corrupt recovery, legacy·pending 보존을 구현함. 최종 clean tests 188/fail 0, lint 오류 0, debug/release assembly와 독립 follow-up review Blocker/High 0을 통과함. 공식 서명 내부 APK `r1`은 기존 앱 위 설치·실제 Telegram 전송 후 형의 “이 메시지를 받으면 테스트는 성공이야” 확인으로 A52s 실기기 PASS 처리함.
+**current_stage:** `V7-04-CODE-PASS / DEVICE-GATE-DEFERRED-TO-V7-06`<br>
+**status:** `v7_04_code_pass_device_gate_deferred_to_v7_06` — 여러 private bot 신원검증 구현, 전체 자동 회귀, Debug/Release Lint·assembly, adapter persist-zero/send-zero 테스트와 최종 독립 follow-up review PASS. 2026-08-12 사용자 결정에 따라 실제 private bot 2개 A52s add/reverify·무전송 검증은 V7-06 정식 목적지 UI 구현 뒤 수행하며, 검증용 APK는 Hermes가 전달하고 형이 A52s에서 직접 설치·조작한다. 현재 UI에 검증 경로가 없어 현 APK는 전달하지 않는다.<br>
+**구현 상태:** v0.5.0 인터랙션 기반, v0.6.0 Quiet Recorder, v0.6.1 플로팅 스타일·safe area, v0.6.2 Telegram 세션 유지 대상 변경, v0.6.3 개별 설정 페이지, v0.6.4 연결정보 인라인·톱니 anchored PopupMenu까지 완료. v0.6.4는 tests 110/fail 0, lint 오류 0, 공식 인증서·v2/v3·ZIP/ELF 16KB 검증과 local/origin/GitHub 일치를 통과함. V7-01은 legacy account/target pure migration model을 커밋 `f1d45e4`로 고정함. V7-02는 destination/catalog/scope/route state machine/dispatch snapshot과 default·next-one·current-recording·FREEZING·no-fallback 계약을 TDD로 구현함. latest catalog identity/revision revalidation, route-attempt-bound completion/abort, scalar-only snapshot, local-ID 재바인딩 차단까지 보완했으며 전체 tests 140/fail 0, lint 오류 0, debug/release assembly와 독립 follow-up review Blocker/High 0을 통과함. 실제 Android 저장소·UI 연결은 건드리지 않음. V7-03은 versioned catalog codec, Android Keystore 암호화 AtomicFile, copy→validate→persist→read-back→publish, raw V7-01 migration, schema marker, backup-only/corrupt recovery, legacy·pending 보존을 구현함. 최종 clean tests 188/fail 0, lint 오류 0, debug/release assembly와 독립 follow-up review Blocker/High 0을 통과함. 공식 서명 내부 APK `r1`은 기존 앱 위 설치·실제 Telegram 전송 후 형의 “이 메시지를 받으면 테스트는 성공이야” 확인으로 A52s 실기기 PASS 처리함. V7-04는 request token, expected client/account, private-chat·bot·canonical ID 검증, duplicate/identity-change 차단, account 전환·저장 race 직렬화, disabled-state 보존, TDLib lookup adapter를 구현함. 최종 core 138 + app 42 = 고유 tests 180/fail 0, Debug/Release Lint 오류 0, 양쪽 assembly·ZIP/ELF 16KB와 독립 review Blocker/High/Medium/Low 0을 통과함. 실제 봇 2개 A52s 게이트는 사용자 결정으로 V7-06 UI 뒤로 이월하고, Hermes의 기기 조작 없이 형이 전달받은 APK로 직접 검증함.
 
 ## 1. 목표와 제품 원칙
 
@@ -146,6 +146,8 @@ Telegram 음성 녹음과 STT 마이크 사용은 동시에 수행하지 않는�
 
 한 단계가 실패하면 같은 버전의 첫 미통과 게이트로 돌아간다. 미통과 상태에서 다음 버전을 병행 구현하지 않는다.
 
+`v0.7.0`부터 릴리즈 후보와 최종 릴리즈를 분리한다. RC는 공식 서명 APK로 실제 사용·복구 검증을 수행하는 단계이고, 최종 릴리즈는 승인된 RC와 동일한 소스를 기능 추가 없이 다시 clean build하여 산출물·업데이트 설치를 최종 확인하는 단계다. RC 이후 소스나 리소스가 바뀌면 기존 RC를 폐기하고 `versionCode`를 올린 RC2/RC3로 전체 회귀와 실기기 검증을 다시 수행한다. 최종 A52s PASS 전에는 tag와 GitHub Release를 만들지 않는다.
+
 ## 6. 공통 검증 명령
 
 프로젝트 루트에서 실행한다.
@@ -248,6 +250,7 @@ python3 ~/.hermes/skills/software-development/android-native-app-delivery/script
 | 2026-08-10 13:57 KST | V5-02 focusable overlay IME 경로 FAIL | 사용자 실기기에서 창은 보이나 어느 곳을 눌러도 입력 포커스와 키보드가 열리지 않음; Activity 폴백 승인 대기 |
 | 2026-08-10 | V5-02 translucent Activity 폴백 승인 | 일반 Activity 입력·IME 경로로 교체하고 overlay 입력 구현은 제품 경로에서 제거 |
 | 2026-08-10 14:22 KST | V5-02 Activity 폴백 사용자 실기기 PASS | 창 열림·텍스트 입력·창 닫힘 확인; Activity 방식을 제품 경로로 채택하고 V5-03은 승인 전 대기 |
+| 2026-08-12 | `v0.7.0`을 V7-00~V7-10의 11단계로 운영 | V7-09 공식 서명 RC의 실사용·복구 검증과 V7-10 기능 동결 최종 릴리즈를 분리하여 테스트한 APK와 배포 APK의 불일치를 방지 |
 
 ## 11. 단계 완료 보고 형식
 

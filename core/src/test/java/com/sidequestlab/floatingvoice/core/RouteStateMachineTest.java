@@ -8,6 +8,25 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class RouteStateMachineTest {
     @Test
+    void missingDefaultRequiresExplicitNextOneWithoutImplicitFallback() {
+        RouteStateMachine machine = machine(catalog(primary(), secondary()), null);
+
+        assertTrue(machine.startRecording().isEmpty());
+        assertTrue(machine.select(DestinationScope.NEXT_ONE, "secondary"));
+        assertEquals("secondary", machine.startRecording().orElseThrow().localId());
+    }
+
+    @Test
+    void nullDefaultExplicitlyClearsRestoredCatalogDefault() {
+        DestinationCatalog stored = catalog(primary(), secondary())
+                .withDefault("primary", 7L);
+        RouteStateMachine machine = machine(stored, null);
+
+        assertTrue(machine.defaultLocalId().isEmpty());
+        assertTrue(machine.startRecording().isEmpty());
+    }
+
+    @Test
     void defaultChangeDuringRecordingAppliesOnlyToFutureRecording() {
         RouteStateMachine machine = machine(catalog(primary(), secondary()), "primary");
 
@@ -15,6 +34,19 @@ class RouteStateMachineTest {
         assertTrue(machine.select(DestinationScope.DEFAULT, "secondary"));
         assertEquals("primary", machine.currentDestination().orElseThrow().localId());
 
+        assertTrue(machine.cancelRecording());
+        assertEquals("secondary", machine.startRecording().orElseThrow().localId());
+    }
+
+    @Test
+    void idleDefaultSelectionPersistsAcrossRecordingsWithoutCreatingNextOne() {
+        RouteStateMachine machine = machine(catalog(primary(), secondary()), "primary");
+
+        assertTrue(machine.select(DestinationScope.DEFAULT, "secondary"));
+        assertEquals("secondary", machine.defaultLocalId().orElseThrow());
+        assertTrue(machine.nextOneLocalId().isEmpty());
+
+        assertEquals("secondary", machine.startRecording().orElseThrow().localId());
         assertTrue(machine.cancelRecording());
         assertEquals("secondary", machine.startRecording().orElseThrow().localId());
     }

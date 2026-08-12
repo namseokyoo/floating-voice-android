@@ -8,6 +8,8 @@
 
 **Tech Stack:** Java 17, Android SDK 29–36, TDLib, Android Keystore-backed settings, private SharedPreferences dispatch metadata, AppCompat XML, JUnit 5.
 
+**현재 단계 상태 (2026-08-12 06:00 KST):** `V7-05-CODE-PASS / NEXT=V7-06`. `DestinationResolver`와 lookup adapter, account/client/request generation 검증, duplicate·identity-change·disabled-state·persist-zero/send-zero 계약을 구현했다. `PendingDispatch`/`DispatchState`/`PendingDispatchCodec`/`PendingDispatchStore`를 추가해 불변 dispatch snapshot과 durable FAILED/UNKNOWN retention을 구현했고, live TDLib spike는 이월되어 자동 재시도는 허용하지 않는다. 전체 회귀 PASS. 2026-08-12 사용자 결정에 따라 실제 private bot 2개 A52s 검증은 V7-06 정식 목적지 UI 뒤로 이월한다.
+
 **Non-goals:** 그룹·채널·토픽, 여러 방 동시 전송, 목적지 자동 추천, 다른 Telegram 계정 다중 로그인, 목적지 무효 시 자동 폴백, STT/로컬 archive/Android share.
 
 ---
@@ -63,7 +65,8 @@ Dispatch snapshot
 | V7-06 | main destination UI | 오삭제/기본 혼동 | labeled confirmation + pending 보존 |
 | V7-07 | overlay picker | next-one/session 혼동 | scope label/consume tests |
 | V7-08 | lifecycle/race hardening | process death/TDLib update | device race matrix 통과 |
-| V7-09 | release candidate | migration/서명/stale APK | update install + artifact gate |
+| V7-09 | 공식 서명 RC·실사용 검증 | migration/서명/stale APK/복구 실패 | update install + 집중 device matrix |
+| V7-10 | 기능 동결 최종 릴리즈 | 테스트 APK와 배포 APK 불일치 | clean build + 최종 A52s PASS + tag/release |
 
 ---
 
@@ -238,7 +241,7 @@ normalize username
 
 **완화:** request generation token + expected client/account/username 확인, canonical ID mismatch는 사용자 재승인 전 blocked 상태.
 
-**게이트:** fake/pure tests 통과 후 사용자 승인된 실제 private bot 2개를 add/reverify하고 어떤 메시지도 전송되지 않았음을 확인.
+**게이트:** fake/pure tests 통과 후 사용자 승인된 실제 private bot 2개를 add/reverify하고 어떤 메시지도 전송되지 않았음을 확인. **2026-08-12 결정:** 현재 단계에는 호출 가능한 정식 UI가 없으므로 실기기 게이트를 V7-06 UI 구현 뒤로 이월한다. V7-06 검증용 APK를 사용자에게 전달하고, 사용자가 A52s에서 직접 설치·조작해 PASS/FAIL을 회신한다.
 
 ---
 
@@ -423,7 +426,7 @@ normalize username
 5. migration failure fixture: legacy keys 보존
 6. same certificate update install
 
-**공통 clean build/artifact gate:** master plan의 R4–R7 수행.
+**공통 clean build/artifact gate:** master plan의 R4–R7 수행. 이 단계의 산출물은 공식 서명 RC이며 최종 GitHub Release가 아니다.
 
 **위험:** fixture migration이 통과해도 실제 설치된 Keystore/SharedPreferences/TDLib session 조합에서 legacy target이 유실되거나 잘못 `VERIFIED`될 수 있다.
 
@@ -437,11 +440,35 @@ normalize username
 - catalog UI를 disable해도 migrated default를 통해 단일 destination voice path 유지
 - pending dispatch schema downgrade는 지원한다고 가정하지 않음; rollback 전 backup/export 계획 필요
 
-**최종 게이트:** migration + wrong-room 0 + file retention + artifact + 사용자 release 승인.
+**RC 게이트:** migration + wrong-room 0 + file retention + artifact + 사용자 RC 승인. 실제 사용에서 문제가 발견되거나 소스·리소스가 바뀌면 기존 RC를 폐기하고 `versionCode`를 올린 RC2/RC3를 새로 빌드·서명해 전체 회귀와 A52s 검증을 반복한다.
 
 ---
 
-## 13. 증거 구조
+## 13. V7-10 — 기능 동결 최종 릴리즈
+
+**선행조건:**
+
+- 마지막 RC가 A52s 집중 matrix를 통과하고 사용자에게 최종 후보로 승인됨
+- RC 이후 코드·리소스·빌드 설정 변경 0
+- 열려 있는 P0/P1, 데이터 유실, 오전송, 자격정보 노출 결함 0
+
+**수행 범위:**
+
+1. 승인된 RC 소스 commit과 worktree 일치 확인
+2. 기능 추가 없이 clean test/lint/release build
+3. 공식 인증서, v2/v3, package/version, arm64 ABI, ZIP/ELF 16KB 정렬, secret scan 확인
+4. RC와 동일 인증서로 기존 A52s 앱 위 update install
+5. 기본·다음 1회·이번 녹음·재시도 경로 최종 A52s PASS
+6. APK mtime/size/SHA-256과 소스 commit을 최종 provenance에 고정
+7. 별도 사용자 승인 후에만 tag와 GitHub Release 생성
+
+**불변 조건:** 최종 build 뒤 어떤 소스나 리소스라도 바뀌면 V7-10을 계속하지 않고 V7-09 새 RC로 되돌아간다. 테스트하지 않은 APK를 같은 버전명으로 교체하지 않는다.
+
+**최종 게이트:** clean build + artifact 검증 + update install + 최종 A52s PASS + 사용자 release 승인. 모두 통과하기 전에는 tag/GitHub Release 미생성.
+
+---
+
+## 14. 증거 구조
 
 ```text
 .hermes/evidence/v0.7.0/
@@ -452,5 +479,6 @@ normalize username
   dispatch-recovery.md
   overlay-scope-matrix.md
   device-race-matrix.md
-  artifact-provenance.md
+  rc-artifact-provenance.md
+  final-artifact-provenance.md
 ```

@@ -32,11 +32,16 @@ import android.view.WindowManager;
 import androidx.core.content.ContextCompat;
 
 import com.sidequestlab.floatingvoice.core.AnchoredPanelPlacement;
+import com.sidequestlab.floatingvoice.core.Destination;
+import com.sidequestlab.floatingvoice.core.DestinationCatalog;
+import com.sidequestlab.floatingvoice.core.DestinationScope;
+import com.sidequestlab.floatingvoice.core.DispatchTargetSnapshot;
 import com.sidequestlab.floatingvoice.core.GestureClassifier;
 import com.sidequestlab.floatingvoice.core.OverlayColorPreset;
 import com.sidequestlab.floatingvoice.core.OverlayEvent;
 import com.sidequestlab.floatingvoice.core.OverlayReflowPolicy;
 import com.sidequestlab.floatingvoice.core.OverlayStateMachine;
+import com.sidequestlab.floatingvoice.core.RouteStateMachine;
 
 import java.io.File;
 import java.time.Instant;
@@ -55,7 +60,15 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
             "com.sidequestlab.floatingvoice.COMPOSER_CLOSED";
     public static final String ACTION_COMPOSER_SUBMIT =
             "com.sidequestlab.floatingvoice.COMPOSER_SUBMIT";
+    public static final String ACTION_DESTINATION_PICKED =
+            "com.sidequestlab.floatingvoice.DESTINATION_PICKED";
+    public static final String ACTION_DESTINATION_PICKER_CLOSED =
+            "com.sidequestlab.floatingvoice.DESTINATION_PICKER_CLOSED";
     public static final String EXTRA_COMPOSER_TEXT = "composer_text";
+    public static final String EXTRA_DESTINATION_PICKER_REQUEST_ID =
+            "destination_picker_request_id";
+    public static final String EXTRA_DESTINATION_SCOPE = "destination_scope";
+    public static final String EXTRA_DESTINATION_LOCAL_ID = "destination_local_id";
     static final int COMPOSER_SUBMIT_REJECTED = 0;
     static final int COMPOSER_SUBMIT_ACCEPTED = 1;
     private static final int NOTIFICATION_ID = 41;
@@ -63,6 +76,8 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
     private static final int TOUCH_MOVEMENT_THRESHOLD_DP = 12;
     private static final long TOUCH_LONG_PRESS_THRESHOLD_MS = 600L;
     private static final long PREREQUISITE_CHECK_MS = 1_000L;
+    private static final long PICKER_RESTORE_INPUT_SUPPRESSION_MS = 300L;
+    private static final long ACCOUNT_ROUTE_GRACE_MS = 5_000L;
 
     private final OverlayStateMachine overlayStateMachine = new OverlayStateMachine();
     private final RecordingCancelOperation cancelOperation = new RecordingCancelOperation();
@@ -82,12 +97,18 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
     private MediaRecorder recorder;
     private File activeRecording;
     private File readyVoiceRecording;
+    private DispatchTargetSnapshot readyVoiceTarget;
     private int readyVoiceDuration;
     private long readyVoiceAttemptId;
     private String readyText;
     private long readyTextAttemptId;
     private long recordingStartedAt;
     private TelegramRepository telegram;
+    private volatile RouteStateMachine routeStateMachine;
+    private long destinationPickerRequestId;
+    private DestinationScope pendingDestinationScope;
+    private boolean destinationPickerOpen;
+    private long accountRouteGraceDeadline;
     private String notificationText;
     private int notificationResourceId = R.string.notification_ready;
     private Object[] notificationArguments = new Object[0];
@@ -112,6 +133,7 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
             mainHandler.postDelayed(prerequisiteMonitor, PREREQUISITE_CHECK_MS);
         };
         telegram = ((FloatingVoiceApp) getApplication()).telegram();
+        initializeRouteState(telegram.destinationCatalog());
         telegram.addListener(this);
         overlayUiPreferences = new OverlayUiPreferences(this);
         currentFabSizePx = dp(overlayUiPreferences.sizePreset().sizeDp());
@@ -137,6 +159,14 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
         composerClosedReceiver = new BroadcastReceiver() {
             @Override public void onReceive(Context context, Intent intent) {
                 if (intent == null || isTearingDown()) return;
+                if (ACTION_DESTINATION_PICKED.equals(intent.getAction())) {
+                    handleDestinationPicked(intent);
+                    return;
+                }
+                if (ACTION_DESTINATION_PICKER_CLOSED.equals(intent.getAction())) {
+                    handleDestinationPickerClosed(intent);
+                    return;
+                }
                 if (ACTION_COMPOSER_SUBMIT.equals(intent.getAction())) {
                     String text = intent.getStringExtra(EXTRA_COMPOSER_TEXT);
                     if (overlayStateMachine.state() == OverlayStateMachine.State.TEXT_COMPOSING
@@ -159,6 +189,8 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
         };
         IntentFilter composerFilter = new IntentFilter(ACTION_COMPOSER_CLOSED);
         composerFilter.addAction(ACTION_COMPOSER_SUBMIT);
+        composerFilter.addAction(ACTION_DESTINATION_PICKED);
+        composerFilter.addAction(ACTION_DESTINATION_PICKER_CLOSED);
         ContextCompat.registerReceiver(this, composerClosedReceiver, composerFilter,
                 ContextCompat.RECEIVER_NOT_EXPORTED);
         createNotificationChannel();
@@ -250,16 +282,44 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
         boolean notification = Build.VERSION.SDK_INT < 33
                 || checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)
                 == android.content.pm.PackageManager.PERMISSION_GRANTED;
+        boolean authenticated = telegram != null
+                && telegram.authStage() == TelegramRepository.AuthStage.READY;
+        boolean routeReady = routeStateMachine != null;
+        boolean accountStillResolving = authenticated && telegram.authenticatedAccountUserId() == 0L
+                && SystemClock.uptimeMillis() <= accountRouteGraceDeadline;
         return microphone && notification && Settings.canDrawOverlays(this)
-                && telegram != null && telegram.isReadyWithTarget();
+                && authenticated && (routeReady || accountStillResolving);
     }
 
     @Override public void onAuthStage(TelegramRepository.AuthStage stage) {
+        if (stage == TelegramRepository.AuthStage.READY && routeStateMachine == null) {
+            accountRouteGraceDeadline = SystemClock.uptimeMillis() + ACCOUNT_ROUTE_GRACE_MS;
+            initializeRouteState(telegram.destinationCatalog());
+        }
         if (running && stage != TelegramRepository.AuthStage.READY) stopSelf();
     }
 
+    @Override public void onAccountChanged(String account) {
+        if (routeStateMachine == null) initializeRouteState(telegram.destinationCatalog());
+    }
+
     @Override public void onTargetChanged(TargetChat target) {
-        if (running && target == null) stopSelf();
+        // Legacy single-target changes do not own V7 routing.
+    }
+
+    @Override public void onDestinationCatalogChanged(DestinationCatalog catalog) {
+        RouteStateMachine current = routeStateMachine;
+        if (current == null) {
+            initializeRouteState(catalog);
+            return;
+        }
+        try {
+            current.replaceCatalog(catalog);
+            updateDestinationChip();
+        } catch (IllegalArgumentException unsafeRebind) {
+            updateState(R.string.destination_selection_rejected);
+            stopSelf();
+        }
     }
 
     @SuppressLint("RtlHardcoded") // x/y are physical display coordinates, not logical start/end.
@@ -274,12 +334,23 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
         overlayViewController = new FloatingOverlayViewController(
                 this, new FloatingOverlayViewController.Listener() {
             @Override public void onStopAndSend() {
-                if (!isTearingDown()) dispatchOverlayEvent(OverlayEvent.TAP);
+                if (!isTearingDown()
+                        && !terminalInputGate.shouldSuppress(SystemClock.uptimeMillis())) {
+                    dispatchOverlayEvent(OverlayEvent.TAP);
+                }
             }
 
             @Override public void onCancel() {
-                if (!isTearingDown()) {
+                if (!isTearingDown()
+                        && !terminalInputGate.shouldSuppress(SystemClock.uptimeMillis())) {
                     dispatchOverlayEvent(OverlayEvent.CANCEL_VOICE_REQUESTED);
+                }
+            }
+
+            @Override public void onChooseDestination() {
+                if (!isTearingDown()
+                        && !terminalInputGate.shouldSuppress(SystemClock.uptimeMillis())) {
+                    openDestinationPicker(DestinationScope.CURRENT_RECORDING);
                 }
             }
         });
@@ -289,6 +360,12 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
                 // The reducer closes the palette, opens the transient composer, and keeps
                 // Telegram transport ownership in this service.
                 dispatchOverlayEvent(OverlayEvent.COMPOSE_TEXT);
+            }
+
+            @Override public void onChooseDestination() {
+                if (isTearingDown()) return;
+                dispatchOverlayEvent(OverlayEvent.GESTURE_CANCELED);
+                openDestinationPicker(DestinationScope.DEFAULT);
             }
 
             @Override public void onDismissRequested() {
@@ -357,9 +434,18 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
     }
 
     private void startRecording() {
+        RouteStateMachine route = routeStateMachine;
+        Destination selectedDestination = route == null
+                ? null : route.startRecording().orElse(null);
+        if (selectedDestination == null) {
+            dispatchOverlayEvent(OverlayEvent.VOICE_START_FAILED);
+            updateState(R.string.destination_required_before_recording);
+            return;
+        }
         File externalMusic = getExternalFilesDir(Environment.DIRECTORY_MUSIC);
         File root = new File(externalMusic == null ? getFilesDir() : externalMusic, "voice_notes");
         if (!root.mkdirs() && !root.isDirectory()) {
+            route.cancelRecording();
             dispatchOverlayEvent(OverlayEvent.VOICE_START_FAILED);
             updateState(R.string.recording_folder_failed);
             return;
@@ -383,14 +469,25 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
                 try { next.release(); } catch (RuntimeException ignored) { }
             }
             recorder = null;
+            route.cancelRecording();
+            File failedRecording = activeRecording;
+            activeRecording = null;
+            boolean cleaned = failedRecording == null
+                    || !failedRecording.exists() || failedRecording.delete();
             dispatchOverlayEvent(OverlayEvent.VOICE_START_FAILED);
-            updateState(R.string.recording_start_failed, e.getMessage());
+            if (cleaned) {
+                updateState(R.string.recording_start_failed, e.getMessage());
+            } else {
+                updateState(R.string.recording_start_failed_retained,
+                        e.getMessage(), failedRecording.getAbsolutePath());
+            }
             return;
         }
 
         recorder = next;
         recordingStartedAt = SystemClock.elapsedRealtime();
         dispatchOverlayEvent(OverlayEvent.VOICE_START_SUCCEEDED);
+        updateDestinationChip();
         boolean dockShown = showRecordingDock();
         if (isRecordingState()) {
             updateState(dockShown
@@ -403,6 +500,9 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
         hideActionMenu();
         terminalInputGate.suppressTouchesThrough(
                 SystemClock.uptimeMillis() + TERMINAL_INPUT_SUPPRESSION_MS);
+        RouteStateMachine route = routeStateMachine;
+        boolean routeFreezing = route != null && route.beginFreezing();
+        long routeAttemptId = route == null ? 0L : route.routeAttemptId();
         MediaRecorder current = recorder;
         recorder = null;
         int duration = (int) Math.max(1,
@@ -415,12 +515,28 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
             if (current != null) {
                 try { current.release(); } catch (RuntimeException ignored) { }
             }
+            if (routeFreezing) route.abortFreezing(routeAttemptId);
             dispatchOverlayEvent(OverlayEvent.VOICE_STOP_FAILED);
             updateIdleBubble();
             updateState(R.string.recording_stop_failed_retained, activeRecording);
             return;
         }
+
+        DispatchTargetSnapshot frozen = routeFreezing
+                ? route.freeze().orElse(null) : null;
+        if (frozen == null) {
+            if (routeFreezing) route.abortFreezing(routeAttemptId);
+            File retained = activeRecording;
+            activeRecording = null;
+            dispatchOverlayEvent(OverlayEvent.VOICE_STOP_FAILED);
+            updateIdleBubble();
+            updateState(R.string.destination_invalid_recording_retained,
+                    retained == null ? "" : retained.getAbsolutePath());
+            return;
+        }
+
         readyVoiceRecording = activeRecording;
+        readyVoiceTarget = frozen;
         readyVoiceDuration = duration;
         readyVoiceAttemptId = overlayStateMachine.attemptId();
         activeRecording = null;
@@ -436,6 +552,8 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
         recorder = null;
         File canceledRecording = activeRecording;
         activeRecording = null;
+        RouteStateMachine route = routeStateMachine;
+        if (route != null) route.cancelRecording();
 
         RecordingCancelOperation.Result result = cancelOperation.execute(
                 recorderPort(current), canceledRecording, filePort());
@@ -502,7 +620,7 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
         int dockWidth = px(R.dimen.overlay_dock_width);
         int dockHeight = px(R.dimen.overlay_dock_height);
         int stopSize = px(R.dimen.overlay_stop_size);
-        int dockPadding = dp(8);
+        int dockPadding = dp(4);
         layoutParams.width = dockWidth;
         layoutParams.height = dockHeight;
         Rect display = currentDisplayBounds();
@@ -579,6 +697,7 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
 
     private void showActionMenu() {
         if (actionMenuController == null || layoutParams == null) return;
+        actionMenuController.setDestinationSummary(idleDestinationSummary());
         Rect display = currentDisplayBounds();
         int panelWidth = px(R.dimen.overlay_palette_width);
         int panelHeight = px(R.dimen.overlay_palette_height);
@@ -620,6 +739,162 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
             dispatchOverlayEvent(OverlayEvent.CLOSE_COMPOSER);
             restorePrimaryOverlay();
         }
+    }
+
+    private synchronized void initializeRouteState(DestinationCatalog catalog) {
+        if (routeStateMachine != null || telegram == null || catalog == null) return;
+        long accountUserId = telegram.authenticatedAccountUserId();
+        if (accountUserId <= 0L) {
+            if (accountRouteGraceDeadline == 0L) {
+                accountRouteGraceDeadline = SystemClock.uptimeMillis() + ACCOUNT_ROUTE_GRACE_MS;
+            }
+            return;
+        }
+        String defaultLocalId = catalog.defaultLocalId()
+                .filter(localId -> catalog.selectable(localId, accountUserId).isPresent())
+                .orElse(null);
+        try {
+            routeStateMachine = new RouteStateMachine(
+                    accountUserId, catalog, defaultLocalId);
+            accountRouteGraceDeadline = 0L;
+        } catch (IllegalArgumentException invalidCatalog) {
+            routeStateMachine = null;
+        }
+    }
+
+    private void openDestinationPicker(DestinationScope scope) {
+        RouteStateMachine route = routeStateMachine;
+        if (route == null || destinationPickerOpen) return;
+        boolean phaseAllowed = (scope == DestinationScope.DEFAULT
+                || scope == DestinationScope.NEXT_ONE)
+                ? route.phase() == RouteStateMachine.Phase.IDLE
+                : scope == DestinationScope.CURRENT_RECORDING
+                && route.phase() == RouteStateMachine.Phase.RECORDING;
+        if (!phaseAllowed) {
+            updateState(R.string.destination_selection_rejected);
+            return;
+        }
+
+        String selectedLocalId = scope == DestinationScope.CURRENT_RECORDING
+                ? route.currentDestination().map(Destination::localId).orElse(null)
+                : scope == DestinationScope.DEFAULT
+                ? route.defaultLocalId().orElse(null)
+                : route.nextOneLocalId().orElseGet(
+                        () -> route.defaultLocalId().orElse(null));
+        long requestId = ++destinationPickerRequestId;
+        pendingDestinationScope = scope;
+        destinationPickerOpen = true;
+        terminalInputGate.suppressTouchesThrough(
+                SystemClock.uptimeMillis() + TERMINAL_INPUT_SUPPRESSION_MS);
+        hideActionMenu();
+        if (primaryOverlay != null) primaryOverlay.setVisibility(View.INVISIBLE);
+
+        Intent picker = new Intent(this, DestinationPickerActivity.class)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK
+                        | Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS
+                        | Intent.FLAG_ACTIVITY_NO_HISTORY
+                        | Intent.FLAG_ACTIVITY_NO_ANIMATION)
+                .putExtra(EXTRA_DESTINATION_PICKER_REQUEST_ID, requestId)
+                .putExtra(EXTRA_DESTINATION_SCOPE, scope.name());
+        if (selectedLocalId != null) {
+            picker.putExtra(EXTRA_DESTINATION_LOCAL_ID, selectedLocalId);
+        }
+        try {
+            startActivity(picker);
+        } catch (RuntimeException launchFailure) {
+            destinationPickerOpen = false;
+            pendingDestinationScope = null;
+            restoreAfterDestinationPicker();
+            updateState(R.string.destination_selection_rejected);
+        }
+    }
+
+    private void handleDestinationPicked(Intent intent) {
+        long requestId = intent.getLongExtra(EXTRA_DESTINATION_PICKER_REQUEST_ID, 0L);
+        if (!destinationPickerOpen || requestId != destinationPickerRequestId) return;
+        String localId = intent.getStringExtra(EXTRA_DESTINATION_LOCAL_ID);
+        DestinationScope scope = pendingDestinationScope;
+        destinationPickerOpen = false;
+        pendingDestinationScope = null;
+
+        RouteStateMachine route = routeStateMachine;
+        boolean accepted = false;
+        if (route != null && scope != null && localId != null) {
+            if (scope == DestinationScope.DEFAULT) {
+                // Persist first. The repository publishes the updated catalog back to this
+                // service; an in-memory-only default must never outlive a failed store write.
+                accepted = telegram.setDefaultDestination(localId)
+                        && route.select(DestinationScope.DEFAULT, localId);
+            } else {
+                accepted = route.select(scope, localId);
+            }
+        }
+        restoreAfterDestinationPicker();
+        if (!accepted) {
+            updateState(R.string.destination_selection_rejected);
+            return;
+        }
+        updateDestinationChip();
+        updateState(scope == DestinationScope.DEFAULT
+                        ? R.string.destination_default_selection_saved
+                        : R.string.destination_selection_saved,
+                destinationLabel(localId));
+    }
+
+    private void handleDestinationPickerClosed(Intent intent) {
+        long requestId = intent.getLongExtra(EXTRA_DESTINATION_PICKER_REQUEST_ID, 0L);
+        if (!destinationPickerOpen || requestId != destinationPickerRequestId) return;
+        destinationPickerOpen = false;
+        pendingDestinationScope = null;
+        restoreAfterDestinationPicker();
+    }
+
+    private void restoreAfterDestinationPicker() {
+        View currentOverlay = primaryOverlay;
+        if (currentOverlay == null || isTearingDown()) return;
+        terminalInputGate.suppressTouchesThrough(SystemClock.uptimeMillis()
+                + PICKER_RESTORE_INPUT_SUPPRESSION_MS);
+        currentOverlay.setVisibility(View.VISIBLE);
+        if (isRecordingState()) showRecordingDock(false);
+        else showIdleOverlay();
+    }
+
+    private void updateDestinationChip() {
+        RouteStateMachine route = routeStateMachine;
+        View currentOverlay = primaryOverlay;
+        if (route == null || currentOverlay == null) return;
+        Destination current = route.currentDestination().orElse(null);
+        if (current == null) return;
+        String chip = text(R.string.destination_chip_current_recording,
+                destinationLabel(current.localId()));
+        currentOverlay.post(() -> {
+            if (primaryOverlay == currentOverlay && overlayViewController != null
+                    && !isTearingDown()) {
+                overlayViewController.setDestinationChip(chip);
+            }
+        });
+    }
+
+    private String destinationLabel(String localId) {
+        Destination destination = telegram.destinationCatalog().find(localId).orElse(null);
+        if (destination == null) return localId == null ? "" : localId;
+        if (!destination.userAlias().isBlank()) return destination.userAlias();
+        if (!destination.resolvedTitle().isBlank()) return destination.resolvedTitle();
+        return "@" + destination.resolvedUsername();
+    }
+
+    private String idleDestinationSummary() {
+        RouteStateMachine route = routeStateMachine;
+        if (route == null) return text(R.string.overlay_destination_action_supporting);
+        String next = route.nextOneLocalId().orElse(null);
+        if (next != null) {
+            return text(R.string.destination_chip_next_one, destinationLabel(next));
+        }
+        String fallback = route.defaultLocalId().orElse(null);
+        if (fallback != null) {
+            return text(R.string.destination_chip_default, destinationLabel(fallback));
+        }
+        return text(R.string.overlay_destination_no_default);
     }
 
     private void hidePrimaryOverlay() {
@@ -675,7 +950,7 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
             int dockWidth = px(R.dimen.overlay_dock_width);
             int dockHeight = px(R.dimen.overlay_dock_height);
             int stopSize = px(R.dimen.overlay_stop_size);
-            int dockPadding = dp(8);
+            int dockPadding = dp(4);
             int stopCenterOffset = recordingStopOnRight
                     ? dockWidth - dockPadding - stopSize / 2
                     : dockPadding + stopSize / 2;
@@ -735,24 +1010,38 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
 
     private void sendReadyVoice() {
         File completed = readyVoiceRecording;
+        DispatchTargetSnapshot target = readyVoiceTarget;
         int duration = readyVoiceDuration;
         long attemptId = readyVoiceAttemptId;
         readyVoiceRecording = null;
+        readyVoiceTarget = null;
         readyVoiceDuration = 0;
-        readyVoiceAttemptId = 0;
-        if (completed == null) return;
+        readyVoiceAttemptId = 0L;
+        if (completed == null || target == null) {
+            if (target != null) completeRoute(target);
+            dispatchOverlayEvent(OverlayEvent.VOICE_REJECTED, attemptId);
+            return;
+        }
 
-        telegram.sendVoiceNote(completed, duration, new TelegramRepository.SendCallback() {
+        telegram.sendVoiceNote(completed, duration, target,
+                new TelegramRepository.SendCallback() {
             @Override public void onQueued(long temporaryMessageId) {
+                completeRoute(target);
                 handleVoiceSendCallback(OverlayEvent.VOICE_QUEUED, attemptId,
                         () -> updateState(R.string.voice_queued_retained));
             }
 
             @Override public void onRejected(String reason) {
+                completeRoute(target);
                 handleVoiceSendCallback(OverlayEvent.VOICE_REJECTED, attemptId,
                         () -> updateState(reason));
             }
         });
+    }
+
+    private void completeRoute(DispatchTargetSnapshot target) {
+        RouteStateMachine route = routeStateMachine;
+        if (route != null) route.completeDispatch(target.routeAttemptId());
     }
 
     private void handleVoiceSendCallback(
@@ -956,8 +1245,8 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
                             int dockHeight = px(R.dimen.overlay_dock_height);
                             int stopSize = px(R.dimen.overlay_stop_size);
                             int stopOffset = recordingStopOnRight
-                                    ? dockWidth - dp(8) - stopSize / 2
-                                    : dp(8) + stopSize / 2;
+                                    ? dockWidth - dp(4) - stopSize / 2
+                                    : dp(4) + stopSize / 2;
                             minX = Math.max(display.left,
                                     display.left + margin + currentFabSizePx / 2 - stopOffset);
                             maxX = Math.min(display.right - layoutParams.width,

@@ -27,6 +27,11 @@ public final class PendingRecordingStore {
         return value;
     }
 
+    /** Peeks without consuming so failure updates never lose the retained file. */
+    public synchronized String get(PendingMessageKey message) {
+        return preferences.getString(key(message), null);
+    }
+
     /** Migrates v0.6.1's single-target keys before the Telegram client starts. */
     public synchronized void migrateLegacy(long chatId) {
         SharedPreferences.Editor editor = preferences.edit();

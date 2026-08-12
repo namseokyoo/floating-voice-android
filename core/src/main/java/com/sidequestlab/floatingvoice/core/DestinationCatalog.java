@@ -113,10 +113,53 @@ public final class DestinationCatalog {
         if (existing == null) {
             throw new IllegalArgumentException("destination is missing: " + localId);
         }
+        if (localId.equals(defaultLocalId)) {
+            throw new IllegalArgumentException(
+                    "default destination deletion requires an explicit recovery choice");
+        }
         List<Destination> updated = new ArrayList<>(destinations);
         updated.remove(existing);
-        return new DestinationCatalog(updated,
-                localId.equals(defaultLocalId) ? null : defaultLocalId);
+        return new DestinationCatalog(updated, defaultLocalId);
+    }
+
+    /** Atomically replaces the default and removes the previous default. */
+    public DestinationCatalog replacingDefaultAndRemoving(
+            String removedLocalId, String replacementLocalId,
+            long authenticatedAccountUserId) {
+        requireCurrentDefault(removedLocalId);
+        if (Objects.equals(removedLocalId, replacementLocalId)) {
+            throw new IllegalArgumentException("replacement must differ from removed destination");
+        }
+        if (selectable(replacementLocalId, authenticatedAccountUserId).isEmpty()) {
+            throw new IllegalArgumentException(
+                    "replacement default is not selectable: " + replacementLocalId);
+        }
+        List<Destination> updated = new ArrayList<>(destinations);
+        updated.remove(byLocalId.get(removedLocalId));
+        return new DestinationCatalog(updated, replacementLocalId);
+    }
+
+    /** Removes the default only when no selectable recovery destination exists. */
+    public DestinationCatalog withoutDefaultDestination(
+            String removedLocalId, long authenticatedAccountUserId) {
+        requireCurrentDefault(removedLocalId);
+        for (Destination destination : destinations) {
+            if (!destination.localId().equals(removedLocalId)
+                    && destination.selectableBy(authenticatedAccountUserId)) {
+                throw new IllegalArgumentException(
+                        "selectable replacement exists: " + destination.localId());
+            }
+        }
+        List<Destination> updated = new ArrayList<>(destinations);
+        updated.remove(byLocalId.get(removedLocalId));
+        return new DestinationCatalog(updated, null);
+    }
+
+    private void requireCurrentDefault(String localId) {
+        Objects.requireNonNull(localId, "localId");
+        if (!localId.equals(defaultLocalId) || !byLocalId.containsKey(localId)) {
+            throw new IllegalArgumentException("destination is not the current default: " + localId);
+        }
     }
 
     public DestinationCatalog reordered(List<String> orderedLocalIds) {

@@ -10,7 +10,7 @@ android {
         applicationId "com.sidequestlab.floatingvoice"
         minSdk 29
         targetSdk 36
-        versionCode 14
+        versionCode 17
         versionName "0.6.4"
 
         testInstrumentationRunner "android.app.Instrumentation"
@@ -23,7 +23,7 @@ android {
     buildTypes {
         debug {
             applicationIdSuffix ".debug"
-            versionNameSuffix "-connection-info-popup-device-test"
+            versionNameSuffix "-internal-themed-send-red-cancel-test"
         }
         release {
             minifyEnabled false

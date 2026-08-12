@@ -19,6 +19,7 @@ final class FloatingOverlayViewController {
     interface Listener {
         void onStopAndSend();
         void onCancel();
+        void onChooseDestination();
     }
 
     private static final long TIMER_REFRESH_MS = 250L;
@@ -31,9 +32,11 @@ final class FloatingOverlayViewController {
     private final LinearLayout recordingRow;
     private final View recordingDragRegion;
     private final View stopAndSend;
+    private final View chooseDestination;
     private final View cancel;
     private final TextView recordingStatus;
     private final TextView recordingTimer;
+    private final TextView destinationChip;
     private long recordingStartedAt;
     private boolean timerRunning;
     private boolean visualInitialized;
@@ -58,13 +61,16 @@ final class FloatingOverlayViewController {
         recordingRow = root.findViewById(R.id.overlay_recording_row);
         recordingDragRegion = root.findViewById(R.id.overlay_drag_region);
         stopAndSend = root.findViewById(R.id.overlay_stop_send);
+        chooseDestination = root.findViewById(R.id.overlay_recording_destination);
         cancel = root.findViewById(R.id.overlay_cancel);
         recordingStatus = root.findViewById(R.id.overlay_recording_status);
         recordingTimer = root.findViewById(R.id.overlay_recording_timer);
+        destinationChip = root.findViewById(R.id.overlay_destination_chip);
 
         idleAction.setClickable(false);
         idleAction.setFocusable(false);
         stopAndSend.setOnClickListener(view -> listener.onStopAndSend());
+        chooseDestination.setOnClickListener(view -> listener.onChooseDestination());
         cancel.setOnClickListener(view -> listener.onCancel());
         showIdle();
     }
@@ -84,9 +90,17 @@ final class FloatingOverlayViewController {
     }
 
     void setIdleColors(int backgroundColor, int foregroundColor) {
-        if (!(idleAction instanceof MaterialButton button)) return;
-        button.setBackgroundTintList(ColorStateList.valueOf(backgroundColor));
-        button.setIconTint(ColorStateList.valueOf(foregroundColor));
+        ColorStateList background = ColorStateList.valueOf(backgroundColor);
+        ColorStateList foreground = ColorStateList.valueOf(foregroundColor);
+        if (idleAction instanceof MaterialButton idleButton) {
+            idleButton.setBackgroundTintList(background);
+            idleButton.setIconTint(foreground);
+        }
+        if (stopAndSend instanceof MaterialButton sendButton) {
+            // Stop freezes the recording and sends it, so this is the primary themed action.
+            sendButton.setBackgroundTintList(background);
+            sendButton.setIconTint(foreground);
+        }
     }
 
     void setIdleClickListener(View.OnClickListener listener) {
@@ -146,6 +160,8 @@ final class FloatingOverlayViewController {
         recordingDragRegion.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_YES);
         root.setContentDescription(text(R.string.content_description_recording_dock));
         stopAndSend.setContentDescription(text(R.string.content_description_stop_and_send));
+        chooseDestination.setContentDescription(
+                text(R.string.content_description_change_recording_destination));
         cancel.setContentDescription(text(R.string.content_description_cancel_recording));
         recordingStatus.setText(text(R.string.overlay_recording_status));
         startTimer();
@@ -154,21 +170,30 @@ final class FloatingOverlayViewController {
     private void arrangeRecordingActions(boolean stopOnRight) {
         recordingRow.removeAllViews();
         if (stopOnRight) {
-            recordingRow.addView(cancel);
             recordingRow.addView(recordingDragRegion);
+            recordingRow.addView(chooseDestination);
+            recordingRow.addView(cancel);
             recordingRow.addView(stopAndSend);
         } else {
             recordingRow.addView(stopAndSend);
-            recordingRow.addView(recordingDragRegion);
             recordingRow.addView(cancel);
+            recordingRow.addView(chooseDestination);
+            recordingRow.addView(recordingDragRegion);
         }
-        // Semantic order stays constant even when physical order mirrors at the opposite edge.
+        // Keep the three actions adjacent at the original bubble edge. The compact timer and
+        // destination summary occupy the inward side of the dock.
         stopAndSend.setAccessibilityTraversalAfter(View.NO_ID);
-        stopAndSend.setAccessibilityTraversalBefore(recordingDragRegion.getId());
-        recordingDragRegion.setAccessibilityTraversalAfter(stopAndSend.getId());
-        recordingDragRegion.setAccessibilityTraversalBefore(cancel.getId());
-        cancel.setAccessibilityTraversalAfter(recordingDragRegion.getId());
-        cancel.setAccessibilityTraversalBefore(View.NO_ID);
+        stopAndSend.setAccessibilityTraversalBefore(cancel.getId());
+        cancel.setAccessibilityTraversalAfter(stopAndSend.getId());
+        cancel.setAccessibilityTraversalBefore(chooseDestination.getId());
+        chooseDestination.setAccessibilityTraversalAfter(cancel.getId());
+        chooseDestination.setAccessibilityTraversalBefore(recordingDragRegion.getId());
+        recordingDragRegion.setAccessibilityTraversalAfter(chooseDestination.getId());
+        recordingDragRegion.setAccessibilityTraversalBefore(View.NO_ID);
+    }
+
+    void setDestinationChip(String text) {
+        destinationChip.setText(text == null ? "" : text);
     }
 
     void setIdlePressed(boolean pressed) {
@@ -183,6 +208,8 @@ final class FloatingOverlayViewController {
         if (recordingDock.getVisibility() == View.VISIBLE) {
             root.setContentDescription(text(R.string.content_description_recording_dock));
             stopAndSend.setContentDescription(text(R.string.content_description_stop_and_send));
+            chooseDestination.setContentDescription(
+                    text(R.string.content_description_change_recording_destination));
             cancel.setContentDescription(text(R.string.content_description_cancel_recording));
             recordingStatus.setText(text(R.string.overlay_recording_status));
             updateTimer(android.os.SystemClock.elapsedRealtime());
@@ -197,6 +224,7 @@ final class FloatingOverlayViewController {
         root.setOnTouchListener(null);
         recordingDragRegion.setOnTouchListener(null);
         stopAndSend.setOnClickListener(null);
+        chooseDestination.setOnClickListener(null);
         cancel.setOnClickListener(null);
     }
 

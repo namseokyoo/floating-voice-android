@@ -648,7 +648,7 @@
             </LinearLayout>
         </ScrollView>
 
-        <!-- TRANSFER DESTINATION: current route and replacement action only. -->
+        <!-- TRANSFER DESTINATION: stored destination catalog management (V7-06). -->
         <ScrollView
             android:id="@+id/destination_settings_screen"
             android:layout_width="match_parent"
@@ -677,15 +677,50 @@
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginBottom="24dp"
-                    android:text="@string/settings_target_supporting"
+                    android:layout_marginBottom="16dp"
+                    android:text="@string/destinations_private_bot_only_note"
                     android:textAppearance="?attr/textAppearanceBodyMedium"
                     android:textColor="?attr/colorOnSurfaceVariant" />
 
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/target_settings_toggle"
-                    style="@style/FloatingVoice.QuietPrimaryButton"
-                    android:text="@string/settings_set_target" />
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="16dp"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/destination_add_button"
+                        style="@style/FloatingVoice.QuietPrimaryButton"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/destination_action_add" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/destination_order_edit_button"
+                        style="@style/FloatingVoice.QuietOutlinedButton"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="8dp"
+                        android:text="@string/destination_order_edit" />
+                </LinearLayout>
+
+                <TextView
+                    android:id="@+id/destinations_list_empty"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="16dp"
+                    android:text="@string/destinations_list_empty"
+                    android:textAppearance="?attr/textAppearanceBodyMedium"
+                    android:textColor="?attr/colorOnSurfaceVariant"
+                    android:visibility="gone" />
+
+                <LinearLayout
+                    android:id="@+id/destinations_list_container"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical" />
             </LinearLayout>
         </ScrollView>
 

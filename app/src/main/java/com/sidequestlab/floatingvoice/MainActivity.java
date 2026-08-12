@@ -14,10 +14,13 @@ import android.os.Build;
 import android.os.Bundle;
 import android.provider.Settings;
 import android.text.InputType;
+import android.view.LayoutInflater;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.AdapterView;
 import android.widget.EditText;
 import android.widget.ImageView;
+import android.widget.LinearLayout;
 import android.widget.Spinner;
 import android.widget.TextView;
 
@@ -38,6 +41,8 @@ import com.google.android.material.snackbar.Snackbar;
 import com.sidequestlab.floatingvoice.core.AppConfig;
 import com.sidequestlab.floatingvoice.core.ConnectionInfoFormatter;
 import com.sidequestlab.floatingvoice.core.DashboardReadiness;
+import com.sidequestlab.floatingvoice.core.Destination;
+import com.sidequestlab.floatingvoice.core.DestinationCatalog;
 import com.sidequestlab.floatingvoice.core.OverlayColorPreset;
 import com.sidequestlab.floatingvoice.core.OverlaySizePreset;
 import com.sidequestlab.floatingvoice.core.TargetChangePolicy;
@@ -55,6 +60,12 @@ public final class MainActivity extends AppCompatActivity implements TelegramRep
     private static final String STATE_CONNECTION_MODE = "connection_mode";
     private static final String STATE_PENDING_TARGET_USERNAME = "pending_target_username";
     private static final String STATE_PENDING_TARGET_OPERATION = "pending_target_operation";
+    private static final String STATE_DESTINATION_ORDER_EDITING = "destination_order_editing";
+    private static final int MENU_SET_DEFAULT = 1;
+    private static final int MENU_RENAME = 2;
+    private static final int MENU_REVERIFY = 3;
+    private static final int MENU_TOGGLE_ENABLED = 4;
+    private static final int MENU_DELETE = 5;
 
     private enum Page {
         HOME, CONNECTION, APP_SETTINGS, DESTINATION_SETTINGS, TELEGRAM_SETTINGS
@@ -128,7 +139,10 @@ public final class MainActivity extends AppCompatActivity implements TelegramRep
     private View permissionStep;
     private View connectionComplete;
     private MaterialButton dashboardPrimaryAction;
-    private MaterialButton targetSettingsToggle;
+    private MaterialButton destinationAddButton;
+    private MaterialButton destinationOrderEditButton;
+    private LinearLayout destinationsListContainer;
+    private TextView destinationsListEmpty;
     private TelegramRepository telegram;
     private SecureSettingsStore settingsStore;
     private OverlayUiPreferences overlayUiPreferences;
@@ -141,6 +155,7 @@ public final class MainActivity extends AppCompatActivity implements TelegramRep
     private String pendingTargetUsername;
     private long pendingTargetOperation;
     private boolean statusCallbacksReady;
+    private boolean destinationOrderEditing;
     private String persistentStatus;
 
     @Override protected void onCreate(Bundle savedInstanceState) {
@@ -161,6 +176,8 @@ public final class MainActivity extends AppCompatActivity implements TelegramRep
             }
             pendingTargetUsername = savedInstanceState.getString(STATE_PENDING_TARGET_USERNAME);
             pendingTargetOperation = savedInstanceState.getLong(STATE_PENDING_TARGET_OPERATION);
+            destinationOrderEditing = savedInstanceState.getBoolean(
+                    STATE_DESTINATION_ORDER_EDITING, false);
         }
         applySystemBarInsets();
         bindViews();
@@ -219,6 +236,7 @@ public final class MainActivity extends AppCompatActivity implements TelegramRep
         outState.putString(STATE_CONNECTION_MODE, connectionMode.name());
         outState.putString(STATE_PENDING_TARGET_USERNAME, pendingTargetUsername);
         outState.putLong(STATE_PENDING_TARGET_OPERATION, pendingTargetOperation);
+        outState.putBoolean(STATE_DESTINATION_ORDER_EDITING, destinationOrderEditing);
         super.onSaveInstanceState(outState);
     }
 
@@ -270,7 +288,10 @@ public final class MainActivity extends AppCompatActivity implements TelegramRep
         permissionStep = findViewById(R.id.permission_step);
         connectionComplete = findViewById(R.id.connection_complete);
         dashboardPrimaryAction = findViewById(R.id.dashboard_primary_action);
-        targetSettingsToggle = findViewById(R.id.target_settings_toggle);
+        destinationAddButton = findViewById(R.id.destination_add_button);
+        destinationOrderEditButton = findViewById(R.id.destination_order_edit_button);
+        destinationsListContainer = findViewById(R.id.destinations_list_container);
+        destinationsListEmpty = findViewById(R.id.destinations_list_empty);
         apiId.setInputType(InputType.TYPE_CLASS_NUMBER);
     }
 
@@ -303,7 +324,11 @@ public final class MainActivity extends AppCompatActivity implements TelegramRep
         findViewById(R.id.dismiss_error).setOnClickListener(v -> dismissPersistentStatus());
         findViewById(R.id.logout).setOnClickListener(v -> confirmLogout());
         dashboardPrimaryAction.setOnClickListener(v -> handlePrimaryAction());
-        targetSettingsToggle.setOnClickListener(v -> requestTargetEditor());
+        destinationAddButton.setOnClickListener(v -> showAddDestinationDialog());
+        destinationOrderEditButton.setOnClickListener(v -> {
+            destinationOrderEditing = !destinationOrderEditing;
+            renderDestinationList();
+        });
         navigationButton.setOnClickListener(v -> navigateBack());
         settingsButton.setOnClickListener(v -> showSettingsMenu());
         permissionStatus.setOnClickListener(v -> requestRequiredPermissions());
@@ -708,14 +733,16 @@ public final class MainActivity extends AppCompatActivity implements TelegramRep
         if (settingsTargetSummary == null || settingsConnectionSummary == null
                 || settingsApiIdValue == null || settingsApiHashValue == null
                 || settingsPhoneValue == null) return;
-        TargetChat target = telegram.target();
-        settingsTargetSummary.setText(target == null
-                ? getString(R.string.settings_target_not_set)
-                : getString(R.string.settings_current_target_format, target));
-        targetSettingsToggle.setText(target == null
-                ? R.string.settings_set_target : R.string.settings_change_target);
+        DestinationCatalog destinationCatalog = telegram.destinationCatalog();
+        Destination defaultDestination = destinationCatalog.defaultLocalId()
+                .flatMap(destinationCatalog::find).orElse(null);
+        settingsTargetSummary.setText(defaultDestination == null
+                ? getString(R.string.settings_default_destination_missing)
+                : getString(R.string.settings_default_destination_format,
+                        defaultDestination.userAlias()));
         settingsConnectionSummary.setText(telegram.authStage() == TelegramRepository.AuthStage.READY
                 ? R.string.settings_connection_ready : R.string.settings_connection_not_ready);
+        renderDestinationList();
         if (savedConfig == null) {
             settingsApiIdValue.setText(R.string.settings_connection_value_unavailable);
             settingsApiHashValue.setText(R.string.settings_connection_value_unavailable);
@@ -730,6 +757,319 @@ public final class MainActivity extends AppCompatActivity implements TelegramRep
                     ConnectionInfoFormatter.apiHashSuffix(savedConfig.apiHash())));
             settingsPhoneValue.setText(savedConfig.phoneNumber());
         }
+    }
+
+    private void renderDestinationList() {
+        if (destinationsListContainer == null) return;
+        DestinationCatalog catalog = telegram.destinationCatalog();
+        String defaultLocalId = catalog.defaultLocalId().orElse(null);
+        destinationsListContainer.removeAllViews();
+        destinationsListEmpty.setVisibility(
+                catalog.destinations().isEmpty() ? View.VISIBLE : View.GONE);
+        destinationOrderEditButton.setEnabled(catalog.destinations().size() > 1);
+        destinationOrderEditButton.setText(destinationOrderEditing
+                ? R.string.destination_order_done : R.string.destination_order_edit);
+        for (int index = 0; index < catalog.destinations().size(); index++) {
+            Destination destination = catalog.destinations().get(index);
+            View item = LayoutInflater.from(this).inflate(
+                    R.layout.destination_list_item, destinationsListContainer, false);
+            bindDestinationItem(item, destination, defaultLocalId,
+                    index, catalog.destinations().size());
+            destinationsListContainer.addView(item);
+        }
+    }
+
+    private void bindDestinationItem(View item, Destination destination, String defaultLocalId,
+                                     int index, int destinationCount) {
+        TextView title = item.findViewById(R.id.destination_item_title);
+        TextView badge = item.findViewById(R.id.destination_item_badge);
+        TextView identity = item.findViewById(R.id.destination_item_identity);
+        TextView statusView = item.findViewById(R.id.destination_item_status);
+
+        title.setText(destination.userAlias());
+        String shownUsername = destination.resolvedUsername().isEmpty()
+                ? destination.configuredUsername() : destination.resolvedUsername();
+        identity.setText(getString(R.string.destination_item_identity_format, shownUsername));
+        statusView.setText(destinationStatusText(destination));
+
+        boolean isDefault = destination.localId().equals(defaultLocalId);
+        badge.setVisibility(View.VISIBLE);
+        if (isDefault) {
+            badge.setText(R.string.destination_item_default_badge);
+        } else if (!destination.enabled()) {
+            badge.setText(R.string.destination_item_disabled_badge);
+        } else {
+            badge.setVisibility(View.GONE);
+        }
+
+        long currentAccountUserId = telegram.authenticatedAccountUserId();
+        boolean ownedByCurrentAccount = currentAccountUserId > 0L
+                && destination.accountUserId() == currentAccountUserId;
+        boolean legacyReverifyAllowed = currentAccountUserId > 0L
+                && destination.accountUserId() == 0L
+                && destination.verificationStatus()
+                == Destination.VerificationStatus.NEEDS_REVERIFY;
+        View overflow = item.findViewById(R.id.destination_action_overflow);
+        overflow.setVisibility(destinationOrderEditing ? View.GONE : View.VISIBLE);
+        overflow.setEnabled(ownedByCurrentAccount || legacyReverifyAllowed);
+        overflow.setContentDescription(getString(
+                R.string.destination_menu_content_description, destination.userAlias()));
+        overflow.setOnClickListener(v -> showDestinationMenu(v, destination, isDefault,
+                ownedByCurrentAccount, legacyReverifyAllowed, currentAccountUserId));
+        View orderControls = item.findViewById(R.id.destination_order_controls);
+        orderControls.setVisibility(destinationOrderEditing ? View.VISIBLE : View.GONE);
+        View moveUp = item.findViewById(R.id.destination_action_move_up);
+        moveUp.setEnabled(ownedByCurrentAccount && index > 0);
+        moveUp.setOnClickListener(
+                v -> { if (telegram.moveDestination(destination.localId(), true)) refreshUi(); });
+        View moveDown = item.findViewById(R.id.destination_action_move_down);
+        moveDown.setEnabled(ownedByCurrentAccount && index < destinationCount - 1);
+        moveDown.setOnClickListener(
+                v -> { if (telegram.moveDestination(destination.localId(), false)) refreshUi(); });
+    }
+
+    private void showDestinationMenu(View anchor, Destination destination, boolean isDefault,
+                                     boolean ownedByCurrentAccount,
+                                     boolean legacyReverifyAllowed,
+                                     long currentAccountUserId) {
+        PopupMenu menu = new PopupMenu(this, anchor);
+        menu.getMenu().add(0, MENU_SET_DEFAULT, 0, R.string.destination_action_default)
+                .setEnabled(ownedByCurrentAccount && !isDefault
+                        && destination.selectableBy(currentAccountUserId));
+        menu.getMenu().add(0, MENU_RENAME, 1, R.string.destination_action_alias)
+                .setEnabled(ownedByCurrentAccount);
+        menu.getMenu().add(0, MENU_REVERIFY, 2, R.string.destination_action_reverify)
+                .setEnabled(ownedByCurrentAccount || legacyReverifyAllowed);
+        boolean canToggle = destination.verificationStatus()
+                == Destination.VerificationStatus.VERIFIED
+                || destination.verificationStatus()
+                == Destination.VerificationStatus.DISABLED;
+        menu.getMenu().add(0, MENU_TOGGLE_ENABLED, 3, destination.enabled()
+                        ? R.string.destination_action_disable : R.string.destination_action_enable)
+                .setEnabled(ownedByCurrentAccount && canToggle);
+        menu.getMenu().add(0, MENU_DELETE, 4, R.string.destination_action_delete)
+                .setEnabled(ownedByCurrentAccount);
+        menu.setOnMenuItemClickListener(menuItem -> {
+            switch (menuItem.getItemId()) {
+                case MENU_SET_DEFAULT: confirmSetDefault(destination); return true;
+                case MENU_RENAME: showRenameDialog(destination); return true;
+                case MENU_REVERIFY: confirmReverify(destination); return true;
+                case MENU_TOGGLE_ENABLED: toggleDestinationEnabled(destination); return true;
+                case MENU_DELETE: confirmDelete(destination); return true;
+                default: return false;
+            }
+        });
+        menu.show();
+    }
+
+    private String destinationStatusText(Destination destination) {
+        switch (destination.verificationStatus()) {
+            case VERIFIED: return getString(R.string.destination_item_status_verified);
+            case VERIFYING: return getString(R.string.destination_item_status_verifying);
+            case NEEDS_REVERIFY: return getString(R.string.destination_item_status_needs_reverify);
+            case INVALID: return getString(R.string.destination_item_status_invalid);
+            case DISABLED: return getString(R.string.destination_item_status_disabled);
+            default: return "";
+        }
+    }
+
+    private void confirmSetDefault(Destination destination) {
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.destination_action_default)
+                .setMessage(getString(R.string.destination_set_default_message,
+                        destination.userAlias()))
+                .setNegativeButton(R.string.cancel, null)
+                .setPositiveButton(R.string.destination_action_default, (dialog, which) -> {
+                    telegram.setDefaultDestination(destination.localId());
+                    refreshUi();
+                })
+                .show();
+    }
+
+    private void confirmReverify(Destination destination) {
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.destination_reverify_title)
+                .setMessage(R.string.destination_reverify_message)
+                .setNegativeButton(R.string.cancel, null)
+                .setPositiveButton(R.string.destination_reverify_action, (dialog, which) -> {
+                    long generation = telegram.reverifyDestinationUsername(
+                            destination.localId(),
+                            destination.resolvedUsername().isEmpty()
+                                    ? destination.configuredUsername()
+                                    : destination.resolvedUsername(),
+                            destination.userAlias());
+                    if (generation == 0L) refreshUi();
+                })
+                .show();
+    }
+
+    private void toggleDestinationEnabled(Destination destination) {
+        boolean enabling = !destination.enabled();
+        telegram.setDestinationEnabled(destination.localId(), enabling);
+        refreshUi();
+    }
+
+    private void showRenameDialog(Destination destination) {
+        EditText input = new EditText(this);
+        input.setText(destination.userAlias());
+        input.setHint(R.string.destination_alias_label);
+        input.setSingleLine(true);
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.destination_alias_title)
+                .setMessage(R.string.destination_alias_label)
+                .setView(input)
+                .setNegativeButton(R.string.cancel, null)
+                .setPositiveButton(R.string.destination_alias_action, (dialog, which) -> {
+                    String alias = input.getText().toString().trim();
+                    if (!alias.isEmpty()) {
+                        telegram.setDestinationAlias(destination.localId(), alias);
+                        refreshUi();
+                    }
+                })
+                .show();
+    }
+
+    private void showAddDestinationDialog() {
+        if (telegram.authStage() != TelegramRepository.AuthStage.READY) {
+            showPage(Page.CONNECTION, ConnectionMode.RESUME);
+            return;
+        }
+        LinearLayout content = new LinearLayout(this);
+        content.setOrientation(LinearLayout.VERTICAL);
+        int padding = dp(20);
+        content.setPaddingRelative(padding, dp(8), padding, 0);
+        EditText usernameInput = new EditText(this);
+        usernameInput.setHint(R.string.connection_target_supporting);
+        usernameInput.setSingleLine(true);
+        EditText aliasInput = new EditText(this);
+        aliasInput.setHint(R.string.destination_alias_label);
+        aliasInput.setSingleLine(true);
+        LinearLayout.LayoutParams fieldParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        fieldParams.topMargin = dp(12);
+        content.addView(usernameInput);
+        content.addView(aliasInput, fieldParams);
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.destination_action_add)
+                .setMessage(R.string.destination_add_supporting)
+                .setView(content)
+                .setNegativeButton(R.string.cancel, null)
+                .setPositiveButton(R.string.destination_action_add, (dialog, which) -> {
+                    String candidate = usernameInput.getText().toString().trim();
+                    String alias = aliasInput.getText().toString().trim();
+                    long generation = telegram.addDestinationUsername(candidate, alias);
+                    if (generation == 0L) refreshUi();
+                })
+                .show();
+    }
+
+    private void confirmDelete(Destination destination) {
+        DestinationCatalog catalog = telegram.destinationCatalog();
+        boolean deletingDefault = catalog.defaultLocalId()
+                .filter(destination.localId()::equals).isPresent();
+        List<Destination> replacements = new ArrayList<>();
+        long accountUserId = telegram.authenticatedAccountUserId();
+        for (Destination candidate : catalog.destinations()) {
+            if (!candidate.localId().equals(destination.localId())
+                    && candidate.selectableBy(accountUserId)) {
+                replacements.add(candidate);
+            }
+        }
+        if (deletingDefault && !replacements.isEmpty()) {
+            confirmDeleteDefaultWithReplacement(destination, replacements);
+            return;
+        }
+
+        int retained = telegram.retainedDispatchCount(destination.localId());
+        int messageResource = retained > 0
+                ? R.string.destination_delete_message_with_pending
+                : R.string.destination_delete_message;
+        String message = retained > 0
+                ? getString(messageResource, retained)
+                : getString(messageResource);
+        if (retained > 0) {
+            message += "\n\n" + getString(R.string.destination_delete_pending_note);
+        }
+        if (deletingDefault) {
+            message += "\n\n" + getString(R.string.destination_delete_default_no_replacement);
+        }
+        AlertDialog.Builder builder = new AlertDialog.Builder(this)
+                .setTitle(R.string.destination_delete_title)
+                .setMessage(message)
+                .setNegativeButton(R.string.cancel, null)
+                .setPositiveButton(R.string.destination_delete_action, (dialog, which) -> {
+                    telegram.removeDestination(destination.localId());
+                    refreshUi();
+                });
+        if (deletingDefault) {
+            Destination reverify = firstReverifyCandidate(catalog, destination.localId());
+            builder.setNeutralButton(reverify == null
+                            ? R.string.destination_delete_and_add
+                            : R.string.destination_delete_and_reverify,
+                    (dialog, which) -> {
+                        if (!telegram.removeDestination(destination.localId())) return;
+                        refreshUi();
+                        if (reverify == null) showAddDestinationDialog();
+                        else confirmReverify(reverify);
+                    });
+        }
+        builder.show();
+    }
+
+    private void confirmDeleteDefaultWithReplacement(
+            Destination destination, List<Destination> replacements) {
+        int retained = telegram.retainedDispatchCount(destination.localId());
+        String message = getString(R.string.destination_delete_default_choose_replacement);
+        if (retained > 0) {
+            message += "\n\n" + getString(
+                    R.string.destination_delete_message_with_pending, retained);
+        }
+        String[] labels = new String[replacements.size()];
+        for (int index = 0; index < replacements.size(); index++) {
+            Destination replacement = replacements.get(index);
+            String username = replacement.resolvedUsername().isEmpty()
+                    ? replacement.configuredUsername() : replacement.resolvedUsername();
+            labels[index] = replacement.userAlias() + "  ·  @" + username;
+        }
+        final int[] selected = {-1};
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle(R.string.destination_delete_default_title)
+                .setMessage(message)
+                .setSingleChoiceItems(labels, -1, (ignored, which) -> selected[0] = which)
+                .setNegativeButton(R.string.cancel, null)
+                .setPositiveButton(R.string.destination_replace_and_delete_action, null)
+                .create();
+        dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE)
+                .setOnClickListener(view -> {
+                    if (selected[0] < 0) {
+                        Snackbar.make(destinationsListContainer,
+                                R.string.destination_replacement_required,
+                                Snackbar.LENGTH_SHORT).show();
+                        return;
+                    }
+                    Destination replacement = replacements.get(selected[0]);
+                    if (telegram.removeDestinationReplacingDefault(
+                            destination.localId(), replacement.localId())) {
+                        dialog.dismiss();
+                        refreshUi();
+                    }
+                }));
+        dialog.show();
+    }
+
+    private Destination firstReverifyCandidate(
+            DestinationCatalog catalog, String excludedLocalId) {
+        long accountUserId = telegram.authenticatedAccountUserId();
+        for (Destination candidate : catalog.destinations()) {
+            if (!candidate.localId().equals(excludedLocalId)
+                    && (candidate.accountUserId() == accountUserId
+                    || candidate.accountUserId() == 0L)
+                    && candidate.verificationStatus()
+                    == Destination.VerificationStatus.NEEDS_REVERIFY) {
+                return candidate;
+            }
+        }
+        return null;
     }
 
     private void refreshDashboard() {
@@ -1075,6 +1415,40 @@ public final class MainActivity extends AppCompatActivity implements TelegramRep
                 refreshUi();
             }
         });
+    }
+
+    @Override public void onDestinationCatalogChanged(DestinationCatalog catalog) {
+        runOnUiThread(() -> refreshUi());
+    }
+
+    @Override public void onDestinationVerificationPreview(
+            TelegramRepository.DestinationVerificationPreview preview) {
+        runOnUiThread(() -> showDestinationVerificationPreview(preview));
+    }
+
+    private void showDestinationVerificationPreview(
+            TelegramRepository.DestinationVerificationPreview preview) {
+        Destination previous = preview.previous();
+        Destination candidate = preview.candidate();
+        String previousUsername = previous.resolvedUsername().isEmpty()
+                ? previous.configuredUsername() : previous.resolvedUsername();
+        String candidateUsername = candidate.resolvedUsername().isEmpty()
+                ? candidate.configuredUsername() : candidate.resolvedUsername();
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle(R.string.destination_preview_title)
+                .setMessage(getString(R.string.destination_preview_message,
+                        previous.resolvedTitle(), previousUsername,
+                        candidate.resolvedTitle(), candidateUsername))
+                .setNegativeButton(R.string.cancel, (ignored, which) ->
+                        telegram.cancelDestinationVerificationPreview(preview.token()))
+                .setPositiveButton(R.string.destination_preview_save, (ignored, which) -> {
+                    telegram.confirmDestinationVerificationPreview(preview.token());
+                    refreshUi();
+                })
+                .create();
+        dialog.setOnCancelListener(ignored ->
+                telegram.cancelDestinationVerificationPreview(preview.token()));
+        dialog.show();
     }
 
     @Override public void onLocaleChanged() {
