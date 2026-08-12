@@ -11,7 +11,7 @@
 플로팅 마이크 버튼을 한 번 누르면 녹음이 시작되고,<br>
 다시 누르면 내 Telegram 계정으로 확인된 봇 대화에 음성 메시지가 전송된다.
 
-![Version](https://img.shields.io/badge/version-0.5.0-315CDB?style=for-the-badge)
+![Version](https://img.shields.io/badge/version-0.7.0_RC1-315CDB?style=for-the-badge)
 ![Android](https://img.shields.io/badge/Android-10%2B-3DDC84?style=for-the-badge&logo=android&logoColor=white)
 ![ABI](https://img.shields.io/badge/ABI-arm64--v8a-555555?style=for-the-badge)
 ![Java](https://img.shields.io/badge/Java-17-ED8B00?style=for-the-badge&logo=openjdk&logoColor=white)
@@ -40,7 +40,7 @@
 | **텍스트 전송** | 플로팅 버튼 길게 누르기 → 텍스트 보내기 |
 | **음성 형식** | OGG / Opus / mono / 48 kHz |
 | **전송 주체** | 로그인한 본인의 Telegram 사용자 계정 |
-| **전송 대상** | username으로 확인한 고정 Telegram 봇 대화 |
+| **전송 대상** | 저장된 여러 private bot 중 기본 대상 또는 이번 녹음에서 선택한 대상 |
 | **전송 방식** | TDLib `InputMessageVoiceNote` + `SendMessage` |
 | **성공 판정** | `UpdateMessageSendSucceeded` 수신 후 확정 |
 | **실패 처리** | 녹음 파일을 삭제하지 않고 로컬에 보관 |
@@ -53,7 +53,7 @@ Telegram에 짧은 음성 메모를 남기기 위해 매번 앱을 열고, 대�
 
 - 다른 앱을 쓰는 중에도 플로팅 버튼이 계속 보인다.
 - Telegram UI 위치가 바뀌어도 영향을 받지 않는다.
-- 미리 확인한 고정 대상 외에는 전송하지 않는다.
+- 미리 확인한 private bot 대상 외에는 전송하지 않는다.
 - 자동 테스트 메시지나 백그라운드 자동 전송이 없다.
 
 ## 쓰는 법
@@ -68,7 +68,7 @@ Telegram에 짧은 음성 메모를 남기기 위해 매번 앱을 열고, 대�
 빨간 정지 아이콘 탭
       │
       ▼
-고정 대상 재검증 → TDLib 전송 → 성공 확인 → 로컬 파일 삭제
+선택 대상 snapshot 고정 → TDLib 전송 → 성공 확인 → 로컬 파일 삭제
                               └→ 실패 → 녹음 파일 보관
 ```
 
@@ -102,7 +102,7 @@ Telegram에 짧은 음성 메모를 남기기 위해 매번 앱을 열고, 대�
 | **Telegram API ID** | [my.telegram.org](https://my.telegram.org)의 API development tools에서 발급한 숫자 | 암호화 저장 |
 | **Telegram API Hash** | 같은 페이지에서 발급한 32자리 값 | 암호화 저장 |
 | **전화번호** | 국가번호 포함 형식, 예: `+8210XXXXXXXX` | 암호화 저장 |
-| **대상 봇 username** | 고정 전송할 봇의 `@username` | 암호화 저장 |
+| **대상 봇 username** | 추가·재검증할 private bot의 `@username` | 암호화 저장 |
 | **Telegram 인증번호** | 로그인 과정에서 Telegram이 보낸 코드 | 저장하지 않음 |
 | **2단계 인증 비밀번호** | 계정이 요구할 때만 입력 | 저장하지 않음 |
 | **이메일·이메일 코드** | Telegram 인증 상태가 요구할 때만 입력 | 저장하지 않음 |
@@ -128,7 +128,7 @@ Telegram에 짧은 음성 메모를 남기기 위해 매번 앱을 열고, 대�
 
 - Telegram API ID·Hash
 - 계정 전화번호
-- 대상 봇 username과 확인된 chat ID·제목
+- 여러 대상 봇의 username·확인된 chat ID·bot user ID·별칭·기본 대상
 - TDLib 데이터베이스 암호화 키
 - TDLib 로컬 세션 데이터
 - 성공 확인 전의 녹음 파일
@@ -155,16 +155,17 @@ Telegram에 짧은 음성 메모를 남기기 위해 매번 앱을 열고, 대�
 
 현재 화면 캡처는 허용되어 있다. 설정 화면을 공유할 때는 전화번호·API ID·대상 정보가 보이지 않는지 먼저 확인해야 한다.
 
-## 전송 대상 안전장치
+## 다중 전송 대상 안전장치
 
 대상 username만 저장하고 바로 보내지 않는다.
 
 1. `SearchPublicChat`으로 username을 찾는다.
 2. 결과가 개인 대화인지 확인한다.
 3. `GetUser`로 실제 `UserTypeBot`인지 확인한다.
-4. 확인된 chat ID·제목·username을 암호화 저장한다.
-5. 전송 직전에 현재 설정의 username과 고정 대상이 같은지 다시 검사한다.
-6. 설정 변경 전에 시작된 오래된 비동기 검색 결과는 무시한다.
+4. 확인된 chat ID·bot user ID·계정 user ID·username을 암호화 저장한다.
+5. 녹음 중 선택한 대상을 정지 시 불변 snapshot으로 고정하고 그 chat ID만 사용한다.
+6. 대상 삭제·비활성화·계정 변경·오래된 비동기 결과는 차단하며 다른 대상으로 자동 폴백하지 않는다.
+7. 전송 실패·불확실 상태는 원래 대상 snapshot과 녹음 파일을 보존하고 자동 재시도하지 않는다.
 
 현재 구현은 **공개 username이 있는 Telegram 봇**만 대상으로 지원한다.
 
@@ -177,7 +178,7 @@ flowchart LR
     R --> F[앱 전용 녹음 파일]
     F --> T[TelegramRepository]
     T --> D[TDLib 사용자 세션]
-    D --> C[확인된 고정 봇 chat ID]
+    D --> C[불변 전송 대상 snapshot]
     C --> S{최종 전송 결과}
     S -->|성공| X[로컬 파일 삭제]
     S -->|실패| K[파일 보관]
@@ -328,7 +329,7 @@ floating-voice-android/
 <details>
 <summary><b>음성이 전송되지 않음</b></summary>
 
-설정 화면의 인증 상태와 대상 봇 상태를 확인한다. 실패한 녹음은 삭제하지 않으므로 앱 전용 `voice_notes/` 경로에 남아 있을 수 있다.
+설정 화면의 인증 상태와 선택한 전송 대상 상태를 확인한다. 실패하거나 결과가 불확실한 녹음은 삭제하지 않으므로 앱 전용 `voice_notes/` 경로에 남아 있을 수 있다.
 </details>
 
 <details>

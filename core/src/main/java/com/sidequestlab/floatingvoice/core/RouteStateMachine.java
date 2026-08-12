@@ -52,6 +52,11 @@ public final class RouteStateMachine {
         return routeAttemptId;
     }
 
+    /** Prevents a route session from surviving an authenticated-account change. */
+    public synchronized boolean matchesAuthenticatedAccount(long accountUserId) {
+        return accountUserId > 0 && authenticatedAccountUserId == accountUserId;
+    }
+
     public synchronized void replaceCatalog(DestinationCatalog replacement) {
         Objects.requireNonNull(replacement, "replacement");
         for (Destination existing : catalog.destinations()) {

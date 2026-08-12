@@ -2,7 +2,7 @@
 
 **Effective date / 시행일:** 2026-08-10
 
-**Applies to / 적용 대상:** Floating Voice version `0.5.0`
+**Applies to / 적용 대상:** Floating Voice version `0.7.0`
 
 Floating Voice publishes source code and a release-signed `arm64-v8a` APK through GitHub Releases. It is not distributed through an app store.
 
@@ -21,9 +21,10 @@ Telegram processes account authentication, chat lookup, and voice/text-message d
 The app may store:
 
 - Telegram API ID, API Hash, and account phone number
-- verified target-bot username, chat ID, and title
+- saved private-bot usernames, verified chat/bot/account IDs, titles, aliases, and default destination
 - a TDLib database-encryption key and TDLib session data
-- recordings awaiting final send confirmation or retained after failure
+- recordings awaiting final send confirmation or retained after failure, uncertain delivery, or interruption
+- immutable pending-dispatch metadata that retains the original destination identity and recording path
 - temporary TDLib text-message IDs used to classify final success or failure; text bodies are not persisted by the app composer
 
 Runtime settings are encrypted with AES-GCM using a non-exportable Android Keystore key. Login codes and two-step verification passwords are not persisted. Retained OGG recordings are not separately encrypted.
@@ -58,9 +59,10 @@ Do not include real credentials, account details, recordings, session files, or 
 앱은 다음 정보를 저장할 수 있습니다.
 
 - Telegram API ID, API Hash, 계정 전화번호
-- 확인된 대상 봇 username, chat ID, 제목
+- 저장된 private bot username, 확인된 chat/bot/account ID, 제목, 별칭, 기본 전송 대상
 - TDLib 데이터베이스 암호화 키와 TDLib 세션 데이터
-- 최종 전송 성공을 기다리거나 실패 후 보관된 녹음 파일
+- 최종 전송 성공을 기다리거나 실패·불확실·중단 후 보관된 녹음 파일
+- 원래 전송 대상과 녹음 경로를 보존하는 불변 pending-dispatch 메타데이터
 - 최종 성공·실패 분류에 필요한 임시 TDLib 텍스트 메시지 ID (Composer는 텍스트 본문을 저장하지 않음)
 
 설정값은 Android Keystore의 비추출 키를 사용해 AES-GCM으로 암호화합니다. 로그인 코드와 2단계 인증 비밀번호는 저장하지 않습니다. 실패 후 남은 OGG 녹음 파일은 별도로 암호화되지 않습니다.

@@ -292,14 +292,31 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
     }
 
     @Override public void onAuthStage(TelegramRepository.AuthStage stage) {
-        if (stage == TelegramRepository.AuthStage.READY && routeStateMachine == null) {
+        if (stage == TelegramRepository.AuthStage.READY) {
+            // READY precedes the asynchronous GetMe account identity. Drop every route session
+            // now so a previous account/default/one-shot cannot remain visible or start capture.
+            routeStateMachine = null;
             accountRouteGraceDeadline = SystemClock.uptimeMillis() + ACCOUNT_ROUTE_GRACE_MS;
             initializeRouteState(telegram.destinationCatalog());
+        } else {
+            routeStateMachine = null;
+            accountRouteGraceDeadline = 0L;
         }
         if (running && stage != TelegramRepository.AuthStage.READY) stopSelf();
     }
 
     @Override public void onAccountChanged(String account) {
+        long accountUserId = telegram.authenticatedAccountUserId();
+        RouteStateMachine current = routeStateMachine;
+        if (current != null && !current.matchesAuthenticatedAccount(accountUserId)) {
+            routeStateMachine = null;
+            accountRouteGraceDeadline = 0L;
+            if (running) {
+                updateState(R.string.service_prerequisite_lost);
+                stopSelf();
+                return;
+            }
+        }
         if (routeStateMachine == null) initializeRouteState(telegram.destinationCatalog());
     }
 

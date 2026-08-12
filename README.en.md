@@ -11,7 +11,7 @@
 Tap the floating microphone once to start recording.<br>
 Tap it again to send a voice message from your Telegram account to a verified bot chat.
 
-![Version](https://img.shields.io/badge/version-0.5.0-315CDB?style=for-the-badge)
+![Version](https://img.shields.io/badge/version-0.7.0_RC1-315CDB?style=for-the-badge)
 ![Android](https://img.shields.io/badge/Android-10%2B-3DDC84?style=for-the-badge&logo=android&logoColor=white)
 ![ABI](https://img.shields.io/badge/ABI-arm64--v8a-555555?style=for-the-badge)
 ![Java](https://img.shields.io/badge/Java-17-ED8B00?style=for-the-badge&logo=openjdk&logoColor=white)
@@ -40,7 +40,7 @@ Tap it again to send a voice message from your Telegram account to a verified bo
 | **Send text** | Long-press the floating button → Send text |
 | **Audio format** | OGG / Opus / mono / 48 kHz |
 | **Sender** | The signed-in Telegram user account |
-| **Recipient** | A fixed Telegram bot chat verified by username |
+| **Recipient** | The default or current-recording target selected from saved private bots |
 | **Send API** | TDLib `InputMessageVoiceNote` + `SendMessage` |
 | **Success condition** | Confirmed only after `UpdateMessageSendSucceeded` |
 | **Failure handling** | Keeps the recording locally instead of deleting it |
@@ -53,7 +53,7 @@ Floating Voice removes the repeated steps of opening Telegram, locating a chat, 
 
 - The recording control stays visible while you use other apps.
 - Telegram UI changes do not affect the sending path.
-- Messages are sent only to the previously verified fixed target.
+- Messages are sent only to a previously verified private-bot target.
 - Saving settings or signing in never sends a test message.
 
 ## How it works
@@ -68,7 +68,7 @@ Tap floating microphone
  Tap red stop button
           │
           ▼
-Re-check fixed target → Send through TDLib → Confirm success → Delete local file
+Freeze selected target snapshot → Send through TDLib → Confirm success → Delete local file
                                           └→ Failure → Keep recording
 ```
 
@@ -102,7 +102,7 @@ The selected language applies to the settings screen, authentication state, vali
 | **Telegram API ID** | Numeric ID from API development tools at [my.telegram.org](https://my.telegram.org) | Encrypted |
 | **Telegram API Hash** | 32-character hash from the same page | Encrypted |
 | **Phone number** | International format, for example `+8210XXXXXXXX` | Encrypted |
-| **Target bot username** | `@username` of the fixed recipient bot | Encrypted |
+| **Target bot username** | `@username` of a private bot to add or re-verify | Encrypted |
 | **Telegram login code** | Code sent by Telegram during sign-in | No |
 | **Two-step verification password** | Entered only when Telegram requests it | No |
 | **Email and email code** | Entered only when the authorization state requests them | No |
@@ -128,7 +128,7 @@ The service must be started by the user from a visible Activity. It does not sil
 
 - Telegram API ID and API Hash
 - Account phone number
-- Target bot username and the verified chat ID/title
+- Saved bot usernames, verified chat/bot/account IDs, aliases, and default target
 - TDLib database encryption key
 - TDLib local session data
 - Recordings that have not received final send-success confirmation
@@ -155,16 +155,17 @@ The service must be started by the user from a visible Activity. It does not sil
 
 Screenshots are currently allowed. Before sharing the settings screen, verify that no phone number, API ID, API Hash, username, or account details are visible.
 
-## Fixed-target safeguards
+## Multi-destination safeguards
 
 A username is never accepted as the target without verification.
 
 1. Resolve the username with `SearchPublicChat`.
 2. Require the result to be a private one-to-one chat.
 3. Load the user with `GetUser` and require `UserTypeBot`.
-4. Encrypt and save the verified chat ID, title, and username.
-5. Re-check that the current configuration still matches the fixed target immediately before sending.
-6. Ignore stale asynchronous results that started before the username or client changed.
+4. Encrypt and save the verified chat ID, bot user ID, account user ID, and username.
+5. Freeze the selected target into an immutable snapshot before sending and use only its chat ID.
+6. Block deleted, disabled, wrong-account, identity-changed, and stale asynchronous results without fallback.
+7. Retain the original target snapshot and recording after failed or uncertain delivery; never auto-retry.
 
 The current implementation supports only Telegram bots that have a public username.
 
@@ -177,7 +178,7 @@ flowchart LR
     R --> F[App-specific recording]
     F --> T[TelegramRepository]
     T --> D[TDLib user session]
-    D --> C[Verified fixed bot chat ID]
+    D --> C[Immutable destination snapshot]
     C --> S{Final send result}
     S -->|Success| X[Delete local file]
     S -->|Failure| K[Keep local file]
@@ -329,7 +330,7 @@ Check microphone permission, return to a visible app screen, and start the float
 <details>
 <summary><b>The voice message is not sent</b></summary>
 
-Check the authorization and fixed-target status in the app. Failed recordings are not deleted and may remain under the app-specific `voice_notes/` directory.
+Check authorization and the selected destination status in the app. Failed or uncertain recordings are not deleted and may remain under the app-specific `voice_notes/` directory.
 </details>
 
 <details>

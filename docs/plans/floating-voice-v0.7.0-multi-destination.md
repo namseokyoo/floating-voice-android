@@ -8,7 +8,7 @@
 
 **Tech Stack:** Java 17, Android SDK 29–36, TDLib, Android Keystore-backed settings, private SharedPreferences dispatch metadata, AppCompat XML, JUnit 5.
 
-**현재 단계 상태 (2026-08-12 06:00 KST):** `V7-05-CODE-PASS / NEXT=V7-06`. `DestinationResolver`와 lookup adapter, account/client/request generation 검증, duplicate·identity-change·disabled-state·persist-zero/send-zero 계약을 구현했다. `PendingDispatch`/`DispatchState`/`PendingDispatchCodec`/`PendingDispatchStore`를 추가해 불변 dispatch snapshot과 durable FAILED/UNKNOWN retention을 구현했고, live TDLib spike는 이월되어 자동 재시도는 허용하지 않는다. 전체 회귀 PASS. 2026-08-12 사용자 결정에 따라 실제 private bot 2개 A52s 검증은 V7-06 정식 목적지 UI 뒤로 이월한다.
+**현재 단계 상태 (2026-08-12):** `V7-08-AUTOMATED-PASS / NEXT=V7-09-RC1`. V7-06 메인 전송 대상 관리와 V7-07 Activity 기반 picker·현재 녹음 대상 선택은 사용자 직접 A52s 검증을 통과했다. V7-08은 인증 계정 변경 시 이전 route를 즉시 폐기하고 실행 중 서비스를 fail-closed하며, service restart의 ephemeral route 폐기, durable pending snapshot/path 보존, UNKNOWN retention, duplicate final callback 억제, no-fallback/no-auto-retry 계약을 보강했다. clean core 165 + app 51 고유 unit tests, Debug/Release unit, localization, Lint 오류 0, debug/release assembly가 통과했다. 다음 게이트는 immutable commit에서 공식 서명 RC1을 만들고 사용자 직접 A52s 집중 matrix를 수행하는 것이다.
 
 **Non-goals:** 그룹·채널·토픽, 여러 방 동시 전송, 목적지 자동 추천, 다른 Telegram 계정 다중 로그인, 목적지 무효 시 자동 폴백, STT/로컬 archive/Android share.
 

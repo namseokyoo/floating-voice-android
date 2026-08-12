@@ -23,7 +23,7 @@ Include the affected commit or version, Android version, reproduction steps, imp
 High-priority reports include:
 
 - credential or session exposure
-- fixed-recipient verification bypass
+- destination verification, immutable snapshot, or no-fallback bypass
 - message sending without an explicit recording action
 - premature recording deletion or unintended upload
 - exported-component, overlay, foreground-service, or permission abuse

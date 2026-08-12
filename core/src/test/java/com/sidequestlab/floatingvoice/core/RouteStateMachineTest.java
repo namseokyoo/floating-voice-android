@@ -8,6 +8,28 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class RouteStateMachineTest {
     @Test
+    void routeSessionIsBoundToOneAuthenticatedAccount() {
+        RouteStateMachine machine = machine(catalog(primary(), secondary()), "primary");
+
+        assertTrue(machine.matchesAuthenticatedAccount(7L));
+        assertFalse(machine.matchesAuthenticatedAccount(8L));
+        assertFalse(machine.matchesAuthenticatedAccount(0L));
+    }
+
+    @Test
+    void rebuildingRouteAfterServiceRestartDropsEphemeralSelection() {
+        DestinationCatalog stored = catalog(primary(), secondary())
+                .withDefault("primary", 7L);
+        RouteStateMachine beforeRestart = machine(stored, "primary");
+        assertTrue(beforeRestart.select(DestinationScope.NEXT_ONE, "secondary"));
+
+        RouteStateMachine afterRestart = machine(stored, "primary");
+
+        assertTrue(afterRestart.nextOneLocalId().isEmpty());
+        assertEquals("primary", afterRestart.startRecording().orElseThrow().localId());
+    }
+
+    @Test
     void missingDefaultRequiresExplicitNextOneWithoutImplicitFallback() {
         RouteStateMachine machine = machine(catalog(primary(), secondary()), null);
 

@@ -72,6 +72,44 @@ public class PendingDispatchStoreTest {
         assertEquals(DispatchState.UNKNOWN_RETAINED,
                 store.find("queued").orElseThrow().state());
         assertEquals("queued", store.findDispatchId(queuedKey).orElseThrow());
+        assertFalse(store.find("prepared").orElseThrow().automaticRetryAllowed());
+        assertFalse(store.find("queued").orElseThrow().automaticRetryAllowed());
+    }
+
+    @Test
+    public void lateFinalSuccessAfterRestartCompletesOriginalSnapshotOnlyOnce() {
+        FakeBackend backend = new FakeBackend();
+        PendingDispatchStore store = new PendingDispatchStore(backend);
+        PendingMessageKey original = new PendingMessageKey(200L, -30L);
+        assertTrue(store.prepare(preparedFor("late", "original", 200L)));
+        assertTrue(store.markQueued("late", original));
+        assertEquals(1, store.markUncertainAfterRestart());
+
+        assertTrue(store.markCompleted(original, false));
+        PendingDispatch completed = store.find("late").orElseThrow();
+        assertEquals(DispatchState.COMPLETED_FILE_RETAINED, completed.state());
+        assertEquals("original", completed.target().localId());
+        assertEquals(200L, completed.target().chatId());
+        assertEquals("/tmp/late.ogg", completed.absolutePath());
+        assertFalse(store.markCompleted(original, false));
+    }
+
+    @Test
+    public void destinationRemovalCannotChangeFailedDispatchSnapshotOrPath() {
+        FakeBackend backend = new FakeBackend();
+        PendingDispatchStore store = new PendingDispatchStore(backend);
+        PendingMessageKey key = new PendingMessageKey(700L, -31L);
+        assertTrue(store.prepare(preparedFor("removed", "deleted-destination", 700L)));
+        assertTrue(store.markQueued("removed", key));
+
+        assertTrue(store.markFailed(key, 503, "offline", true, 5));
+
+        PendingDispatch retained = store.find("removed").orElseThrow();
+        assertEquals(DispatchState.FAILED_RETAINED, retained.state());
+        assertEquals("deleted-destination", retained.target().localId());
+        assertEquals(700L, retained.target().chatId());
+        assertEquals("/tmp/removed.ogg", retained.absolutePath());
+        assertFalse(retained.automaticRetryAllowed());
     }
 
     @Test
