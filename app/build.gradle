@@ -23,7 +23,7 @@ android {
     buildTypes {
         debug {
             applicationIdSuffix ".debug"
-            versionNameSuffix "-internal-v7-09-rc2"
+            versionNameSuffix "-internal-v8-01-stt-spike"
         }
         release {
             minifyEnabled false

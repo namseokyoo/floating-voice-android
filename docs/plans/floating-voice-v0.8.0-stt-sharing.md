@@ -6,13 +6,13 @@
 
 **Architecture:** `MediaRecorder` 음성 캡처와 `SpeechRecognizer` 텍스트 캡처를 서로 배타적인 mode/state로 분리한다. overlay menu의 사용자 동작은 non-exported `SpeechReviewActivity`를 열고, 이 visible Activity가 recognizer·편집·Sharesheet를 소유한다. STT final result는 draft일 뿐이며 review와 명시적 Share 이후에만 `ACTION_SEND`를 연다. 로컬 archive와 audio share는 Telegram destination과 다른 **output route**로 모델링하고 한 capture당 한 output만 허용한다.
 
-**Capability policy:** 현재 `MainActivity.startOverlay()`와 `FloatingVoiceService.onStartCommand()`의 `telegram.isReadyWithTarget()` 단일 gate를 기능별 capability로 분리한다. 권장 기본값은 Telegram이 준비되지 않아도 STT/명시적 로컬 녹음 메뉴는 열 수 있게 하되, 중앙 1탭 Telegram 녹음은 verified Telegram route가 없으면 시작하지 않는 것이다.
+**Capability policy (approved 2026-08-13):** 현재 `MainActivity.startOverlay()`와 `FloatingVoiceService.onStartCommand()`의 `telegram.isReadyWithTarget()` 단일 gate를 기능별 capability로 분리한다. Telegram이 준비되지 않아도 STT/명시적 로컬 녹음·오디오 공유는 각 capability가 준비되면 사용할 수 있다. 중앙 1탭 Telegram 녹음만 verified Telegram route를 요구한다. unavailable action은 이유를 표시하며 다른 route로 자동 폴백하지 않는다.
 
 **Tech Stack:** Android `SpeechRecognizer`/`RecognizerIntent`, API 31 on-device probe, API 33 support/model APIs, Android Sharesheet, SAF `ACTION_OPEN_DOCUMENT_TREE`, `FileProvider`, Java 17, JUnit 5, A52s 실기기 측정.
 
 **Non-goals:** 녹음된 OGG 사후 STT, bundled Whisper, cloud STT, MediaRecorder+SpeechRecognizer 동시 실행, Kakao 지정방 자동전송, 공유 대상 앱의 최종 수신 성공 추적, 복수 output 동시 실행.
 
-**현재 단계 상태 (2026-08-13):** `V8-00 PASS / V8-01 BLOCKED ON CAPABILITY POLICY`. accepted v0.7.0 app source 이후 코드 변경이 없는 상태에서 core 165 + app Debug/Release 각 62, localization 357 keys, Debug/Release Lint 오류 0, clean assembly, arm64 ZIP/ELF 16KB를 재검증했다. 공개 v0.7.0 APK도 기존 hash·크기·공식 인증서 v2/v3와 일치했다. 새 A52s 실행은 없으며, V8-01 spike 전 Telegram readiness와 STT/local output capability 분리 정책의 사용자 결정을 기다린다.
+**현재 단계 상태 (2026-08-13 13:22 KST):** `V8-01 AUTOMATED PASS / A52s USER DEVICE GATE`. production 메뉴와 release APK를 바꾸지 않은 별도 `.debug` 런처에 일반/on-device recognizer 지원, API 33 support probe, `ko-KR` partial/final, 실제 비행기모드 판독, 발화 종료→final latency, correction character distance, 20문장 메모리 요약, cancel/destroy/stale callback 차단을 구현했다. clean tests 290/fail 0, Debug/Release Lint 오류 0, localization 357 keys/hard failure 0, Debug/Release assembly, arm64 ZIP/ELF 16KB, debug launcher 도달성, release manifest/DEX/resource 제외를 통과했다. 실제 recognizer 품질·오프라인 동작은 미확인이며 폰 설치·조작·측정은 형이 A52s에서 직접 수행한다. 체크리스트는 `docs/testing/v8-01-a52s-stt-checklist.md`다.
 
 ---
 

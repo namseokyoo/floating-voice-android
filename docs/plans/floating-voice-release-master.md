@@ -2,10 +2,10 @@
 
 > **For Hermes:** 이 문서는 재시작 후에도 유지되는 단일 릴리즈 로드맵이다. 한 번에 한 버전만 구현하고, 각 버전의 선행검증·구현·실기기·릴리즈 게이트가 모두 통과한 뒤 사용자 승인으로 다음 버전으로 이동한다.
 
-**기준 시각:** 2026-08-13 12:32 KST<br>
+**기준 시각:** 2026-08-13 13:22 KST<br>
 **현재 안정 기준선:** `v0.7.0` (tag `760075e02bf7de6dbf248d49a83b360b1d2182c1`, post-release closeout `629ecea1300a3a923276a46568ec93b5e702943a`)<br>
-**current_stage:** `V8-00 COMPLETE / V8-01 CAPABILITY POLICY DECISION`<br>
-**status:** `v8_00_pass_waiting_capability_policy` — accepted app-source commit `26b4e8a` 이후 현재 HEAD까지 app/core/manifest/resource/Gradle/TDLib/script 변경이 없음을 확인했다. fresh clean gate에서 core 165 + app Debug/Release 각 62, localization 357 keys/hard failure 0, Debug/Release Lint 오류 0, 양쪽 assembly와 arm64 ZIP/ELF 16KB가 통과했다. 공개 `v0.7.0` APK를 비로그인 재다운로드해 기존 SHA-256 `c8804f36d437bfe346acf4cfc75e7baff162d14b4b4810407e61e67447bf7cf1`, 크기 36,125,719 bytes, 공식 인증서 v2/v3, ZIP/ELF 16KB와 다시 일치함을 확인했다. 새 A52s 실행은 하지 않았으며, 코드 불변성과 기존 사용자 PASS를 근거로 V8-00 자동 기준선을 PASS 처리했다. V8-01 전 Telegram readiness와 STT/local capability 분리 정책 승인을 대기한다.<br>
+**current_stage:** `V8-01 AUTOMATED PASS / A52s USER DEVICE GATE`<br>
+**status:** `v8_01_waiting_a52s_measurement` — 승인된 capability 분리 정책에 따라 production 메뉴와 release APK는 변경하지 않고, 별도 `.debug` 패키지의 STT 측정 런처를 구현했다. 일반/on-device recognizer 지원, API 33 support probe, `ko-KR` partial/final, 실제 비행기모드 판독, 발화 종료→final 지연, 수정 문자 거리, 20문장 메모리 요약, cancel/destroy/stale callback 차단을 포함한다. clean 자동검증은 core 165 + app Debug 63 + Release 62 tests 전부 PASS, Debug/Release Lint 오류 0, localization 357 keys/hard failure 0, 양쪽 assembly와 arm64 ZIP/ELF 16KB를 통과했다. debug 런처 도달성과 release manifest/DEX/resource 완전 제외도 확인했다. 실제 A52s recognizer 품질·오프라인 동작은 미확인이며 형의 직접 측정을 기다린다.<br>
 **구현 상태:** v0.5.0 인터랙션 기반, v0.6.0 Quiet Recorder, v0.6.1 플로팅 스타일·safe area, v0.6.2 Telegram 세션 유지 대상 변경, v0.6.3 개별 설정 페이지, v0.6.4 연결정보 인라인·톱니 anchored PopupMenu까지 완료. v0.6.4는 tests 110/fail 0, lint 오류 0, 공식 인증서·v2/v3·ZIP/ELF 16KB 검증과 local/origin/GitHub 일치를 통과함. V7-01은 legacy account/target pure migration model을 커밋 `f1d45e4`로 고정함. V7-02는 destination/catalog/scope/route state machine/dispatch snapshot과 default·next-one·current-recording·FREEZING·no-fallback 계약을 TDD로 구현함. latest catalog identity/revision revalidation, route-attempt-bound completion/abort, scalar-only snapshot, local-ID 재바인딩 차단까지 보완했으며 전체 tests 140/fail 0, lint 오류 0, debug/release assembly와 독립 follow-up review Blocker/High 0을 통과함. 실제 Android 저장소·UI 연결은 건드리지 않음. V7-03은 versioned catalog codec, Android Keystore 암호화 AtomicFile, copy→validate→persist→read-back→publish, raw V7-01 migration, schema marker, backup-only/corrupt recovery, legacy·pending 보존을 구현함. 최종 clean tests 188/fail 0, lint 오류 0, debug/release assembly와 독립 follow-up review Blocker/High 0을 통과함. 공식 서명 내부 APK `r1`은 기존 앱 위 설치·실제 Telegram 전송 후 형의 “이 메시지를 받으면 테스트는 성공이야” 확인으로 A52s 실기기 PASS 처리함. V7-04는 request token, expected client/account, private-chat·bot·canonical ID 검증, duplicate/identity-change 차단, account 전환·저장 race 직렬화, disabled-state 보존, TDLib lookup adapter를 구현함. 최종 core 138 + app 42 = 고유 tests 180/fail 0, Debug/Release Lint 오류 0, 양쪽 assembly·ZIP/ELF 16KB와 독립 review Blocker/High/Medium/Low 0을 통과함. 실제 봇 2개 A52s 게이트는 사용자 결정으로 V7-06 UI 뒤로 이월하고, Hermes의 기기 조작 없이 형이 전달받은 APK로 직접 검증함.
 
 ## 1. 목표와 제품 원칙
@@ -255,6 +255,8 @@ python3 ~/.hermes/skills/software-development/android-native-app-delivery/script
 | 2026-08-12 19:15 KST | V7-09 RC2 A52s PASS·V7-10 최종 승격 승인 | 형의 “테스트 완료 패스”를 수신하고, 테스트된 RC2 APK와 최종 APK의 byte-for-byte 동일성 및 동일 SHA-256을 확인하여 재빌드 없이 최종 릴리스로 승격 |
 | 2026-08-12 | `v0.7.0` 공개 승인·V7 완료 | annotated tag와 GitHub latest Release를 공개하고 비로그인 원격 APK 재다운로드 후 로컬 최종본과 해시·크기·서명·패키지·ABI·16KB 정렬 일치를 검증 |
 | 2026-08-13 | V8-00 v0.7.0 기준선 재검증 PASS | accepted source 이후 코드 불변, fresh unit/lint/localization/assembly, 공개 APK 해시·서명·16KB 재검증을 통과함. 새 A52s 실행은 없으며 V8-01 전 capability 분리 정책 결정을 대기 |
+| 2026-08-13 | V8 capability 분리 권장안 승인 | Telegram 준비 여부는 중앙 1탭 Telegram 음성만 gate하고, 명시적 STT·로컬 저장·오디오 공유는 각 capability 기준으로 독립 허용. unavailable action은 이유를 표시하며 자동 폴백하지 않음 |
+| 2026-08-13 13:22 KST | V8-01 debug STT spike 자동검증 PASS | 별도 `.debug` 런처와 20문장 메모리 측정 harness 구현. tests 290/fail 0, Debug/Release Lint 오류 0, localization·assembly·서명·16KB·release 제외 PASS. A52s 사용자 측정은 미실행 |
 
 ## 11. 단계 완료 보고 형식
 
