@@ -1,15 +1,17 @@
 package com.sidequestlab.floatingvoice;
 
-import java.util.LinkedHashMap;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
+import java.util.Locale;
 
 /** Debug-only in-memory measurement state. Never persists transcripts. */
 public final class SttMeasurementSession {
     public enum RecognizerMode { STANDARD, ON_DEVICE }
     public enum Environment { ONLINE, AIRPLANE_MODE }
     public record Measurement(int phraseNumber, RecognizerMode mode, Environment environment,
-                              long latencyMs, int correctionDistance, boolean success) { }
+                              long latencyMs, int correctionDistance,
+                              double correctionRatePercent, boolean success,
+                              int errorCode, String errorName) { }
 
     private static final List<String> CORPUS = List.of(
             "오늘 회의는 오후 세 시에 시작합니다.",
@@ -44,7 +46,8 @@ public final class SttMeasurementSession {
     private String finalText = "";
     private RecognizerMode mode = RecognizerMode.STANDARD;
     private Environment environment = Environment.ONLINE;
-    private final Map<Integer, Measurement> measurements = new LinkedHashMap<>();
+    private final List<Measurement> measurements = new ArrayList<>();
+    private int currentSuccessMeasurementIndex = -1;
 
     public int phraseCount() { return CORPUS.size(); }
     public int phraseNumber() { return phraseIndex + 1; }
@@ -65,7 +68,8 @@ public final class SttMeasurementSession {
         clearResult();
     }
 
-    public long beginAttempt(long nowMs, RecognizerMode requestedMode, Environment measuredEnvironment) {
+    public long beginAttempt(long nowMs, RecognizerMode requestedMode,
+                             Environment measuredEnvironment) {
         generation++;
         active = true;
         startedAtMs = nowMs;
@@ -87,8 +91,7 @@ public final class SttMeasurementSession {
         active = false;
         finalText = safe(text);
         partialText = "";
-        long latencyStart = speechEndedAtMs >= 0L ? speechEndedAtMs : startedAtMs;
-        latencyMs = Math.max(0L, nowMs - latencyStart);
+        latencyMs = elapsedFromSpeechEndOrStart(nowMs);
         return true;
     }
 
@@ -102,16 +105,47 @@ public final class SttMeasurementSession {
         generation++;
         active = false;
         partialText = "";
+        currentSuccessMeasurementIndex = -1;
     }
 
     public void failAttempt(long callbackGeneration) {
         if (active && callbackGeneration == generation) active = false;
     }
 
+    public boolean recordFailure(long callbackGeneration, int errorCode,
+                                 String errorName, long nowMs) {
+        if (!active || callbackGeneration != generation) return false;
+        active = false;
+        partialText = "";
+        finalText = "";
+        latencyMs = elapsedFromSpeechEndOrStart(nowMs);
+        currentSuccessMeasurementIndex = -1;
+        measurements.add(new Measurement(
+                phraseNumber(), mode, environment, latencyMs, -1,
+                Double.NaN, false, errorCode, safe(errorName)));
+        return true;
+    }
+
+    public Measurement recordImmediateFailure(RecognizerMode failedMode,
+                                              Environment failedEnvironment,
+                                              int errorCode, String errorName) {
+        Measurement measurement = new Measurement(
+                phraseNumber(), failedMode, failedEnvironment, -1L, -1,
+                Double.NaN, false, errorCode, safe(errorName));
+        measurements.add(measurement);
+        return measurement;
+    }
+
     public void clearResult() {
         partialText = "";
         finalText = "";
         latencyMs = -1L;
+        currentSuccessMeasurementIndex = -1;
+    }
+
+    private long elapsedFromSpeechEndOrStart(long nowMs) {
+        long latencyStart = speechEndedAtMs >= 0L ? speechEndedAtMs : startedAtMs;
+        return Math.max(0L, nowMs - latencyStart);
     }
 
     public static int correctionDistance(String recognized, String corrected) {
@@ -132,26 +166,104 @@ public final class SttMeasurementSession {
         return previous[right.length()];
     }
 
+    public static double correctionRatePercent(String recognized, String corrected) {
+        String reference = safe(corrected);
+        int distance = correctionDistance(recognized, reference);
+        if (reference.isEmpty()) return distance == 0 ? 0.0d : 100.0d;
+        return 100.0d * distance / reference.length();
+    }
+
     public Measurement recordCurrentCorrection(String correctedText) {
         int distance = correctionDistance(finalText, correctedText);
+        double rate = correctionRatePercent(finalText, correctedText);
         Measurement measurement = new Measurement(
-                phraseNumber(), mode, environment, latencyMs, distance, !finalText.isEmpty());
-        measurements.put(phraseIndex, measurement);
+                phraseNumber(), mode, environment, latencyMs, distance, rate,
+                !finalText.isEmpty(), 0, "");
+        if (currentSuccessMeasurementIndex >= 0) {
+            measurements.set(currentSuccessMeasurementIndex, measurement);
+        } else {
+            measurements.add(measurement);
+            currentSuccessMeasurementIndex = measurements.size() - 1;
+        }
+        return measurement;
+    }
+
+    public Measurement recordBlankFinalFailure() {
+        Measurement measurement = new Measurement(
+                phraseNumber(), mode, environment, latencyMs, -1,
+                Double.NaN, false, 1001, "EMPTY_FINAL");
+        measurements.add(measurement);
+        currentSuccessMeasurementIndex = -1;
         return measurement;
     }
 
     public String summaryText() {
         StringBuilder summary = new StringBuilder();
-        for (Measurement measurement : measurements.values()) {
+        for (Measurement measurement : measurements) {
             if (summary.length() > 0) summary.append('\n');
             summary.append(measurement.phraseNumber()).append('/').append(CORPUS.size())
                     .append(' ').append(measurement.mode())
                     .append(' ').append(measurement.environment())
-                    .append(' ').append(measurement.latencyMs()).append("ms")
-                    .append(" corrections=").append(measurement.correctionDistance())
-                    .append(" success=").append(measurement.success());
+                    .append(' ').append(measurement.latencyMs()).append("ms");
+            if (measurement.success()) {
+                summary.append(" corrections=").append(measurement.correctionDistance())
+                        .append(" rate=")
+                        .append(formatPercent(measurement.correctionRatePercent()));
+            } else {
+                summary.append(" error=").append(measurement.errorCode())
+                        .append(':').append(measurement.errorName());
+            }
+            summary.append(" success=").append(measurement.success());
+        }
+        for (RecognizerMode recognizerMode : RecognizerMode.values()) {
+            appendModeSummary(summary, recognizerMode);
         }
         return summary.toString();
+    }
+
+    private void appendModeSummary(StringBuilder summary, RecognizerMode recognizerMode) {
+        List<Measurement> attempts = new ArrayList<>();
+        List<Measurement> successes = new ArrayList<>();
+        List<Long> latencies = new ArrayList<>();
+        List<Double> correctionRates = new ArrayList<>();
+        for (Measurement measurement : measurements) {
+            if (measurement.mode() != recognizerMode) continue;
+            attempts.add(measurement);
+            if (!measurement.success()) continue;
+            successes.add(measurement);
+            latencies.add(measurement.latencyMs());
+            if (!Double.isNaN(measurement.correctionRatePercent())) {
+                correctionRates.add(measurement.correctionRatePercent());
+            }
+        }
+        if (attempts.isEmpty()) return;
+        latencies.sort(Long::compareTo);
+        correctionRates.sort(Double::compareTo);
+        summary.append('\n').append(recognizerMode)
+                .append(" attempts=").append(attempts.size())
+                .append(" success=").append(successes.size())
+                .append(" successRate=")
+                .append(formatPercent(100.0d * successes.size() / attempts.size()))
+                .append(" medianLatency=")
+                .append(latencies.isEmpty() ? "n/a" : medianLong(latencies) + "ms")
+                .append(" medianCorrection=")
+                .append(correctionRates.isEmpty() ? "n/a" : formatPercent(medianDouble(correctionRates)));
+    }
+
+    private static long medianLong(List<Long> sorted) {
+        int middle = sorted.size() / 2;
+        if (sorted.size() % 2 == 1) return sorted.get(middle);
+        return (sorted.get(middle - 1) + sorted.get(middle)) / 2L;
+    }
+
+    private static double medianDouble(List<Double> sorted) {
+        int middle = sorted.size() / 2;
+        if (sorted.size() % 2 == 1) return sorted.get(middle);
+        return (sorted.get(middle - 1) + sorted.get(middle)) / 2.0d;
+    }
+
+    private static String formatPercent(double value) {
+        return String.format(Locale.US, "%.1f%%", value);
     }
 
     private static String safe(String value) { return value == null ? "" : value.trim(); }

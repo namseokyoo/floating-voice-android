@@ -24,7 +24,7 @@
     <string name="debug_stt_raw_label">Raw final result</string>
     <string name="debug_stt_corrected_hint">Correct any errors to match the spoken phrase</string>
     <string name="debug_stt_metrics_empty">Not measured</string>
-    <string name="debug_stt_metrics_format">Mode: %1$s\nEnvironment: %2$s\nFinal latency: %3$d ms\nCorrection character distance: %4$d</string>
+    <string name="debug_stt_metrics_format">Mode: %1$s\nEnvironment: %2$s\nFinal latency: %3$d ms\nCorrection character distance: %4$d\nCorrection burden: %5$.1f%%</string>
     <string name="debug_stt_ready">Ready</string>
     <string name="debug_stt_listening">Starting the recognizer…</string>
     <string name="debug_stt_speak_now">Read the displayed phrase now.</string>
@@ -32,7 +32,7 @@
     <string name="debug_stt_processing">Processing the final result…</string>
     <string name="debug_stt_final_received">Final result received. Correct any mistakes below.</string>
     <string name="debug_stt_empty_result">The final result was blank. Try again.</string>
-    <string name="debug_stt_error">Recognition error %1$d (%2$s). Retry or check the environment.</string>
+    <string name="debug_stt_error">Recognition error %1$d (%2$s). A failure row was recorded in the in-memory summary.</string>
     <string name="debug_stt_canceled">Canceled by the user. No result is accepted.</string>
     <string name="debug_stt_stopped_for_lifecycle">Recognition canceled because the screen was covered.</string>
     <string name="debug_stt_permission_denied">Microphone permission was denied, so measurement cannot start.</string>

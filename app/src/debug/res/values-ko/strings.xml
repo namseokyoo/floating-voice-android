@@ -24,7 +24,7 @@
     <string name="debug_stt_raw_label">최종 원문</string>
     <string name="debug_stt_corrected_hint">틀린 부분을 직접 고친 최종 문장</string>
     <string name="debug_stt_metrics_empty">측정 전</string>
-    <string name="debug_stt_metrics_format">모드: %1$s\n환경: %2$s\n최종 지연: %3$d ms\n수정 문자 거리: %4$d</string>
+    <string name="debug_stt_metrics_format">모드: %1$s\n환경: %2$s\n최종 지연: %3$d ms\n수정 문자 거리: %4$d\n수정 부담률: %5$.1f%%</string>
     <string name="debug_stt_ready">준비됨</string>
     <string name="debug_stt_listening">인식기를 시작하는 중…</string>
     <string name="debug_stt_speak_now">지금 문장을 읽어 주세요.</string>
@@ -32,7 +32,7 @@
     <string name="debug_stt_processing">최종 결과를 처리하는 중…</string>
     <string name="debug_stt_final_received">최종 결과를 받았습니다. 아래에서 틀린 부분을 고쳐 주세요.</string>
     <string name="debug_stt_empty_result">빈 최종 결과입니다. 다시 시도해 주세요.</string>
-    <string name="debug_stt_error">인식 오류 %1$d (%2$s). 다시 시도하거나 환경을 확인해 주세요.</string>
+    <string name="debug_stt_error">인식 오류 %1$d (%2$s). 실패행을 메모리 요약에 기록했습니다.</string>
     <string name="debug_stt_canceled">사용자가 취소했습니다. 결과를 수락하지 않습니다.</string>
     <string name="debug_stt_stopped_for_lifecycle">화면이 가려져 인식을 취소했습니다.</string>
     <string name="debug_stt_permission_denied">마이크 권한이 거부되어 측정할 수 없습니다.</string>

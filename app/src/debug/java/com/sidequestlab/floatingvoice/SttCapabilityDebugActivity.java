@@ -175,6 +175,11 @@ public final class SttCapabilityDebugActivity extends AppCompatActivity {
                 recognizer = SpeechRecognizer.createSpeechRecognizer(this);
             }
         } catch (RuntimeException creationFailure) {
+            session.recordImmediateFailure(
+                    requestOnDevice ? SttMeasurementSession.RecognizerMode.ON_DEVICE
+                            : SttMeasurementSession.RecognizerMode.STANDARD,
+                    actualEnvironment(), 1002, "CREATE_FAILED");
+            summaryView.setText(session.summaryText());
             stateView.setText(R.string.debug_stt_create_failed);
             destroyRecognizer();
             return;
@@ -190,7 +195,9 @@ public final class SttCapabilityDebugActivity extends AppCompatActivity {
         try {
             recognizer.startListening(recognitionIntent());
         } catch (RuntimeException startFailure) {
-            session.failAttempt(activeGeneration);
+            session.recordFailure(activeGeneration, 1003, "START_FAILED",
+                    SystemClock.elapsedRealtime());
+            summaryView.setText(session.summaryText());
             stateView.setText(R.string.debug_stt_start_failed);
             finishAttempt();
         }
@@ -214,7 +221,9 @@ public final class SttCapabilityDebugActivity extends AppCompatActivity {
             }
             @Override public void onError(int error) {
                 if (generation != activeGeneration) return;
-                session.failAttempt(generation);
+                session.recordFailure(generation, error, errorName(error),
+                        SystemClock.elapsedRealtime());
+                summaryView.setText(session.summaryText());
                 stateView.setText(getString(R.string.debug_stt_error, error, errorName(error)));
                 finishAttempt();
             }
@@ -226,6 +235,10 @@ public final class SttCapabilityDebugActivity extends AppCompatActivity {
                 correctedView.setText(session.rawFinalText());
                 stateView.setText(session.rawFinalText().isEmpty()
                         ? R.string.debug_stt_empty_result : R.string.debug_stt_final_received);
+                if (session.rawFinalText().isEmpty()) {
+                    session.recordBlankFinalFailure();
+                    summaryView.setText(session.summaryText());
+                }
                 renderMetrics();
                 finishAttempt();
             }
@@ -246,10 +259,12 @@ public final class SttCapabilityDebugActivity extends AppCompatActivity {
     private void renderMetrics() {
         String corrected = correctedView.getText() == null ? "" : correctedView.getText().toString();
         int correction = SttMeasurementSession.correctionDistance(session.rawFinalText(), corrected);
+        double correctionRate = SttMeasurementSession.correctionRatePercent(
+                session.rawFinalText(), corrected);
         metricsView.setText(getString(R.string.debug_stt_metrics_format,
                 modeLabel(session.currentMode()),
                 environmentLabel(session.currentEnvironment()),
-                session.currentLatencyMs(), correction));
+                session.currentLatencyMs(), correction, correctionRate));
     }
 
     private void recordMeasurement() {
@@ -296,6 +311,10 @@ public final class SttCapabilityDebugActivity extends AppCompatActivity {
             case SpeechRecognizer.ERROR_NO_MATCH -> "NO_MATCH";
             case SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> "BUSY";
             case SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> "PERMISSION";
+            case SpeechRecognizer.ERROR_TOO_MANY_REQUESTS -> "TOO_MANY_REQUESTS";
+            case SpeechRecognizer.ERROR_SERVER_DISCONNECTED -> "SERVER_DISCONNECTED";
+            case SpeechRecognizer.ERROR_LANGUAGE_NOT_SUPPORTED -> "LANGUAGE_NOT_SUPPORTED";
+            case SpeechRecognizer.ERROR_LANGUAGE_UNAVAILABLE -> "LANGUAGE_UNAVAILABLE";
             default -> "ERROR";
         };
     }

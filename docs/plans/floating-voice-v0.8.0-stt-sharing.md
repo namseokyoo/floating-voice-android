@@ -12,7 +12,7 @@
 
 **Non-goals:** 녹음된 OGG 사후 STT, bundled Whisper, cloud STT, MediaRecorder+SpeechRecognizer 동시 실행, Kakao 지정방 자동전송, 공유 대상 앱의 최종 수신 성공 추적, 복수 output 동시 실행.
 
-**현재 단계 상태 (2026-08-13 13:22 KST):** `V8-01 AUTOMATED PASS / A52s USER DEVICE GATE`. production 메뉴와 release APK를 바꾸지 않은 별도 `.debug` 런처에 일반/on-device recognizer 지원, API 33 support probe, `ko-KR` partial/final, 실제 비행기모드 판독, 발화 종료→final latency, correction character distance, 20문장 메모리 요약, cancel/destroy/stale callback 차단을 구현했다. clean tests 290/fail 0, Debug/Release Lint 오류 0, localization 357 keys/hard failure 0, Debug/Release assembly, arm64 ZIP/ELF 16KB, debug launcher 도달성, release manifest/DEX/resource 제외를 통과했다. 실제 recognizer 품질·오프라인 동작은 미확인이며 폰 설치·조작·측정은 형이 A52s에서 직접 수행한다. 체크리스트는 `docs/testing/v8-01-a52s-stt-checklist.md`다.
+**현재 단계 상태 (2026-08-13 14:41 KST):** `V8-01 USER REPORT: GOOD ACCURACY / R2 MEASUREMENT APK`. production 메뉴와 release APK를 바꾸지 않은 별도 `.debug` 런처에서 사용자가 일반/on-device 모드 모두 꽤 정확한 인식을 보인다고 보고했다. 이는 정성 관찰이며 정량 go/no-go PASS는 아니다. R2는 오류·timeout·empty/create/start 실패행, 문자 수정 부담률, 모드별 시도/성공률/중앙 지연/중앙 수정 부담률을 인메모리 요약에 추가한다. 기존 API support probe, 실제 비행기모드 판독, cancel/destroy/stale callback 차단, 비영속·무전송 계약은 유지한다. R2 clean 자동검증과 A52s 정량 측정이 다음 게이트다.
 
 ---
 
