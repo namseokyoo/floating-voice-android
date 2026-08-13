@@ -2,9 +2,9 @@
 
 > **For Hermes:** 이 문서는 재시작 후에도 유지되는 단일 릴리즈 로드맵이다. 한 번에 한 버전만 구현하고, 각 버전의 선행검증·구현·실기기·릴리즈 게이트가 모두 통과한 뒤 사용자 승인으로 다음 버전으로 이동한다.
 
-**기준 시각:** 2026-08-12 05:48 KST<br>
-**현재 안정 기준선:** `v0.6.4` (`808e7942e618e2aaaf3527b27d89bac9256e2601`)<br>
-**current_stage:** `V7 COMPLETE / v0.7.0 RELEASED`<br>
+**기준 시각:** 2026-08-13 12:32 KST<br>
+**현재 안정 기준선:** `v0.7.0` (tag `760075e02bf7de6dbf248d49a83b360b1d2182c1`, post-release closeout `629ecea1300a3a923276a46568ec93b5e702943a`)<br>
+**current_stage:** `V8-00 READY / v0.7.0 BASELINE REVALIDATION`<br>
 **status:** `v7_complete_v0_7_0_released` — RC2/versionCode 19는 commit `26b4e8a5e768d4e1e74e69ff9875d0044ad9a0e6`에서 clean build·공식 서명되었고, core 165 + app Debug/Release 각 62, localization hard gate, Debug/Release Lint 오류 0, v2/v3, arm64 ABI, ZIP/ELF 16KB, credential scan을 통과했다. 형의 A52s “테스트 완료 패스”와 별도 공개 승인을 받은 뒤 테스트된 RC2 바이트를 최종 APK로 그대로 승격했다. `v0.7.0` annotated tag와 GitHub latest Release를 공개했으며, 비로그인 원격 APK를 재다운로드해 로컬 최종본과 byte-for-byte 동일성, SHA-256 `c8804f36d437bfe346acf4cfc75e7baff162d14b4b4810407e61e67447bf7cf1`, 크기 36,125,719 bytes, package/version/ABI, 공식 인증서 v2/v3, ZIP/ELF 16KB를 재검증했다.<br>
 **구현 상태:** v0.5.0 인터랙션 기반, v0.6.0 Quiet Recorder, v0.6.1 플로팅 스타일·safe area, v0.6.2 Telegram 세션 유지 대상 변경, v0.6.3 개별 설정 페이지, v0.6.4 연결정보 인라인·톱니 anchored PopupMenu까지 완료. v0.6.4는 tests 110/fail 0, lint 오류 0, 공식 인증서·v2/v3·ZIP/ELF 16KB 검증과 local/origin/GitHub 일치를 통과함. V7-01은 legacy account/target pure migration model을 커밋 `f1d45e4`로 고정함. V7-02는 destination/catalog/scope/route state machine/dispatch snapshot과 default·next-one·current-recording·FREEZING·no-fallback 계약을 TDD로 구현함. latest catalog identity/revision revalidation, route-attempt-bound completion/abort, scalar-only snapshot, local-ID 재바인딩 차단까지 보완했으며 전체 tests 140/fail 0, lint 오류 0, debug/release assembly와 독립 follow-up review Blocker/High 0을 통과함. 실제 Android 저장소·UI 연결은 건드리지 않음. V7-03은 versioned catalog codec, Android Keystore 암호화 AtomicFile, copy→validate→persist→read-back→publish, raw V7-01 migration, schema marker, backup-only/corrupt recovery, legacy·pending 보존을 구현함. 최종 clean tests 188/fail 0, lint 오류 0, debug/release assembly와 독립 follow-up review Blocker/High 0을 통과함. 공식 서명 내부 APK `r1`은 기존 앱 위 설치·실제 Telegram 전송 후 형의 “이 메시지를 받으면 테스트는 성공이야” 확인으로 A52s 실기기 PASS 처리함. V7-04는 request token, expected client/account, private-chat·bot·canonical ID 검증, duplicate/identity-change 차단, account 전환·저장 race 직렬화, disabled-state 보존, TDLib lookup adapter를 구현함. 최종 core 138 + app 42 = 고유 tests 180/fail 0, Debug/Release Lint 오류 0, 양쪽 assembly·ZIP/ELF 16KB와 독립 review Blocker/High/Medium/Low 0을 통과함. 실제 봇 2개 A52s 게이트는 사용자 결정으로 V7-06 UI 뒤로 이월하고, Hermes의 기기 조작 없이 형이 전달받은 APK로 직접 검증함.
 
@@ -49,9 +49,9 @@ TDLib 최종 성공 확인 → 로컬 파일 삭제
 | 2.1 | `0.6.1` | 플로팅 아이콘·색상·safe area | `docs/releases/v0.6.1.md` | 완료 |
 | 2.2 | `0.6.2` | Telegram 세션 유지 단일 대상 변경 | `docs/releases/v0.6.2.md` | 완료 |
 | 2.3 | `0.6.3` | 톱니 메뉴에서 개별 설정 페이지 직접 진입 | `docs/releases/v0.6.3.md` | 완료 |
-| 2.4 | `0.6.4` | 연결정보 인라인·anchored PopupMenu | `docs/releases/v0.6.4.md` | **실기기 완료 기준선** |
-| 3 | `0.7.0` | 여러 private bot 목적지·기본/다음 1회/이번 녹음·불변 dispatch | [v0.7.0 다중 목적지 계획](floating-voice-v0.7.0-multi-destination.md) | V7-08 자동 검증 PASS · V7-09 RC 준비 |
-| 4 | `0.8.0` | 시스템 STT 텍스트 공유·Android Sharesheet·로컬 OGG 출력 | [v0.8.0 STT·공유 계획](floating-voice-v0.8.0-stt-sharing.md) | 계획 |
+| 2.4 | `0.6.4` | 연결정보 인라인·anchored PopupMenu | `docs/releases/v0.6.4.md` | 완료 |
+| 3 | `0.7.0` | 여러 private bot 목적지·기본/다음 1회/이번 녹음·불변 dispatch | [v0.7.0 다중 목적지 계획](floating-voice-v0.7.0-multi-destination.md) | **V7 완료 · 공개 릴리스** |
+| 4 | `0.8.0` | 시스템 STT 텍스트 공유·Android Sharesheet·로컬 OGG 출력 | [v0.8.0 STT·공유 계획](floating-voice-v0.8.0-stt-sharing.md) | **V8-00 준비** |
 | 5 | `0.9.0` | 메인 버튼 역할 지정: Telegram 음성·텍스트 공유·빠른 메모 | v0.8.0 실기기 PASS 후 상세화 | 범위 확정 |
 | 안정화 | `0.10.x+` | 실사용 피드백·회귀 수정·성능·복구 강화 | 버전별 이슈로 생성 | 미정 |
 | 안정판 | `1.0.0` | 핵심 계약과 업데이트 안정성 보장 | 아래 1.0 게이트 | 미정 |
@@ -102,11 +102,12 @@ Telegram 음성 녹음과 STT 마이크 사용은 동시에 수행하지 않는�
 
 ## 4. 릴리즈 간 선행조건
 
-### 현재 완료 기준선 — `0.6.4`
+### 현재 완료 기준선 — `0.7.0`
 
-- v0.5.0의 취소·상태 머신·텍스트 전송 계약이 유지된다.
-- Quiet Recorder 홈과 홈 톱니 → 3항목 PopupMenu → 개별 페이지 구조가 실기기에서 확인됐다.
-- Telegram 세션을 유지한 단일 대상 변경, API Hash 마스킹, 연결정보 인라인 표시가 검증됐다.
+- v0.6.4까지의 취소·상태 머신·텍스트 전송·Quiet Recorder·설정 구조가 유지된다.
+- 여러 private bot 목적지의 기본/다음 1회/이번 녹음 수명과 불변 dispatch가 자동·A52s 검증을 통과했다.
+- 실패·불확실 전송은 원래 snapshot과 파일을 보존하며 자동 재시도·자동 폴백하지 않는다.
+- 공식 `v0.7.0` APK는 A52s 승인본과 byte-for-byte 동일하고 공개 Release 재다운로드 검증을 통과했다.
 - 다음 기능 버전은 이 기준선을 깨지 않고 update-install 가능한 형태로 시작한다.
 
 ### `0.7.0` 시작 전

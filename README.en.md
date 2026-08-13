@@ -11,7 +11,7 @@
 Tap the floating microphone once to start recording.<br>
 Tap it again to send a voice message from your Telegram account to a verified bot chat.
 
-![Version](https://img.shields.io/badge/version-0.7.0_RC1-315CDB?style=for-the-badge)
+![Version](https://img.shields.io/badge/version-0.7.0-315CDB?style=for-the-badge)
 ![Android](https://img.shields.io/badge/Android-10%2B-3DDC84?style=for-the-badge&logo=android&logoColor=white)
 ![ABI](https://img.shields.io/badge/ABI-arm64--v8a-555555?style=for-the-badge)
 ![Java](https://img.shields.io/badge/Java-17-ED8B00?style=for-the-badge&logo=openjdk&logoColor=white)
@@ -363,6 +363,16 @@ The package ID has been `com.sidequestlab.floatingvoice` since version 0.2.0. Th
 - Each release note records the corresponding APK file SHA-256.
 
 ## Roadmap
+
+The single source of truth for version scope, prerequisites, risks, and completion gates is the [Floating Voice Release Master Plan](docs/plans/floating-voice-release-master.md).
+
+- Current stable baseline: [`v0.7.0`](https://github.com/namseokyoo/floating-voice-android/releases/tag/v0.7.0) — multi-private-bot routing, immutable dispatch, and A52s validation complete
+- `v0.8.0`: system STT text sharing, Android Sharesheet, and local OGG output — next development stage
+- `v0.9.0`: configurable primary-button role
+- `v0.10.x+`: field stabilization
+- `v1.0.0`: only after the stability gates pass
+
+### Release-readiness reference — not the product roadmap
 
 - [x] Korean and English app resources
 - [x] System-default and in-app language selection

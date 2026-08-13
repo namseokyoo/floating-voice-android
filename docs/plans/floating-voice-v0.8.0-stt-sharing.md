@@ -53,7 +53,8 @@ C. OGG 출력
 | V8-06 | SAF local archive | partial copy/data loss | verify-before-cleanup |
 | V8-07 | audio Sharesheet | URI/retention/허위 성공 | grant·retention·wording gate |
 | V8-08 | integration/privacy/accessibility | window leak/텍스트 노출 | full device matrix |
-| V8-09 | release candidate | policy/docs/artifact | update+artifact gate |
+| V8-09 | 공식 서명 RC·실사용 검증 | policy/docs/stale artifact | update+artifact+device gate |
+| V8-10 | 기능 동결 최종 릴리스 | 테스트 APK와 배포 APK 불일치 | accepted bytes+tag+hosted release gate |
 
 ---
 
@@ -327,7 +328,7 @@ TEARING_DOWN
 
 **위험:** `Save + Telegram` 같은 복합 route가 failure semantics를 폭발시킨다.
 
-**완화:** v0.7에서는 single output only. 복합 route는 별도 버전/상태 모델 없이는 금지.
+**완화:** v0.8.0에서는 single output only. 복합 route는 별도 버전/상태 모델 없이는 금지.
 
 **게이트:** route invariants tests 통과.
 
@@ -433,7 +434,7 @@ completed OGG
 - Create: `app/src/androidTest/java/com/sidequestlab/floatingvoice/SpeechReviewActivityTest.java`
 - Create: `app/src/androidTest/java/com/sidequestlab/floatingvoice/AudioOwnershipInstrumentedTest.java`
 - Create: `app/src/androidTest/java/com/sidequestlab/floatingvoice/LocalArchiveInstrumentedTest.java`
-- Create: `scripts/verify-v070-stt-device-matrix.sh`
+- Create: `scripts/verify-v080-stt-device-matrix.sh`
 - Modify: `app/build.gradle`/test runner는 AndroidX Test 도입 승인 후 별도 infrastructure commit으로 적용
 
 **정적:**
@@ -477,7 +478,7 @@ JAVA_HOME=$(/usr/libexec/java_home -v 17) ./gradlew test lintDebug lintRelease
 
 - Modify: `app/build.gradle`
 - Modify: `README.md`, `README.en.md`, `PRIVACY.md`, `SECURITY.md`
-- Create: `docs/releases/v0.7.0.md`
+- Create: `docs/releases/v0.8.0.md`
 
 **privacy 문서 필수 내용:**
 
@@ -508,14 +509,31 @@ JAVA_HOME=$(/usr/libexec/java_home -v 17) ./gradlew test lintDebug lintRelease
 - local/share route 문제 시 Telegram default route를 보존하되 실패 capture를 자동 Telegram 전송하지 않음
 - schema 변경은 이전 route/catalog를 파괴하지 않도록 additive로 설계
 
-**최종 게이트:** STT go/no-go 기준 + archive no-loss + share wording + update + artifact + 사용자 승인.
+**RC 게이트:** STT go/no-go 기준 + archive no-loss + share wording + update + artifact + A52s RC 승인. RC 이후 소스·리소스·manifest·빌드 설정·APK byte가 바뀌면 기존 RC를 폐기하고 `versionCode`를 올린 RC2/RC3로 전체 회귀와 실기기 검증을 반복한다.
 
 ---
 
-## 13. 증거 구조
+## 13. V8-10 — 기능 동결 최종 릴리스
+
+**선행조건:** 마지막 공식 서명 RC가 전체 A52s matrix를 통과하고 형의 명시적 PASS를 받았으며, 열려 있는 P0/P1·데이터 유실·오전송·자격정보 노출 결함이 0개다.
+
+**수행 범위:**
+
+1. 승인된 RC source commit·worktree·artifact provenance를 다시 확인한다.
+2. 기능 추가 없이 unit/lint/localization/release artifact gate를 재확인한다.
+3. 기본 전략은 A52s가 승인한 RC bytes를 그대로 최종 APK로 승격하는 것이다.
+4. 어떤 이유로든 최종 APK를 재빌드하면 RC와 동등한 source만으로는 부족하며, 새 bytes를 A52s에서 다시 검증받는다.
+5. 별도 공개 승인 후에만 annotated tag와 GitHub Release를 생성한다.
+6. 공개 asset을 비로그인 상태로 재다운로드해 로컬 승인본과 byte-for-byte, SHA-256, 크기, 서명, package/version/ABI, ZIP/ELF 16KB 일치를 검증한다.
+
+**최종 게이트:** accepted artifact parity + 사용자 공개 승인 + immutable tag + hosted asset 재검증. 하나라도 미충족이면 릴리스 완료로 기록하지 않는다.
+
+---
+
+## 14. 증거 구조
 
 ```text
-.hermes/evidence/v0.7.0/
+.hermes/evidence/v0.8.0/
   stt-capability-a52s.md
   stt-20-phrase-results.csv
   speech-state-tests.md
@@ -524,5 +542,6 @@ JAVA_HOME=$(/usr/libexec/java_home -v 17) ./gradlew test lintDebug lintRelease
   saf-archive-failure-matrix.md
   audio-share-uri-retention.md
   privacy-scan.md
-  artifact-provenance.md
+  rc-artifact-provenance.md
+  final-artifact-provenance.md
 ```

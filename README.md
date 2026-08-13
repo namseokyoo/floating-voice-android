@@ -11,7 +11,7 @@
 플로팅 마이크 버튼을 한 번 누르면 녹음이 시작되고,<br>
 다시 누르면 내 Telegram 계정으로 확인된 봇 대화에 음성 메시지가 전송된다.
 
-![Version](https://img.shields.io/badge/version-0.7.0_RC1-315CDB?style=for-the-badge)
+![Version](https://img.shields.io/badge/version-0.7.0-315CDB?style=for-the-badge)
 ![Android](https://img.shields.io/badge/Android-10%2B-3DDC84?style=for-the-badge&logo=android&logoColor=white)
 ![ABI](https://img.shields.io/badge/ABI-arm64--v8a-555555?style=for-the-badge)
 ![Java](https://img.shields.io/badge/Java-17-ED8B00?style=for-the-badge&logo=openjdk&logoColor=white)
@@ -359,9 +359,8 @@ floating-voice-android/
 
 버전별 범위·선행검증·리스크·완료 게이트의 단일 기준은 [Floating Voice Release Master Plan](docs/plans/floating-voice-release-master.md)이다.
 
-- 현재 안정 기준선: `v0.6.4` — 실기기 테스트 완료
-- `v0.7.0`: 여러 private bot 목적지와 불변 dispatch
-- `v0.8.0`: 시스템 STT 텍스트 공유·Android Sharesheet·로컬 OGG 출력
+- 현재 안정 기준선: [`v0.7.0`](https://github.com/namseokyoo/floating-voice-android/releases/tag/v0.7.0) — 다중 private bot 목적지·불변 dispatch·A52s 검증 완료
+- `v0.8.0`: 시스템 STT 텍스트 공유·Android Sharesheet·로컬 OGG 출력 — 다음 개발 단계
 - `v0.9.0`: 메인 버튼 역할 지정
 - `v0.10.x+`: 실사용 안정화
 - `v1.0.0`: 안정성 게이트 충족 후에만 진입
