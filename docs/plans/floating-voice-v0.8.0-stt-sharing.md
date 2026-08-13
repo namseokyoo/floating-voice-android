@@ -12,6 +12,8 @@
 
 **Non-goals:** 녹음된 OGG 사후 STT, bundled Whisper, cloud STT, MediaRecorder+SpeechRecognizer 동시 실행, Kakao 지정방 자동전송, 공유 대상 앱의 최종 수신 성공 추적, 복수 output 동시 실행.
 
+**현재 단계 상태 (2026-08-13):** `V8-00 PASS / V8-01 BLOCKED ON CAPABILITY POLICY`. accepted v0.7.0 app source 이후 코드 변경이 없는 상태에서 core 165 + app Debug/Release 각 62, localization 357 keys, Debug/Release Lint 오류 0, clean assembly, arm64 ZIP/ELF 16KB를 재검증했다. 공개 v0.7.0 APK도 기존 hash·크기·공식 인증서 v2/v3와 일치했다. 새 A52s 실행은 없으며, V8-01 spike 전 Telegram readiness와 STT/local output capability 분리 정책의 사용자 결정을 기다린다.
+
 ---
 
 ## 0. 사용자에게 보이는 세 경로
