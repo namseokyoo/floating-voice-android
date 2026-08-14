@@ -974,16 +974,41 @@ public final class TelegramRepository {
             }
             status(R.string.repo_text_queuing, fixedTarget.title());
             expectedClient.send(request, result -> handleTextSendResponse(
-                    expectedClient, expectedGeneration, callback, result));
+                    expectedClient, expectedGeneration, fixedTarget.chatId(), callback, result));
+        }
+    }
+
+    /** Sends reviewed text only to the frozen verified destination snapshot. */
+    public void sendText(String message, DispatchTargetSnapshot targetSnapshot,
+                         TextSendCallback callback) {
+        Objects.requireNonNull(callback, "callback");
+        synchronized (configurationLock) {
+            Client expectedClient = client;
+            long expectedGeneration = clientGeneration;
+            if (authStage != AuthStage.READY || expectedClient == null) {
+                callback.onRejected(text(R.string.repo_text_connection_target_required));
+                return;
+            }
+            VerifiedTextDispatch.Result prepared = VerifiedTextDispatch.prepare(
+                    message, targetSnapshot, accountUserId, destinationCatalog());
+            if (!prepared.accepted()) {
+                callback.onRejected(text(R.string.repo_text_connection_target_required));
+                return;
+            }
+            status(R.string.repo_text_queuing, targetSnapshot.userAlias());
+            expectedClient.send(prepared.request(), result -> handleTextSendResponse(
+                    expectedClient, expectedGeneration, targetSnapshot.chatId(),
+                    callback, result));
         }
     }
 
     private void handleTextSendResponse(Client expectedClient, long expectedGeneration,
-                                        TextSendCallback callback, TdApi.Object result) {
+                                        long expectedChatId, TextSendCallback callback,
+                                        TdApi.Object result) {
         synchronized (configurationLock) {
             if (!currentClient(expectedClient, expectedGeneration)) {
                 callback.onRejected(text(R.string.repo_text_connection_target_required));
-            } else if (result instanceof TdApi.Message sent) {
+            } else if (result instanceof TdApi.Message sent && sent.chatId == expectedChatId) {
                 PendingMessageKey pending = new PendingMessageKey(sent.chatId, sent.id);
                 pendingTextMessages.put(pending);
                 pendingTextSends.put(pending, callback);

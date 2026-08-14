@@ -12,7 +12,7 @@
 
 **Non-goals:** 녹음된 OGG 사후 STT, bundled Whisper, cloud STT, MediaRecorder+SpeechRecognizer 동시 실행, Kakao 지정방 자동전송, 공유 대상 앱의 최종 수신 성공 추적, 복수 output 동시 실행.
 
-**현재 단계 상태 (2026-08-14 15:53 KST):** `V8-04 R2 SIGNED DEVICE APK PREPARATION`. 작은 불투명 중앙 review 카드와 사용자 Stop까지 같은 generation/audio lease에서 fresh recognizer cycle을 잇는 chained dictation을 구현했다. Stop 뒤 error/blank final에도 누적·visible partial을 review에 보존하고 cancel/destroy 동기 callback을 선무효화한다. 최초 독립 R2 리뷰 High 2건을 RED→GREEN으로 닫고 후속 리뷰 PASS(Blocker 0/High 0), clean 211 tasks, core 186/app debug 127/app release 123 tests, Lint 오류 0, speech-review Lint issue 0, localization 382/382를 통과했다. reviewed source commit/push 후 공식 서명 R2 APK를 만들어 형이 A52s에서 확인한다. Android `SpeechRecognizer`의 진짜 무제한 단일 세션을 보장하는 것이 아니라 short recognizer cycle을 잇는 사용자 세션이다. STT 텍스트의 Telegram 기본 대상·다른 Telegram 대상·Android 공유 선택은 V8-05 통합 output-route 계약으로 편입하며 R2 PASS 전에는 구현하지 않는다. 폰/ADB 조작과 공개 릴리스는 승인 범위가 아니다.
+**현재 단계 상태 (2026-08-14 18:36 KST):** `V8-05 OUTPUT ROUTE DOMAIN MODEL`. V8-04 R4는 Android 13+ complete-silence segmented STT, API 29–32 bounded chained fallback, explicit Stop review, premature-end visible draft 보존을 구현해 공식 서명 APK로 전달했으며 자동 gate와 독립 후속 리뷰 PASS(Blocker 0/High 0)다. A52s 실기기 판정은 대기 중이지만 형의 “이어서 진행” 승인으로 R4 APK 바이트를 변경하지 않고 V8-05를 시작한다. STT text는 현재 검증된 Telegram 기본 목적지를 기본값으로 삼고, 다른 검증 목적지는 명시 선택하며, Android Sharesheet는 chat destination이 아닌 별도 `SYSTEM_TEXT_SHARE` action이다. 한 capture의 content/output/Telegram identity+revision을 실행 직전에 한 번만 freeze하고 callback 자동 실행·복합 output·실패 시 자동 fallback을 금지한다. 기존 legacy `sendText()` 대신 verified `DispatchTargetSnapshot` 기반 text send seam을 TDD로 연결한다. 폰/ADB 조작과 공개 릴리스는 승인 범위가 아니다.
 
 ---
 
@@ -376,6 +376,8 @@ TEARING_DOWN
 **완화:** v0.8.0에서는 single output only. 복합 route는 별도 버전/상태 모델 없이는 금지.
 
 **게이트:** route invariants tests 통과.
+
+**구현 현황 (2026-08-14 21:07 KST):** `OutputRoute`/`OutputSnapshot`/`OutputRouteStateMachine`과 snapshot 기반 `VerifiedTextDispatch`를 추가했다. Speech review는 검증된 기본 Telegram 대상, 다른 검증 대상 선택, 별도 Android 공유를 제공한다. Telegram 미설정 상태에서도 별도 Home action으로 STT·Android 공유에 진입할 수 있고 Telegram 전송 capability는 계속 fail-closed다. Telegram 전송은 speech 전용 queue/pending 상태와 memory-only handoff/attempt ID를 사용하며 delivered 전에는 draft를 닫지 않고 reject 시 같은 review로 복귀한다. 회전 중 destination/handoff/result와 거절 feedback도 memory-only ViewModel/registry로 유지하며 stale ordered receipt는 현재 attempt의 feedback/UI를 바꾸지 않는다. 최종 clean gate는 core 195/debug 149/release 145 tests(실패·오류·skip 0), localization 393/393, Lint Fatal/Error 0, Debug/Release assembly PASS다. 독립 follow-up review는 Blocker/High/Medium/Low 0으로 PASS했다.
 
 ---
 

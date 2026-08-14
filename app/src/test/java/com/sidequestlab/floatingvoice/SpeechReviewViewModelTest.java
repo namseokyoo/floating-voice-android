@@ -42,6 +42,56 @@ public class SpeechReviewViewModelTest {
     }
 
     @Test
+    public void rotationRetainsExplicitTelegramDestinationAndInFlightHandoffIdentity() {
+        AudioCaptureCoordinator coordinator = new AudioCaptureCoordinator();
+        SpeechReviewViewModel model = new SpeechReviewViewModel(
+                coordinator, new FakeRecognitionFactory(coordinator));
+        model.initializeTelegramDestination("default-a");
+        model.selectTelegramDestination("explicit-b");
+
+        assertEquals(true, model.beginTelegramHandoff(42L));
+        SpeechReviewViewModel.TelegramOutputState retained = model.telegramOutputState();
+
+        assertEquals("explicit-b", retained.selectedLocalId());
+        assertEquals(true, retained.explicitSelection());
+        assertEquals(true, retained.handoffInFlight());
+        assertEquals(42L, retained.handoffId());
+        assertEquals(true, model.matchesTelegramHandoff(42L));
+    }
+
+    @Test
+    public void rejectedTelegramFeedbackSurvivesRepeatedRenderStatePublication() {
+        AudioCaptureCoordinator coordinator = new AudioCaptureCoordinator();
+        SpeechReviewViewModel model = new SpeechReviewViewModel(
+                coordinator, new FakeRecognitionFactory(coordinator));
+        model.initializeTelegramDestination("default-a");
+        assertEquals(true, model.beginTelegramHandoff(42L));
+
+        assertEquals(true, model.rejectTelegramHandoff(42L));
+        model.notifyStateChanged();
+
+        assertEquals(false, model.telegramOutputState().handoffInFlight());
+        assertEquals(SpeechReviewViewModel.TelegramFeedback.REJECTED,
+                model.telegramFeedback());
+    }
+
+    @Test
+    public void staleOrderedRejectionCannotAlterCurrentHandoffOrFeedback() {
+        AudioCaptureCoordinator coordinator = new AudioCaptureCoordinator();
+        SpeechReviewViewModel model = new SpeechReviewViewModel(
+                coordinator, new FakeRecognitionFactory(coordinator));
+        assertEquals(true, model.beginTelegramHandoff(41L));
+        model.clearTelegramHandoff(41L);
+        assertEquals(true, model.beginTelegramHandoff(42L));
+
+        assertEquals(false, model.rejectTelegramHandoff(41L));
+
+        assertEquals(true, model.matchesTelegramHandoff(42L));
+        assertEquals(SpeechReviewViewModel.TelegramFeedback.NONE,
+                model.telegramFeedback());
+    }
+
+    @Test
     public void synchronousRetryOutcomeAdvancesSessionBeforeApplyingNewGeneration() {
         AudioCaptureCoordinator coordinator = new AudioCaptureCoordinator();
         FakeRecognitionFactory factory = new FakeRecognitionFactory(coordinator);

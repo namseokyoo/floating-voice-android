@@ -180,6 +180,17 @@
                     style="@style/FloatingVoice.QuietPrimaryButton"
                     android:text="@string/home_connect_action" />
 
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/dashboard_local_share_action"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:minHeight="48dp"
+                    android:text="@string/home_local_share_action"
+                    android:visibility="gone"
+                    tools:visibility="visible" />
+
                 <TextView
                     android:id="@+id/dashboard_action_note"
                     android:layout_width="match_parent"

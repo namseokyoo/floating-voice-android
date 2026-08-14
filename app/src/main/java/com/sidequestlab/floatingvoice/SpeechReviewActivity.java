@@ -8,6 +8,7 @@ import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.SystemClock;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.util.DisplayMetrics;
@@ -20,11 +21,19 @@ import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.activity.OnBackPressedCallback;
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
 import androidx.lifecycle.ViewModel;
 import androidx.lifecycle.ViewModelProvider;
 
+import com.sidequestlab.floatingvoice.core.Destination;
+import com.sidequestlab.floatingvoice.core.DestinationCatalog;
+import com.sidequestlab.floatingvoice.core.OutputRoute;
+import com.sidequestlab.floatingvoice.core.OutputRouteStateMachine;
+
+import java.util.ArrayList;
+import java.util.List;
 import java.util.function.Consumer;
 
 /** Non-exported, memory-only review/edit host for explicit Android text sharing. */
@@ -36,7 +45,14 @@ public final class SpeechReviewActivity extends AppCompatActivity {
     private Button share;
     private Button retry;
     private Button stop;
+    private View outputControls;
+    private TextView telegramDestination;
+    private Button chooseDestination;
+    private Button sendTelegram;
+    private TelegramRepository telegram;
+    private SpeechTelegramHandoffRegistry telegramHandoffs;
     private BroadcastReceiver serviceTeardownReceiver;
+    private BroadcastReceiver speechTelegramResultReceiver;
     private Consumer<SpeechReviewSession.UiState> observer;
     private boolean applyingState;
     private boolean chooserAwaitingReturn;
@@ -52,10 +68,16 @@ public final class SpeechReviewActivity extends AppCompatActivity {
         share = findViewById(R.id.speech_review_share);
         retry = findViewById(R.id.speech_review_retry);
         stop = findViewById(R.id.speech_review_stop);
+        outputControls = findViewById(R.id.speech_review_output_controls);
+        telegramDestination = findViewById(R.id.speech_review_telegram_destination);
+        chooseDestination = findViewById(R.id.speech_review_choose_destination);
+        sendTelegram = findViewById(R.id.speech_review_send_telegram);
         shareController = AndroidShareController.create(
                 this, getString(R.string.speech_review_share_chooser_title));
 
         FloatingVoiceApp app = (FloatingVoiceApp) getApplication();
+        telegram = app.telegram();
+        telegramHandoffs = app.speechTelegramHandoffs();
         AudioCaptureCoordinator coordinator = app.audioCaptureCoordinator();
         model = new ViewModelProvider(this, new ViewModelProvider.Factory() {
             @NonNull @Override public <T extends ViewModel> T create(@NonNull Class<T> type) {
@@ -69,6 +91,7 @@ public final class SpeechReviewActivity extends AppCompatActivity {
                 return type.cast(created);
             }
         }).get(SpeechReviewViewModel.class);
+        refreshTelegramDestination();
 
         observer = this::render;
         model.setObserver(observer);
@@ -82,6 +105,8 @@ public final class SpeechReviewActivity extends AppCompatActivity {
             @Override public void afterTextChanged(Editable editable) { }
         });
         share.setOnClickListener(view -> shareDraft());
+        chooseDestination.setOnClickListener(view -> openTelegramDestinationDialog());
+        sendTelegram.setOnClickListener(view -> sendDraftToTelegram());
         retry.setOnClickListener(view -> model.retry());
         stop.setOnClickListener(view -> model.stopListening());
         findViewById(R.id.speech_review_cancel).setOnClickListener(view -> closeWithoutSharing());
@@ -103,6 +128,18 @@ public final class SpeechReviewActivity extends AppCompatActivity {
         ContextCompat.registerReceiver(this, serviceTeardownReceiver,
                 new IntentFilter(FloatingVoiceService.ACTION_SERVICE_TEARDOWN),
                 ContextCompat.RECEIVER_NOT_EXPORTED);
+
+        speechTelegramResultReceiver = new BroadcastReceiver() {
+            @Override public void onReceive(Context context, Intent intent) {
+                if (intent == null || !FloatingVoiceService.ACTION_SPEECH_TELEGRAM_RESULT
+                        .equals(intent.getAction())) return;
+                replayTelegramHandoffResult();
+            }
+        };
+        ContextCompat.registerReceiver(this, speechTelegramResultReceiver,
+                new IntentFilter(FloatingVoiceService.ACTION_SPEECH_TELEGRAM_RESULT),
+                ContextCompat.RECEIVER_NOT_EXPORTED);
+        replayTelegramHandoffResult();
 
         if (checkSelfPermission(Manifest.permission.RECORD_AUDIO)
                 == PackageManager.PERMISSION_GRANTED) {
@@ -126,6 +163,7 @@ public final class SpeechReviewActivity extends AppCompatActivity {
 
     @Override protected void onResume() {
         super.onResume();
+        replayTelegramHandoffResult();
         if (model != null && model.hasSession()
                 && model.session().uiState().stage()
                 == SpeechReviewSession.Stage.SHARE_CONFIRMATION_REQUIRED) {
@@ -158,6 +196,18 @@ public final class SpeechReviewActivity extends AppCompatActivity {
     }
 
     private void shareDraft() {
+        SpeechReviewSession.UiState state = model.session().uiState();
+        model.clearTelegramFeedback();
+        DestinationCatalog catalog = telegram == null
+                ? DestinationCatalog.empty() : telegram.destinationCatalog();
+        long accountUserId = telegram == null ? 0L : telegram.authenticatedAccountUserId();
+        OutputRouteStateMachine output = new OutputRouteStateMachine(
+                OutputRoute.ContentKind.TEXT, accountUserId, catalog,
+                catalog.defaultLocalId().orElse(null));
+        if (!output.selectRoute(OutputRoute.SYSTEM_TEXT_SHARE)
+                || output.freeze(state.draft()).isEmpty()) {
+            return;
+        }
         AndroidShareController.Result result = model.session().share(shareController);
         chooserAwaitingReturn = result
                 == AndroidShareController.Result.CHOOSER_OPENED_USER_CONFIRMATION_REQUIRED;
@@ -167,6 +217,146 @@ public final class SpeechReviewActivity extends AppCompatActivity {
         } else if (result == AndroidShareController.Result.LAUNCH_FAILED) {
             status.setText(R.string.speech_review_share_failed);
         }
+    }
+
+    private void sendDraftToTelegram() {
+        SpeechReviewViewModel.TelegramOutputState output = model.telegramOutputState();
+        if (output.handoffInFlight() || output.selectedLocalId() == null) return;
+        SpeechReviewSession.UiState state = model.session().uiState();
+        if (!state.shareEnabled() || state.draft().isBlank()) return;
+        long handoffId = Math.max(1L, SystemClock.elapsedRealtimeNanos());
+        if (!model.beginTelegramHandoff(handoffId)) return;
+        sendTelegram.setEnabled(false);
+        chooseDestination.setEnabled(false);
+        share.setEnabled(false);
+        status.setText(R.string.speech_review_telegram_queuing);
+
+        Intent handoff = new Intent(FloatingVoiceService.ACTION_SPEECH_TELEGRAM_SUBMIT)
+                .setPackage(getPackageName())
+                .putExtra(FloatingVoiceService.EXTRA_COMPOSER_TEXT, state.draft())
+                .putExtra(FloatingVoiceService.EXTRA_DESTINATION_LOCAL_ID,
+                        output.selectedLocalId())
+                .putExtra(FloatingVoiceService.EXTRA_SPEECH_TELEGRAM_HANDOFF_ID,
+                        handoffId);
+        BroadcastReceiver receipt = new BroadcastReceiver() {
+            @Override public void onReceive(Context context, Intent intent) {
+                if (getResultCode() == FloatingVoiceService.COMPOSER_SUBMIT_ACCEPTED) {
+                    replayTelegramHandoffResult();
+                    return;
+                }
+                if (!model.rejectTelegramHandoff(handoffId)) return;
+                telegramHandoffs.clear(handoffId);
+                model.notifyStateChanged();
+                render(model.session().uiState());
+                status.setText(R.string.speech_review_telegram_handoff_failed);
+            }
+        };
+        try {
+            sendOrderedBroadcast(handoff, null, receipt, null,
+                    FloatingVoiceService.COMPOSER_SUBMIT_REJECTED, null, null);
+        } catch (RuntimeException failure) {
+            if (model.rejectTelegramHandoff(handoffId)) {
+                telegramHandoffs.clear(handoffId);
+                model.notifyStateChanged();
+                render(model.session().uiState());
+                status.setText(R.string.speech_review_telegram_handoff_failed);
+            }
+        }
+    }
+
+    private void openTelegramDestinationDialog() {
+        SpeechReviewViewModel.TelegramOutputState output = model.telegramOutputState();
+        if (telegram == null || output.handoffInFlight()) return;
+        DestinationCatalog catalog = telegram.destinationCatalog();
+        long accountUserId = telegram.authenticatedAccountUserId();
+        List<Destination> selectable = new ArrayList<>();
+        for (Destination destination : catalog.destinations()) {
+            if (destination.selectableBy(accountUserId)) selectable.add(destination);
+        }
+        if (selectable.isEmpty()) {
+            status.setText(R.string.speech_review_no_verified_destinations);
+            return;
+        }
+        CharSequence[] labels = new CharSequence[selectable.size()];
+        int checked = -1;
+        for (int index = 0; index < selectable.size(); index++) {
+            Destination destination = selectable.get(index);
+            labels[index] = destinationLabel(destination);
+            if (destination.localId().equals(output.selectedLocalId())) checked = index;
+        }
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle(R.string.speech_review_destination_dialog_title)
+                .setSingleChoiceItems(labels, checked, null)
+                .setNegativeButton(R.string.destination_picker_close, null)
+                .create();
+        dialog.setOnShowListener(ignored -> dialog.getListView().setOnItemClickListener(
+                (parent, view, position, id) -> {
+                    model.selectTelegramDestination(selectable.get(position).localId());
+                    refreshTelegramDestination();
+                    render(model.session().uiState());
+                    dialog.dismiss();
+                }));
+        dialog.show();
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().addFlags(WindowManager.LayoutParams.FLAG_SECURE);
+            if (Build.VERSION.SDK_INT >= 31) dialog.getWindow().setHideOverlayWindows(true);
+        }
+    }
+
+    private void refreshTelegramDestination() {
+        if (model == null) return;
+        SpeechReviewViewModel.TelegramOutputState output = model.telegramOutputState();
+        if (telegram == null) {
+            model.invalidateTelegramDestination(output.selectedLocalId());
+            telegramDestination.setText(R.string.speech_review_telegram_destination_none);
+            return;
+        }
+        DestinationCatalog catalog = telegram.destinationCatalog();
+        long accountUserId = telegram.authenticatedAccountUserId();
+        Destination selected = output.selectedLocalId() == null ? null
+                : catalog.selectable(output.selectedLocalId(), accountUserId).orElse(null);
+        if (selected == null && output.selectedLocalId() != null) {
+            model.invalidateTelegramDestination(output.selectedLocalId());
+        }
+        if (selected == null && !output.explicitSelection()) {
+            selected = catalog.defaultLocalId()
+                    .flatMap(localId -> catalog.selectable(localId, accountUserId))
+                    .orElse(null);
+            if (selected != null) model.initializeTelegramDestination(selected.localId());
+        }
+        telegramDestination.setText(selected == null
+                ? getString(R.string.speech_review_telegram_destination_none)
+                : getString(R.string.speech_review_telegram_destination_format,
+                        destinationLabel(selected)));
+    }
+
+    private void replayTelegramHandoffResult() {
+        if (model == null || telegramHandoffs == null) return;
+        SpeechReviewViewModel.TelegramOutputState output = model.telegramOutputState();
+        if (!output.handoffInFlight()) return;
+        telegramHandoffs.latest(output.handoffId()).ifPresent(event -> {
+            if (!model.matchesTelegramHandoff(event.handoffId())) return;
+            switch (event.status()) {
+                case QUEUED -> status.setText(R.string.speech_review_telegram_pending);
+                case DELIVERED -> {
+                    telegramHandoffs.clear(event.handoffId());
+                    model.close();
+                    finish();
+                }
+                case REJECTED -> {
+                    telegramHandoffs.clear(event.handoffId());
+                    if (!model.rejectTelegramHandoff(event.handoffId())) return;
+                    if (model.hasSession()) render(model.session().uiState());
+                    status.setText(R.string.speech_review_telegram_handoff_failed);
+                }
+            }
+        });
+    }
+
+    private static String destinationLabel(Destination destination) {
+        if (!destination.userAlias().isBlank()) return destination.userAlias();
+        if (!destination.resolvedTitle().isBlank()) return destination.resolvedTitle();
+        return "@" + destination.resolvedUsername();
     }
 
     private void closeWithoutSharing() {
@@ -193,9 +383,15 @@ public final class SpeechReviewActivity extends AppCompatActivity {
                 || state.stage() == SpeechReviewSession.Stage.SHARE_FAILED;
         stop.setVisibility(dictating ? View.VISIBLE : View.GONE);
         stop.setEnabled(dictating);
+        outputControls.setVisibility(reviewing ? View.VISIBLE : View.GONE);
+        if (reviewing) refreshTelegramDestination();
+        SpeechReviewViewModel.TelegramOutputState output = model.telegramOutputState();
+        chooseDestination.setEnabled(reviewing && !output.handoffInFlight());
+        sendTelegram.setEnabled(reviewing && state.shareEnabled()
+                && output.selectedLocalId() != null && !output.handoffInFlight());
         share.setVisibility(reviewing ? View.VISIBLE : View.GONE);
         retry.setVisibility(reviewing ? View.VISIBLE : View.GONE);
-        status.setText(switch (state.stage()) {
+        int statusResource = switch (state.stage()) {
             case CHECKING -> R.string.speech_recognition_checking;
             case LISTENING -> R.string.speech_recognition_listening;
             case PROCESSING -> R.string.speech_recognition_processing;
@@ -204,7 +400,10 @@ public final class SpeechReviewActivity extends AppCompatActivity {
             case SHARE_CONFIRMATION_REQUIRED -> R.string.speech_review_share_opened;
             case SHARE_FAILED -> R.string.speech_review_share_failed;
             case CANCELED -> R.string.speech_recognition_canceled;
-        });
+        };
+        status.setText(model.telegramFeedback()
+                == SpeechReviewViewModel.TelegramFeedback.REJECTED
+                ? R.string.speech_review_telegram_handoff_failed : statusResource);
     }
 
     private static SpeechReviewViewModel.RecognitionPort controllerPort(
@@ -229,6 +428,14 @@ public final class SpeechReviewActivity extends AppCompatActivity {
                 // Receiver was already removed by the platform.
             }
             serviceTeardownReceiver = null;
+        }
+        if (speechTelegramResultReceiver != null) {
+            try {
+                unregisterReceiver(speechTelegramResultReceiver);
+            } catch (IllegalArgumentException ignored) {
+                // Receiver was already removed by the platform.
+            }
+            speechTelegramResultReceiver = null;
         }
         if (!isChangingConfigurations()) {
             sendBroadcast(new Intent(FloatingVoiceService.ACTION_SPEECH_REVIEW_CLOSED)

@@ -10,6 +10,11 @@ import java.util.function.Consumer;
 /** Rotation-retained, memory-only owner of one speech review interaction. */
 public final class SpeechReviewViewModel extends ViewModel
         implements SystemSpeechRecognizerController.Listener {
+    public enum TelegramFeedback { NONE, REJECTED }
+    public record TelegramOutputState(String selectedLocalId,
+                                      boolean explicitSelection,
+                                      boolean handoffInFlight,
+                                      long handoffId) { }
     public interface RecognitionPort {
         SystemSpeechRecognizerController.StartResult start();
         default void stopListening() { }
@@ -27,6 +32,72 @@ public final class SpeechReviewViewModel extends ViewModel
     private SpeechReviewSession session;
     private Consumer<SpeechReviewSession.UiState> observer;
     private boolean started;
+    private String telegramDestinationLocalId;
+    private boolean telegramDestinationExplicit;
+    private boolean telegramHandoffInFlight;
+    private long telegramHandoffId;
+    private TelegramFeedback telegramFeedback = TelegramFeedback.NONE;
+
+    public synchronized TelegramOutputState telegramOutputState() {
+        return new TelegramOutputState(
+                telegramDestinationLocalId, telegramDestinationExplicit,
+                telegramHandoffInFlight, telegramHandoffId);
+    }
+
+    public synchronized void initializeTelegramDestination(String defaultLocalId) {
+        if (telegramDestinationLocalId == null && !telegramDestinationExplicit
+                && defaultLocalId != null && !defaultLocalId.isBlank()) {
+            telegramDestinationLocalId = defaultLocalId;
+        }
+    }
+
+    public synchronized void selectTelegramDestination(String localId) {
+        if (localId == null || localId.isBlank()) {
+            throw new IllegalArgumentException("localId must not be blank");
+        }
+        telegramDestinationLocalId = localId;
+        telegramDestinationExplicit = true;
+    }
+
+    public synchronized void invalidateTelegramDestination(String expectedLocalId) {
+        if (Objects.equals(telegramDestinationLocalId, expectedLocalId)) {
+            telegramDestinationLocalId = null;
+        }
+    }
+
+    public synchronized boolean beginTelegramHandoff(long handoffId) {
+        if (handoffId <= 0L || telegramHandoffInFlight) return false;
+        telegramFeedback = TelegramFeedback.NONE;
+        telegramHandoffInFlight = true;
+        telegramHandoffId = handoffId;
+        return true;
+    }
+
+    public synchronized boolean matchesTelegramHandoff(long handoffId) {
+        return telegramHandoffInFlight && handoffId > 0L
+                && telegramHandoffId == handoffId;
+    }
+
+    public synchronized void clearTelegramHandoff(long expectedHandoffId) {
+        if (!matchesTelegramHandoff(expectedHandoffId)) return;
+        telegramHandoffInFlight = false;
+        telegramHandoffId = 0L;
+    }
+
+    public synchronized boolean rejectTelegramHandoff(long expectedHandoffId) {
+        if (!matchesTelegramHandoff(expectedHandoffId)) return false;
+        clearTelegramHandoff(expectedHandoffId);
+        telegramFeedback = TelegramFeedback.REJECTED;
+        return true;
+    }
+
+    public synchronized TelegramFeedback telegramFeedback() {
+        return telegramFeedback;
+    }
+
+    public synchronized void clearTelegramFeedback() {
+        telegramFeedback = TelegramFeedback.NONE;
+    }
 
     public SpeechReviewViewModel(
             AudioCaptureCoordinator coordinator,
@@ -92,6 +163,9 @@ public final class SpeechReviewViewModel extends ViewModel
         if (session != null) {
             coordinator.completeSpeechInteraction(session.generation());
         }
+        telegramHandoffInFlight = false;
+        telegramHandoffId = 0L;
+        telegramFeedback = TelegramFeedback.NONE;
     }
 
     public synchronized boolean hasSession() {

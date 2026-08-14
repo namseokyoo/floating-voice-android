@@ -16,6 +16,8 @@ public final class OverlayStateMachine {
         TEXT_COMPOSING,
         SPEECH_REVIEW_OPENING,
         SPEECH_REVIEW_OPEN,
+        SPEECH_TEXT_QUEUEING,
+        SPEECH_TEXT_PENDING,
         TEXT_QUEUEING,
         TEXT_PENDING,
         TEARING_DOWN
@@ -167,9 +169,36 @@ public final class OverlayStateMachine {
                 }
             }
             case SPEECH_REVIEW_OPEN -> {
-                if (event == OverlayEvent.CLOSE_SPEECH_REVIEW) {
+                if (event == OverlayEvent.SUBMIT_TEXT) {
+                    state = State.SPEECH_TEXT_QUEUEING;
+                    effects = List.of(Effect.SEND_TEXT);
+                } else if (event == OverlayEvent.CLOSE_SPEECH_REVIEW) {
                     state = State.IDLE;
                     effects = List.of(Effect.RESTORE_PRIMARY_OVERLAY);
+                }
+            }
+            case SPEECH_TEXT_QUEUEING -> {
+                if (event == OverlayEvent.TEXT_QUEUED) {
+                    state = State.SPEECH_TEXT_PENDING;
+                } else if (event == OverlayEvent.TEXT_REJECTED) {
+                    state = State.SPEECH_REVIEW_OPEN;
+                } else if (event == OverlayEvent.TEXT_DELIVERED) {
+                    state = State.IDLE;
+                } else if (event == OverlayEvent.TAP) {
+                    attemptId++;
+                    state = State.VOICE_STARTING;
+                    effects = List.of(Effect.START_VOICE);
+                }
+            }
+            case SPEECH_TEXT_PENDING -> {
+                if (event == OverlayEvent.TEXT_REJECTED) {
+                    state = State.SPEECH_REVIEW_OPEN;
+                } else if (event == OverlayEvent.TEXT_DELIVERED) {
+                    state = State.IDLE;
+                } else if (event == OverlayEvent.TAP) {
+                    attemptId++;
+                    state = State.VOICE_STARTING;
+                    effects = List.of(Effect.START_VOICE);
                 }
             }
             case TEXT_QUEUEING -> {

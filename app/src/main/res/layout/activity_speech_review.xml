@@ -81,6 +81,51 @@
                 android:minHeight="48dp"
                 android:text="@string/speech_review_stop" />
 
+            <LinearLayout
+                android:id="@+id/speech_review_output_controls"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="14dp"
+                android:orientation="vertical"
+                android:visibility="gone">
+
+                <TextView
+                    style="@style/FloatingVoice.FieldLabel"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/speech_review_output_label"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/speech_review_telegram_destination"
+                    style="@style/FloatingVoice.SupportingText"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:accessibilityLiveRegion="polite"
+                    android:text="@string/speech_review_telegram_destination_none" />
+
+                <Button
+                    android:id="@+id/speech_review_choose_destination"
+                    style="@style/FloatingVoice.QuietOutlinedButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:filterTouchesWhenObscured="true"
+                    android:minHeight="48dp"
+                    android:text="@string/speech_review_choose_destination" />
+
+                <Button
+                    android:id="@+id/speech_review_send_telegram"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:enabled="false"
+                    android:filterTouchesWhenObscured="true"
+                    android:minHeight="48dp"
+                    android:text="@string/speech_review_send_telegram" />
+            </LinearLayout>
+
             <Button
                 android:id="@+id/speech_review_share"
                 android:layout_width="match_parent"

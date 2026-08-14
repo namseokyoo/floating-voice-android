@@ -413,6 +413,53 @@ class OverlayStateMachineTest {
     }
 
     @Test
+    void explicitSpeechReviewTelegramSubmitTransitionsToExactlyOneTextSend() {
+        OverlayStateMachine machine = new OverlayStateMachine();
+        machine.accept(OverlayEvent.LONG_PRESS);
+        machine.accept(OverlayEvent.OPEN_SPEECH_REVIEW);
+        machine.accept(OverlayEvent.SPEECH_REVIEW_OPENED);
+
+        OverlayStateMachine.Transition submit = machine.accept(OverlayEvent.SUBMIT_TEXT);
+
+        assertEquals(OverlayStateMachine.State.SPEECH_TEXT_QUEUEING, submit.nextState());
+        assertEquals(List.of(OverlayStateMachine.Effect.SEND_TEXT), submit.effects());
+        OverlayStateMachine.Transition duplicate = machine.accept(OverlayEvent.SUBMIT_TEXT);
+        assertEquals(OverlayStateMachine.State.SPEECH_TEXT_QUEUEING, duplicate.nextState());
+        assertEquals(List.of(), duplicate.effects());
+    }
+
+    @Test
+    void rejectedSpeechTextSendReturnsToReviewWhileDeliveredSendClosesIt() {
+        OverlayStateMachine rejected = machineIn(OverlayStateMachine.State.SPEECH_REVIEW_OPEN);
+        rejected.accept(OverlayEvent.SUBMIT_TEXT);
+        assertEquals(OverlayStateMachine.State.SPEECH_REVIEW_OPEN,
+                rejected.accept(OverlayEvent.TEXT_REJECTED).nextState());
+
+        OverlayStateMachine delivered = machineIn(OverlayStateMachine.State.SPEECH_REVIEW_OPEN);
+        delivered.accept(OverlayEvent.SUBMIT_TEXT);
+        assertEquals(OverlayStateMachine.State.SPEECH_TEXT_PENDING,
+                delivered.accept(OverlayEvent.TEXT_QUEUED).nextState());
+        assertEquals(OverlayStateMachine.State.IDLE,
+                delivered.accept(OverlayEvent.TEXT_DELIVERED).nextState());
+    }
+
+    @Test
+    void closedSpeechTextPendingCanStartVoiceAndOldDeliveryCallbackIsInert() {
+        OverlayStateMachine machine = machineIn(OverlayStateMachine.State.SPEECH_REVIEW_OPEN);
+        machine.accept(OverlayEvent.SUBMIT_TEXT);
+        machine.accept(OverlayEvent.TEXT_QUEUED);
+        long speechTextAttempt = machine.attemptId();
+
+        OverlayStateMachine.Transition tapped = machine.accept(OverlayEvent.TAP);
+
+        assertEquals(OverlayStateMachine.State.VOICE_STARTING, tapped.nextState());
+        assertEquals(List.of(OverlayStateMachine.Effect.START_VOICE), tapped.effects());
+        assertEquals(List.of(), machine.accept(
+                OverlayEvent.TEXT_DELIVERED, speechTextAttempt).effects());
+        assertEquals(OverlayStateMachine.State.VOICE_STARTING, machine.state());
+    }
+
+    @Test
     void speechReviewCloseWhileOpeningRestoresIdleOverlay() {
         OverlayStateMachine machine = new OverlayStateMachine();
         machine.accept(OverlayEvent.LONG_PRESS);
@@ -468,7 +515,13 @@ class OverlayStateMachineTest {
                 OverlayEvent.SPEECH_REVIEW_LAUNCH_FAILED,
                 OverlayEvent.CLOSE_SPEECH_REVIEW));
         legal.put(OverlayStateMachine.State.SPEECH_REVIEW_OPEN, EnumSet.of(
-                OverlayEvent.CLOSE_SPEECH_REVIEW));
+                OverlayEvent.SUBMIT_TEXT, OverlayEvent.CLOSE_SPEECH_REVIEW));
+        legal.put(OverlayStateMachine.State.SPEECH_TEXT_QUEUEING, EnumSet.of(
+                OverlayEvent.TEXT_QUEUED, OverlayEvent.TEXT_REJECTED,
+                OverlayEvent.TEXT_DELIVERED, OverlayEvent.TAP));
+        legal.put(OverlayStateMachine.State.SPEECH_TEXT_PENDING, EnumSet.of(
+                OverlayEvent.TEXT_DELIVERED, OverlayEvent.TEXT_REJECTED,
+                OverlayEvent.TAP));
         legal.put(OverlayStateMachine.State.TEXT_QUEUEING, EnumSet.of(
                 OverlayEvent.TEXT_QUEUED, OverlayEvent.TEXT_REJECTED,
                 OverlayEvent.TEXT_DELIVERED, OverlayEvent.TAP));
@@ -519,6 +572,15 @@ class OverlayStateMachineTest {
                 machine.accept(OverlayEvent.LONG_PRESS);
                 machine.accept(OverlayEvent.OPEN_SPEECH_REVIEW);
                 machine.accept(OverlayEvent.SPEECH_REVIEW_OPENED);
+            }
+            case SPEECH_TEXT_QUEUEING -> {
+                machine = machineIn(OverlayStateMachine.State.SPEECH_REVIEW_OPEN);
+                machine.accept(OverlayEvent.SUBMIT_TEXT);
+            }
+            case SPEECH_TEXT_PENDING -> {
+                machine = machineIn(OverlayStateMachine.State.SPEECH_REVIEW_OPEN);
+                machine.accept(OverlayEvent.SUBMIT_TEXT);
+                machine.accept(OverlayEvent.TEXT_QUEUED);
             }
             case TEXT_QUEUEING -> {
                 machine = textComposingMachine();

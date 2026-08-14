@@ -213,6 +213,7 @@
     <string name="home_connect_title">Connect Telegram</string>
     <string name="home_connect_supporting">Connect the account and destination that will receive your voice recordings.</string>
     <string name="home_connect_action">Connect Telegram</string>
+    <string name="home_local_share_action">Start speech &amp; Android Share</string>
     <string name="home_connect_note">Usually takes about two minutes</string>
     <string name="home_auth_eyebrow">Authentication in progress</string>
     <string name="home_auth_title">Continue authentication</string>
@@ -398,13 +399,23 @@
     <string name="speech_recognition_permission_required">Microphone permission is required.</string>
     <string name="speech_recognition_cancel">Cancel</string>
     <string name="speech_review_title">Review and share text</string>
-    <string name="speech_review_privacy_note">The draft stays only in memory. Speech recognition may use a network service. Nothing is shared until you tap Share and choose an app.</string>
+    <string name="speech_review_privacy_note">The draft stays only in memory. Speech recognition may use a network service. Nothing leaves until you explicitly choose Telegram or Android Share.</string>
     <string name="speech_review_draft_label">Editable draft</string>
 
-    <string name="speech_review_share">Share…</string>
+    <string name="speech_review_output_label">Output</string>
+    <string name="speech_review_telegram_destination_none">Telegram destination unavailable</string>
+    <string name="speech_review_telegram_destination_format">Telegram · %1$s</string>
+    <string name="speech_review_choose_destination">Change Telegram destination</string>
+    <string name="speech_review_destination_dialog_title">Send this text to</string>
+    <string name="speech_review_no_verified_destinations">No verified Telegram destination is available. You can still use Android Share.</string>
+    <string name="speech_review_send_telegram">Send to Telegram</string>
+    <string name="speech_review_telegram_queuing">Handed off safely. Waiting for Telegram to queue it…</string>
+    <string name="speech_review_telegram_pending">Telegram accepted the message. Waiting for delivery confirmation…</string>
+    <string name="speech_review_telegram_handoff_failed">Could not safely hand off this text to the selected Telegram destination. The draft remains here.</string>
+    <string name="speech_review_share">Android Share…</string>
     <string name="speech_review_retry">Try speech recognition again</string>
     <string name="speech_review_stop">Stop and review</string>
-    <string name="speech_review_editing">Review or edit the draft, then tap Share.</string>
+    <string name="speech_review_editing">Review or edit the draft, then choose Telegram or Android Share.</string>
     <string name="speech_review_keyboard_fallback">Speech recognition is unavailable. The visible draft is kept for keyboard editing.</string>
     <string name="speech_review_share_opened">Sharesheet opened — choose an app and confirm there.</string>
     <string name="speech_review_share_failed">Could not open the Sharesheet. Your draft is still here; you can retry safely.</string>

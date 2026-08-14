@@ -141,6 +141,7 @@ public final class MainActivity extends AppCompatActivity implements TelegramRep
     private View permissionStep;
     private View connectionComplete;
     private MaterialButton dashboardPrimaryAction;
+    private MaterialButton dashboardLocalShareAction;
     private MaterialButton destinationAddButton;
     private MaterialButton destinationOrderEditButton;
     private MaterialButton resendAuthCodeButton;
@@ -300,6 +301,7 @@ public final class MainActivity extends AppCompatActivity implements TelegramRep
         permissionStep = findViewById(R.id.permission_step);
         connectionComplete = findViewById(R.id.connection_complete);
         dashboardPrimaryAction = findViewById(R.id.dashboard_primary_action);
+        dashboardLocalShareAction = findViewById(R.id.dashboard_local_share_action);
         destinationAddButton = findViewById(R.id.destination_add_button);
         destinationOrderEditButton = findViewById(R.id.destination_order_edit_button);
         resendAuthCodeButton = findViewById(R.id.resend_auth_code);
@@ -346,6 +348,7 @@ public final class MainActivity extends AppCompatActivity implements TelegramRep
         findViewById(R.id.dismiss_error).setOnClickListener(v -> dismissPersistentStatus());
         findViewById(R.id.logout).setOnClickListener(v -> confirmLogout());
         dashboardPrimaryAction.setOnClickListener(v -> handlePrimaryAction());
+        dashboardLocalShareAction.setOnClickListener(v -> startOverlay());
         destinationAddButton.setOnClickListener(v -> showAddDestinationDialog());
         destinationOrderEditButton.setOnClickListener(v -> {
             destinationOrderEditing = !destinationOrderEditing;
@@ -1104,6 +1107,10 @@ public final class MainActivity extends AppCompatActivity implements TelegramRep
                 && target != null && target.username().equals(savedConfig.botUsername());
         dashboardState = DashboardReadiness.evaluate(running, hasConfiguration,
                 authenticationComplete, targetConfirmed, permissionsGranted());
+        dashboardLocalShareAction.setVisibility(
+                OverlayCapabilityPolicy.independentStartActionVisible(
+                        running, authenticationComplete && targetConfirmed)
+                        ? View.VISIBLE : View.GONE);
 
         switch (dashboardState) {
             case CONNECT_TELEGRAM:
@@ -1296,10 +1303,6 @@ public final class MainActivity extends AppCompatActivity implements TelegramRep
         if (!permissionsGranted()) {
             presentLocalStatus(R.string.permissions_required_first, true, false);
             requestRequiredPermissions();
-            return;
-        }
-        if (!telegram.isReadyWithTarget()) {
-            presentLocalStatus(R.string.telegram_target_required_first, true, false);
             return;
         }
         Intent service = new Intent(this, FloatingVoiceService.class)
