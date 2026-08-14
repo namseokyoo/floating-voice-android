@@ -40,6 +40,18 @@
         <item name="android:windowSoftInputMode">adjustNothing</item>
     </style>
 
+    <style name="Theme.FloatingVoice.SpeechReview" parent="Theme.FloatingVoice.OverlayMaterial3">
+        <item name="android:backgroundDimEnabled">true</item>
+        <item name="android:backgroundDimAmount">0.48</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:windowCloseOnTouchOutside">false</item>
+        <item name="android:windowDisablePreview">true</item>
+        <item name="android:windowIsFloating">true</item>
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="windowNoTitle">true</item>
+    </style>
+
     <!-- Overlay/composer theme keeps its v0.5.0 fixed semantic tokens. -->
     <style name="Theme.FloatingVoice.OverlayMaterial3" parent="Theme.Material3.DayNight.NoActionBar">
         <item name="colorPrimary">@color/fv_primary</item>

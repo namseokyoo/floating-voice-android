@@ -8,6 +8,19 @@ import static org.junit.Assert.assertEquals;
 
 public class SpeechReviewViewModelTest {
     @Test
+    public void explicitStopDelegatesToRecognitionWithoutCancelingTheSession() {
+        AudioCaptureCoordinator coordinator = new AudioCaptureCoordinator();
+        FakeRecognitionFactory factory = new FakeRecognitionFactory(coordinator);
+        SpeechReviewViewModel model = new SpeechReviewViewModel(coordinator, factory);
+        model.startOnce();
+
+        model.stopListening();
+
+        assertEquals(1, factory.port.stops);
+        assertEquals(0, factory.port.cancels);
+    }
+
+    @Test
     public void recreatedActivityStartRequestDoesNotDuplicateRecognitionAndDraftStaysInMemory() {
         AudioCaptureCoordinator coordinator = new AudioCaptureCoordinator();
         FakeRecognitionFactory factory = new FakeRecognitionFactory(coordinator);
@@ -88,6 +101,8 @@ public class SpeechReviewViewModelTest {
     private static final class FakeRecognitionPort
             implements SpeechReviewViewModel.RecognitionPort {
         int starts;
+        int stops;
+        int cancels;
         Runnable onStart;
 
         @Override public SystemSpeechRecognizerController.StartResult start() {
@@ -96,7 +111,8 @@ public class SpeechReviewViewModelTest {
             return SystemSpeechRecognizerController.StartResult.STARTED;
         }
 
-        @Override public void cancel() { }
+        @Override public void stopListening() { stops++; }
+        @Override public void cancel() { cancels++; }
         @Override public void destroy() { }
     }
 }

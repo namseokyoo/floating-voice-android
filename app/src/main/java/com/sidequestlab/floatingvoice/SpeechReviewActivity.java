@@ -10,6 +10,9 @@ import android.os.Build;
 import android.os.Bundle;
 import android.text.Editable;
 import android.text.TextWatcher;
+import android.util.DisplayMetrics;
+import android.view.Gravity;
+import android.view.View;
 import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.EditText;
@@ -32,6 +35,7 @@ public final class SpeechReviewActivity extends AppCompatActivity {
     private EditText draft;
     private Button share;
     private Button retry;
+    private Button stop;
     private BroadcastReceiver serviceTeardownReceiver;
     private Consumer<SpeechReviewSession.UiState> observer;
     private boolean applyingState;
@@ -47,6 +51,7 @@ public final class SpeechReviewActivity extends AppCompatActivity {
         draft = findViewById(R.id.speech_review_draft);
         share = findViewById(R.id.speech_review_share);
         retry = findViewById(R.id.speech_review_retry);
+        stop = findViewById(R.id.speech_review_stop);
         shareController = AndroidShareController.create(
                 this, getString(R.string.speech_review_share_chooser_title));
 
@@ -78,6 +83,7 @@ public final class SpeechReviewActivity extends AppCompatActivity {
         });
         share.setOnClickListener(view -> shareDraft());
         retry.setOnClickListener(view -> model.retry());
+        stop.setOnClickListener(view -> model.stopListening());
         findViewById(R.id.speech_review_cancel).setOnClickListener(view -> closeWithoutSharing());
         getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
             @Override public void handleOnBackPressed() {
@@ -109,6 +115,15 @@ public final class SpeechReviewActivity extends AppCompatActivity {
         }
     }
 
+    @Override protected void onStart() {
+        super.onStart();
+        DisplayMetrics metrics = getResources().getDisplayMetrics();
+        SpeechReviewWindowGeometry.Size size = SpeechReviewWindowGeometry.calculate(
+                metrics.widthPixels, metrics.heightPixels, metrics.density);
+        getWindow().setGravity(Gravity.CENTER);
+        getWindow().setLayout(size.widthPx(), size.heightPx());
+    }
+
     @Override protected void onResume() {
         super.onResume();
         if (model != null && model.hasSession()
@@ -133,7 +148,7 @@ public final class SpeechReviewActivity extends AppCompatActivity {
         boolean shouldFinish = SpeechReviewLifecyclePolicy.shouldFinishOnStop(
                 isChangingConfigurations(), chooserAwaitingReturn, retainedStage);
         if (model != null && model.hasSession() && shouldFinish
-                && model.session().uiState().stage() == SpeechReviewSession.Stage.LISTENING) {
+                && SpeechReviewLifecyclePolicy.shouldCancelRecognitionOnStop(retainedStage)) {
             model.cancel();
         }
         if (!isFinishing() && shouldFinish) {
@@ -171,6 +186,15 @@ public final class SpeechReviewActivity extends AppCompatActivity {
         draft.setEnabled(state.editable());
         share.setEnabled(state.shareEnabled());
         retry.setEnabled(state.retryEnabled());
+        boolean dictating = state.stage() == SpeechReviewSession.Stage.LISTENING
+                || state.stage() == SpeechReviewSession.Stage.PROCESSING;
+        boolean reviewing = state.stage() == SpeechReviewSession.Stage.EDITING
+                || state.stage() == SpeechReviewSession.Stage.KEYBOARD_FALLBACK
+                || state.stage() == SpeechReviewSession.Stage.SHARE_FAILED;
+        stop.setVisibility(dictating ? View.VISIBLE : View.GONE);
+        stop.setEnabled(dictating);
+        share.setVisibility(reviewing ? View.VISIBLE : View.GONE);
+        retry.setVisibility(reviewing ? View.VISIBLE : View.GONE);
         status.setText(switch (state.stage()) {
             case CHECKING -> R.string.speech_recognition_checking;
             case LISTENING -> R.string.speech_recognition_listening;
@@ -189,6 +213,7 @@ public final class SpeechReviewActivity extends AppCompatActivity {
             @Override public SystemSpeechRecognizerController.StartResult start() {
                 return controller.start();
             }
+            @Override public void stopListening() { controller.stopListening(); }
             @Override public void cancel() { controller.cancel(); }
             @Override public void destroy() { controller.destroy(); }
         };

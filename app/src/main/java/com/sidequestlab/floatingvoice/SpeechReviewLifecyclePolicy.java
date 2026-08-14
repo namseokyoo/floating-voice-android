@@ -15,4 +15,12 @@ public final class SpeechReviewLifecyclePolicy {
                 && !localChooserAwaitingReturn
                 && retainedStage != SpeechReviewSession.Stage.SHARE_CONFIRMATION_REQUIRED;
     }
+
+    public static boolean shouldCancelRecognitionOnStop(
+            SpeechReviewSession.Stage retainedStage) {
+        Objects.requireNonNull(retainedStage, "retainedStage");
+        return retainedStage == SpeechReviewSession.Stage.CHECKING
+                || retainedStage == SpeechReviewSession.Stage.LISTENING
+                || retainedStage == SpeechReviewSession.Stage.PROCESSING;
+    }
 }

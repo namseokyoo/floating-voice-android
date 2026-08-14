@@ -23,6 +23,20 @@ public class SpeechReviewLifecyclePolicyTest {
     }
 
     @Test
+    public void backgroundingCancelsEveryActiveRecognitionStageOnly() {
+        assertTrue(SpeechReviewLifecyclePolicy.shouldCancelRecognitionOnStop(
+                SpeechReviewSession.Stage.CHECKING));
+        assertTrue(SpeechReviewLifecyclePolicy.shouldCancelRecognitionOnStop(
+                SpeechReviewSession.Stage.LISTENING));
+        assertTrue(SpeechReviewLifecyclePolicy.shouldCancelRecognitionOnStop(
+                SpeechReviewSession.Stage.PROCESSING));
+        assertFalse(SpeechReviewLifecyclePolicy.shouldCancelRecognitionOnStop(
+                SpeechReviewSession.Stage.EDITING));
+        assertFalse(SpeechReviewLifecyclePolicy.shouldCancelRecognitionOnStop(
+                SpeechReviewSession.Stage.SHARE_CONFIRMATION_REQUIRED));
+    }
+
+    @Test
     public void configurationChangeNeverFinishesReviewActivity() {
         assertFalse(SpeechReviewLifecyclePolicy.shouldFinishOnStop(
                 true,

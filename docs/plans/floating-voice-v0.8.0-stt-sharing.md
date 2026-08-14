@@ -12,7 +12,7 @@
 
 **Non-goals:** 녹음된 OGG 사후 STT, bundled Whisper, cloud STT, MediaRecorder+SpeechRecognizer 동시 실행, Kakao 지정방 자동전송, 공유 대상 앱의 최종 수신 성공 추적, 복수 output 동시 실행.
 
-**현재 단계 상태 (2026-08-14 14:10 KST):** `V8-04 AUTOMATED COMPLETE / INTERMEDIATE APK USER GATE`. V8-03 system recognizer와 V8-04 메모리 내 review/edit, explicit text Sharesheet, 세 번째 overlay action, generation/rotation/lifecycle 안전성을 구현했다. V8-04 최초 독립 리뷰 High 3건을 수정했고 후속 리뷰 PASS(Blocker 0/High 0), clean 211 tasks, core 185 + app debug 114 + app release 110 tests/fail 0, Debug/Release Lint 오류 0, localization 382/382를 통과했다. 공식 서명 중간 APK에서 형이 A52s 검토를 PASS하기 전에는 V8-05로 넘어가지 않는다. 폰/ADB 조작과 공개 릴리스는 승인 범위가 아니다.
+**현재 단계 상태 (2026-08-14 15:53 KST):** `V8-04 R2 SIGNED DEVICE APK PREPARATION`. 작은 불투명 중앙 review 카드와 사용자 Stop까지 같은 generation/audio lease에서 fresh recognizer cycle을 잇는 chained dictation을 구현했다. Stop 뒤 error/blank final에도 누적·visible partial을 review에 보존하고 cancel/destroy 동기 callback을 선무효화한다. 최초 독립 R2 리뷰 High 2건을 RED→GREEN으로 닫고 후속 리뷰 PASS(Blocker 0/High 0), clean 211 tasks, core 186/app debug 127/app release 123 tests, Lint 오류 0, speech-review Lint issue 0, localization 382/382를 통과했다. reviewed source commit/push 후 공식 서명 R2 APK를 만들어 형이 A52s에서 확인한다. Android `SpeechRecognizer`의 진짜 무제한 단일 세션을 보장하는 것이 아니라 short recognizer cycle을 잇는 사용자 세션이다. STT 텍스트의 Telegram 기본 대상·다른 Telegram 대상·Android 공유 선택은 V8-05 통합 output-route 계약으로 편입하며 R2 PASS 전에는 구현하지 않는다. 폰/ADB 조작과 공개 릴리스는 승인 범위가 아니다.
 
 ---
 
@@ -332,25 +332,40 @@ TEARING_DOWN
 
 ---
 
-## 8. V8-05 — output route domain model
+## 8. V8-05 — voice/text 통합 output route domain model
 
 **파일:**
 
-- Create: `core/src/main/java/com/sidequestlab/floatingvoice/core/RecordingOutputRoute.java`
+- Create: `core/src/main/java/com/sidequestlab/floatingvoice/core/OutputRoute.java`
 - Create: `core/src/main/java/com/sidequestlab/floatingvoice/core/OutputRouteStateMachine.java`
 - Create: corresponding tests
 - Extend: `DispatchTargetSnapshot` only for Telegram route; local/share는 별도 output snapshot
+- Extend: STT review UI with current Telegram destination, destination picker, `Telegram으로 보내기`, `Android 공유…`
 
 **route:**
 
-- `TELEGRAM`
-- `LOCAL_ARCHIVE`
+- `TELEGRAM_VOICE`
+- `TELEGRAM_TEXT`
+- `LOCAL_AUDIO_ARCHIVE`
 - `SYSTEM_AUDIO_SHARE`
+- `SYSTEM_TEXT_SHARE`
+
+**STT 텍스트 기본 계약:**
+
+- review 화면의 기본 output은 현재 검증된 Telegram 기본 목적지다.
+- 사용자는 전송 전에 기존 목적지 선택과 같은 흐름으로 다른 검증된 Telegram 목적지를 고를 수 있다.
+- Android 공유는 Telegram destination이 아니라 별도의 `SYSTEM_TEXT_SHARE` output action이다.
+- 전송/공유 시작 시 content와 output, Telegram이면 destination identity/revision을 함께 freeze한다.
+- final/partial callback은 어떤 output도 자동 실행하지 않으며, 명시적 `보내기` 또는 `공유…`만 외부 동작을 시작한다.
+- 실패 시 Telegram↔Sharesheet 또는 다른 Telegram 목적지로 자동 fallback하지 않는다.
 
 **Tests first:**
 
 - 한 capture에 output 하나만 freeze
-- Telegram route만 destination required
+- Telegram voice/text route만 destination required
+- STT text 기본값이 현재 Telegram 목적지이며 명시 변경 전에는 그대로 유지
+- STT text의 목적지 변경 후 send가 변경된 destination snapshot만 사용
+- `SYSTEM_TEXT_SHARE`는 chat destination을 요구하거나 저장하지 않음
 - local/share를 fake chat destination으로 저장하지 않음
 - freeze 이후 output 변경 거부
 - retry/cleanup가 route별 정책 사용

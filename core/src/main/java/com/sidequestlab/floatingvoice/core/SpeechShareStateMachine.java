@@ -116,6 +116,8 @@ public final class SpeechShareStateMachine {
                     }
                 } else if (event.type() == SpeechShareEvent.Type.PROCESSING) {
                     state = State.STT_PROCESSING;
+                } else if (event.type() == SpeechShareEvent.Type.LISTENING_CYCLE_STARTED) {
+                    state = State.STT_LISTENING;
                 } else if (event.type() == SpeechShareEvent.Type.FINAL_RESULT) {
                     String result = normalize(event.text());
                     if (result == null) {

@@ -388,8 +388,8 @@
     <string name="open_app_settings">Open app settings</string>
     <string name="dismiss_error">Dismiss</string>
     <string name="speech_recognition_checking">Checking Korean speech recognition support…</string>
-    <string name="speech_recognition_listening">Listening for a short dictation…</string>
-    <string name="speech_recognition_processing">Processing speech…</string>
+    <string name="speech_recognition_listening">Listening until you tap Stop…</string>
+    <string name="speech_recognition_processing">Processing this segment, then continuing…</string>
     <string name="speech_recognition_complete">Speech recognition complete.</string>
     <string name="speech_recognition_mic_busy">The microphone is already in use.</string>
     <string name="speech_recognition_keyboard_required">Speech recognition is unavailable. Keyboard input is required.</string>
@@ -400,9 +400,10 @@
     <string name="speech_review_title">Review and share text</string>
     <string name="speech_review_privacy_note">The draft stays only in memory. Speech recognition may use a network service. Nothing is shared until you tap Share and choose an app.</string>
     <string name="speech_review_draft_label">Editable draft</string>
-    <string name="speech_review_draft_hint">Speak or type the text you want to share</string>
+
     <string name="speech_review_share">Share…</string>
     <string name="speech_review_retry">Try speech recognition again</string>
+    <string name="speech_review_stop">Stop and review</string>
     <string name="speech_review_editing">Review or edit the draft, then tap Share.</string>
     <string name="speech_review_keyboard_fallback">Speech recognition is unavailable. The visible draft is kept for keyboard editing.</string>
     <string name="speech_review_share_opened">Sharesheet opened — choose an app and confirm there.</string>

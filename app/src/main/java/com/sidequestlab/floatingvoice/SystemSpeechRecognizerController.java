@@ -20,8 +20,9 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * Main-thread owner of one explicit, short system speech-recognition attempt.
- * It never restarts recognition and never triggers a model download automatically.
+ * Main-thread owner of one explicit user-stopped speech-recognition session.
+ * It chains fresh, short platform recognizers while retaining one audio lease and generation.
+ * It never triggers a model download or shares transcript text automatically.
  */
 public final class SystemSpeechRecognizerController {
     public enum StartResult {
@@ -120,6 +121,7 @@ public final class SystemSpeechRecognizerController {
 
     public interface Recognizer {
         void startListening(RecognitionRequest request);
+        void stopListening();
         void cancel();
         void destroy();
     }
@@ -221,31 +223,55 @@ public final class SystemSpeechRecognizerController {
                     session.route, SpeechRecognitionSupport.ModelState.CHECKING,
                     session.fallbackReason);
             emit(OutcomeType.SUPPORT_CHANGED, generation, null, null, checking);
-            if (!isCurrent(session)) return StartResult.STARTED;
+            Cycle cycle = session.cycle;
+            if (!isCurrent(session, cycle)) return StartResult.STARTED;
             Session captured = session;
             try {
-                platform.checkRecognitionSupport(session.recognizer, session.request,
-                        support -> handleSupportResult(captured, support));
+                platform.checkRecognitionSupport(cycle.recognizer, session.request,
+                        support -> handleSupportResult(captured, cycle, support));
             } catch (RuntimeException supportFailure) {
-                handleSupportResult(captured, PlatformSupport.ERROR);
+                handleSupportResult(captured, cycle, PlatformSupport.ERROR);
             }
             return StartResult.STARTED;
         }
 
-        return beginListening(session) ? StartResult.STARTED : StartResult.UNAVAILABLE;
+        return beginListening(session, session.cycle)
+                ? StartResult.STARTED : StartResult.UNAVAILABLE;
     }
 
     public synchronized void cancel() {
         platform.assertMainThread();
         Session session = active;
         if (session == null || session.terminal) return;
+        Cycle cycle = session.cycle;
+        if (cycle != null) cycle.terminal = true;
         try {
-            session.recognizer.cancel();
+            if (cycle != null) cycle.recognizer.cancel();
         } catch (RuntimeException ignored) {
             // Destruction below is the authoritative release boundary.
         }
         terminate(session, SpeechShareEvent.cancel(session.generation),
                 OutcomeType.CANCELED, null, null, false);
+    }
+
+    /** Requests the current platform cycle to finish; its next terminal callback enters review. */
+    public synchronized void stopListening() {
+        platform.assertMainThread();
+        Session session = active;
+        if (session == null || session.terminal || session.stopRequested) return;
+        session.stopRequested = true;
+        Cycle cycle = session.cycle;
+        if (cycle == null) {
+            finishStoppedSession(session, null, ErrorKind.NO_MATCH);
+            return;
+        }
+        try {
+            cycle.recognizer.stopListening();
+        } catch (RuntimeException stopFailure) {
+            if (!isActive(session)) return;
+            cycle.terminal = true;
+            finishStoppedSession(session, cycle, ErrorKind.NO_MATCH);
+        }
     }
 
     public synchronized void destroy() {
@@ -259,8 +285,10 @@ public final class SystemSpeechRecognizerController {
             return;
         }
         if (session.terminal) return;
+        Cycle cycle = session.cycle;
+        if (cycle != null) cycle.terminal = true;
         try {
-            session.recognizer.cancel();
+            if (cycle != null) cycle.recognizer.cancel();
         } catch (RuntimeException ignored) {
             // Destruction below is the authoritative release boundary.
         }
@@ -286,34 +314,41 @@ public final class SystemSpeechRecognizerController {
             boolean onDevice) {
         Session session = new Session(generation, route, fallback,
                 new RecognitionRequest(KOREAN_LANGUAGE, true, true, platform.callingPackage()));
-        Callback callback = new Callback() {
-            @Override public void onPartialResult(String text) {
-                handlePartial(session, text);
-            }
-
-            @Override public void onProcessing() {
-                handleProcessing(session);
-            }
-
-            @Override public void onFinalResult(String text) {
-                handleFinal(session, text);
-            }
-
-            @Override public void onError(PlatformError error) {
-                handleError(session, error);
-            }
-        };
-        session.recognizer = onDevice
-                ? platform.createOnDeviceRecognizer(callback)
-                : platform.createStandardRecognizer(callback);
-        if (session.recognizer == null) throw new IllegalStateException("null recognizer");
+        session.cycle = createCycle(session, onDevice);
         return session;
     }
 
-    private void handleSupportResult(Session session, PlatformSupport platformSupport) {
+    private Cycle createCycle(Session session, boolean onDevice) {
+        Cycle cycle = new Cycle();
+        Callback callback = new Callback() {
+            @Override public void onPartialResult(String text) {
+                handlePartial(session, cycle, text);
+            }
+
+            @Override public void onProcessing() {
+                handleProcessing(session, cycle);
+            }
+
+            @Override public void onFinalResult(String text) {
+                handleFinal(session, cycle, text);
+            }
+
+            @Override public void onError(PlatformError error) {
+                handleError(session, cycle, error);
+            }
+        };
+        cycle.recognizer = onDevice
+                ? platform.createOnDeviceRecognizer(callback)
+                : platform.createStandardRecognizer(callback);
+        if (cycle.recognizer == null) throw new IllegalStateException("null recognizer");
+        return cycle;
+    }
+
+    private void handleSupportResult(
+            Session session, Cycle cycle, PlatformSupport platformSupport) {
         synchronized (this) {
             platform.assertMainThread();
-            if (!isCurrent(session) || session.supportResolved) return;
+            if (!isCurrent(session, cycle) || session.supportResolved) return;
             session.supportResolved = true;
             SpeechRecognitionSupport.ModelState modelState = switch (platformSupport) {
                 case READY -> SpeechRecognitionSupport.ModelState.READY;
@@ -328,11 +363,11 @@ public final class SystemSpeechRecognizerController {
                             SpeechRecognitionSupport.Availability.UNAVAILABLE,
                             session.route, modelState, session.fallbackReason, true);
             emit(OutcomeType.SUPPORT_CHANGED, session.generation, null, null, support);
-            if (!isCurrent(session)) return;
+            if (!isCurrent(session, cycle)) return;
             if (platformSupport == PlatformSupport.READY) {
-                beginListening(session);
+                beginListening(session, cycle);
             } else if (session.route == SpeechRecognitionSupport.Route.ON_DEVICE) {
-                fallbackToStandard(session, switch (platformSupport) {
+                fallbackToStandard(session, cycle, switch (platformSupport) {
                     case DOWNLOAD_REQUIRED ->
                             SpeechRecognitionSupport.FallbackReason
                                     .ON_DEVICE_MODEL_DOWNLOAD_REQUIRED;
@@ -350,87 +385,102 @@ public final class SystemSpeechRecognizerController {
     }
 
     private void fallbackToStandard(
-            Session onDeviceSession,
+            Session session,
+            Cycle onDeviceCycle,
             SpeechRecognitionSupport.FallbackReason fallbackReason) {
-        if (!isCurrent(onDeviceSession)) return;
-        onDeviceSession.terminal = true;
-        if (!destroyRecognizerOnce(onDeviceSession)) return;
-
-        Session standardSession;
-        try {
-            standardSession = createSession(
-                    onDeviceSession.generation,
-                    SpeechRecognitionSupport.Route.STANDARD,
-                    fallbackReason,
-                    false);
-        } catch (RuntimeException standardFailure) {
-            active = null;
-            failWithoutRecognizer(onDeviceSession.generation, OutcomeType.KEYBOARD_REQUIRED,
-                    SpeechRecognitionSupport.keyboardRequired(
-                            SpeechRecognitionSupport.FallbackReason.STANDARD_CREATION_FAILED));
+        if (!isCurrent(session, onDeviceCycle)) return;
+        onDeviceCycle.terminal = true;
+        if (!destroyCycleOnce(session, onDeviceCycle)) {
+            session.terminal = true;
             return;
         }
 
-        active = standardSession;
+        try {
+            session.route = SpeechRecognitionSupport.Route.STANDARD;
+            session.fallbackReason = fallbackReason;
+            session.supportResolved = false;
+            session.cycle = createCycle(session, false);
+        } catch (RuntimeException standardFailure) {
+            terminate(session, SpeechShareEvent.supportUnavailable(session.generation),
+                    OutcomeType.KEYBOARD_REQUIRED, null, null, false);
+            return;
+        }
+
+        Cycle standardCycle = session.cycle;
         SpeechRecognitionSupport checking = SpeechRecognitionSupport.available(
-                standardSession.route,
+                session.route,
                 SpeechRecognitionSupport.ModelState.CHECKING,
-                standardSession.fallbackReason);
+                session.fallbackReason);
         if (platform.apiLevel() >= 33) {
-            emit(OutcomeType.SUPPORT_CHANGED, standardSession.generation, null, null, checking);
-            if (!isCurrent(standardSession)) return;
+            emit(OutcomeType.SUPPORT_CHANGED, session.generation, null, null, checking);
+            if (!isCurrent(session, standardCycle)) return;
             try {
                 platform.checkRecognitionSupport(
-                        standardSession.recognizer,
-                        standardSession.request,
-                        support -> handleSupportResult(standardSession, support));
+                        standardCycle.recognizer,
+                        session.request,
+                        support -> handleSupportResult(session, standardCycle, support));
             } catch (RuntimeException supportFailure) {
-                handleSupportResult(standardSession, PlatformSupport.ERROR);
+                handleSupportResult(session, standardCycle, PlatformSupport.ERROR);
             }
         } else {
-            beginListening(standardSession);
+            emit(OutcomeType.SUPPORT_CHANGED, session.generation, null, null,
+                    SpeechRecognitionSupport.available(
+                            session.route,
+                            SpeechRecognitionSupport.ModelState.NOT_APPLICABLE,
+                            session.fallbackReason));
+            if (!isCurrent(session, standardCycle)) return;
+            beginListening(session, standardCycle);
         }
     }
 
-    private boolean beginListening(Session session) {
-        if (!isCurrent(session) || session.listeningStarted) return false;
-        session.listeningStarted = true;
+    private boolean beginListening(Session session, Cycle cycle) {
+        if (!isCurrent(session, cycle) || cycle.listeningStarted) return false;
+        cycle.listeningStarted = true;
         SpeechRecognitionSupport.ModelState modelState = platform.apiLevel() >= 33
                 ? SpeechRecognitionSupport.ModelState.READY
                 : SpeechRecognitionSupport.ModelState.NOT_APPLICABLE;
-        if (platform.apiLevel() < 33) {
+        if (platform.apiLevel() < 33 && !session.captureStarted) {
             emit(OutcomeType.SUPPORT_CHANGED, session.generation, null, null,
                     SpeechRecognitionSupport.available(
                             session.route, modelState, session.fallbackReason));
-            if (!isCurrent(session)) return false;
+            if (!isCurrent(session, cycle)) return false;
         }
-        coordinator.acceptSpeech(SpeechShareEvent.supportAvailable(session.generation));
+        if (!session.captureStarted) {
+            coordinator.acceptSpeech(SpeechShareEvent.supportAvailable(session.generation));
+            session.captureStarted = true;
+        }
         try {
-            session.recognizer.startListening(session.request);
-            if (!isCurrent(session)) return false;
+            cycle.inStart = true;
+            cycle.recognizer.startListening(session.request);
+            cycle.inStart = false;
+            if (!isCurrent(session, cycle)) return false;
+            coordinator.acceptSpeech(SpeechShareEvent.listeningCycleStarted(session.generation));
             emit(OutcomeType.LISTENING, session.generation, null, null, null);
             return true;
         } catch (RuntimeException startFailure) {
+            cycle.inStart = false;
             terminate(session, SpeechShareEvent.error(session.generation), OutcomeType.ERROR,
                     ErrorKind.START_FAILED, null, false);
             return false;
         }
     }
 
-    private synchronized void handlePartial(Session session, String text) {
+    private synchronized void handlePartial(Session session, Cycle cycle, String text) {
         platform.assertMainThread();
-        if (!isCurrent(session)) return;
+        if (!isCurrent(session, cycle)) return;
         String normalized = normalize(text);
+        cycle.latestPartial = normalized;
+        String visible = joinSegments(session.accumulated, normalized);
         SpeechShareStateMachine.Transition transition = coordinator.acceptSpeech(
-                SpeechShareEvent.partialResult(session.generation, text));
-        if (!transition.effects().isEmpty() && normalized != null) {
-            emit(OutcomeType.PARTIAL_RESULT, session.generation, normalized, null, null);
+                SpeechShareEvent.partialResult(session.generation, visible));
+        if (!transition.effects().isEmpty() && visible != null) {
+            emit(OutcomeType.PARTIAL_RESULT, session.generation, visible, null, null);
         }
     }
 
-    private synchronized void handleProcessing(Session session) {
+    private synchronized void handleProcessing(Session session, Cycle cycle) {
         platform.assertMainThread();
-        if (!isCurrent(session)) return;
+        if (!isCurrent(session, cycle)) return;
         SpeechShareStateMachine.Transition transition = coordinator.acceptSpeech(
                 SpeechShareEvent.processing(session.generation));
         if (transition.nextState() == SpeechShareStateMachine.State.STT_PROCESSING) {
@@ -438,30 +488,101 @@ public final class SystemSpeechRecognizerController {
         }
     }
 
-    private synchronized void handleFinal(Session session, String text) {
+    private synchronized void handleFinal(Session session, Cycle cycle, String text) {
         platform.assertMainThread();
-        if (!isCurrent(session)) return;
+        if (!isCurrent(session, cycle)) return;
         String normalized = normalize(text);
-        if (normalized == null) {
-            terminate(session, SpeechShareEvent.finalResult(session.generation, null),
-                    OutcomeType.ERROR, ErrorKind.NO_MATCH, null, false);
+        session.accumulated = joinSegments(session.accumulated, normalized);
+        if (normalized != null) cycle.latestPartial = null;
+        cycle.terminal = true;
+
+        if (session.stopRequested) {
+            finishStoppedSession(session, cycle, ErrorKind.NO_MATCH);
             return;
         }
-        terminate(session, SpeechShareEvent.finalResult(session.generation, normalized),
-                OutcomeType.FINAL_RESULT, null, normalized, false);
+
+        emitAccumulatedPreview(session);
+        if (!isActive(session)) return;
+        if (cycle.inStart) {
+            terminate(session, SpeechShareEvent.error(session.generation), OutcomeType.ERROR,
+                    ErrorKind.START_FAILED, null, false);
+            return;
+        }
+        continueWithFreshCycle(session, cycle);
     }
 
-    private synchronized void handleError(Session session, PlatformError error) {
+    private synchronized void handleError(Session session, Cycle cycle, PlatformError error) {
         platform.assertMainThread();
-        if (!isCurrent(session)) return;
+        if (!isCurrent(session, cycle)) return;
+        if (session.stopRequested) {
+            cycle.terminal = true;
+            finishStoppedSession(session, cycle, mapError(error));
+            return;
+        }
         if (error == PlatformError.LANGUAGE
                 && session.route == SpeechRecognitionSupport.Route.ON_DEVICE) {
             fallbackToStandard(
-                    session, SpeechRecognitionSupport.FallbackReason.ON_DEVICE_LANGUAGE_ERROR);
+                    session, cycle,
+                    SpeechRecognitionSupport.FallbackReason.ON_DEVICE_LANGUAGE_ERROR);
+            return;
+        }
+        if (error == PlatformError.NO_MATCH || error == PlatformError.TIMEOUT) {
+            cycle.terminal = true;
+            if (cycle.inStart) {
+                terminate(session, SpeechShareEvent.error(session.generation), OutcomeType.ERROR,
+                        ErrorKind.START_FAILED, null, false);
+            } else {
+                continueWithFreshCycle(session, cycle);
+            }
             return;
         }
         terminate(session, SpeechShareEvent.error(session.generation), OutcomeType.ERROR,
                 mapError(error), null, false);
+    }
+
+    private void emitAccumulatedPreview(Session session) {
+        if (session.accumulated == null) return;
+        SpeechShareStateMachine.Transition transition = coordinator.acceptSpeech(
+                SpeechShareEvent.partialResult(session.generation, session.accumulated));
+        if (!transition.effects().isEmpty()) {
+            emit(OutcomeType.PARTIAL_RESULT, session.generation,
+                    session.accumulated, null, null);
+        }
+    }
+
+    private void continueWithFreshCycle(Session session, Cycle completedCycle) {
+        if (!isActive(session) || session.stopRequested) return;
+        if (!destroyCycleOnce(session, completedCycle)) {
+            session.terminal = true;
+            return;
+        }
+        if (!isActive(session) || session.stopRequested) return;
+        Cycle next;
+        try {
+            next = createCycle(session,
+                    session.route == SpeechRecognitionSupport.Route.ON_DEVICE);
+        } catch (RuntimeException creationFailure) {
+            terminate(session, SpeechShareEvent.error(session.generation), OutcomeType.ERROR,
+                    ErrorKind.START_FAILED, null, false);
+            return;
+        }
+        session.cycle = next;
+        beginListening(session, next);
+    }
+
+    private void finishStoppedSession(
+            Session session, Cycle cycle, ErrorKind emptyError) {
+        if (!isActive(session)) return;
+        String finalText = joinSegments(
+                session.accumulated, cycle == null ? null : cycle.latestPartial);
+        if (finalText == null) {
+            terminate(session, SpeechShareEvent.error(session.generation), OutcomeType.ERROR,
+                    emptyError, null, false);
+        } else {
+            terminate(session,
+                    SpeechShareEvent.finalResult(session.generation, finalText),
+                    OutcomeType.FINAL_RESULT, null, finalText, false);
+        }
     }
 
     private void failWithoutRecognizer(
@@ -478,12 +599,14 @@ public final class SystemSpeechRecognizerController {
             ErrorKind error,
             String text,
             boolean completeInteraction) {
-        if (!isCurrent(session)) return;
+        if (!isActive(session)) return;
         session.terminal = true;
+        if (session.cycle != null) session.cycle.terminal = true;
         coordinator.acceptSpeech(event);
         emit(outcomeType, session.generation, text, error, null);
 
-        boolean physicallyDestroyed = destroyRecognizerOnce(session);
+        boolean physicallyDestroyed = session.cycle == null
+                || destroyCycleOnce(session, session.cycle);
         if (!physicallyDestroyed) return;
         active = null;
         coordinator.finishSpeechCapture(session.generation);
@@ -493,12 +616,13 @@ public final class SystemSpeechRecognizerController {
         }
     }
 
-    private boolean destroyRecognizerOnce(Session session) {
-        if (session.destroyAttempted) return session.destroySucceeded;
-        session.destroyAttempted = true;
+    private boolean destroyCycleOnce(Session session, Cycle cycle) {
+        if (cycle == null) return true;
+        if (cycle.destroyAttempted) return cycle.destroySucceeded;
+        cycle.destroyAttempted = true;
         try {
-            session.recognizer.destroy();
-            session.destroySucceeded = true;
+            cycle.recognizer.destroy();
+            cycle.destroySucceeded = true;
             return true;
         } catch (RuntimeException destroyFailure) {
             emit(OutcomeType.DESTROY_FAILED, session.generation, null, null, null);
@@ -506,8 +630,12 @@ public final class SystemSpeechRecognizerController {
         }
     }
 
-    private boolean isCurrent(Session session) {
+    private boolean isActive(Session session) {
         return session != null && session == active && !session.terminal;
+    }
+
+    private boolean isCurrent(Session session, Cycle cycle) {
+        return isActive(session) && cycle != null && cycle == session.cycle && !cycle.terminal;
     }
 
     private void emitDestroyedOnce(long generation) {
@@ -547,17 +675,24 @@ public final class SystemSpeechRecognizerController {
         return normalized.isEmpty() ? null : normalized;
     }
 
+    /** Joins accepted cycle text only; lexical overlap is intentionally preserved verbatim. */
+    private static String joinSegments(String accepted, String next) {
+        String normalizedNext = normalize(next);
+        if (normalizedNext == null) return accepted;
+        return accepted == null ? normalizedNext : accepted + " " + normalizedNext;
+    }
+
     private static final class Session {
         final long generation;
-        final SpeechRecognitionSupport.Route route;
-        final SpeechRecognitionSupport.FallbackReason fallbackReason;
+        SpeechRecognitionSupport.Route route;
+        SpeechRecognitionSupport.FallbackReason fallbackReason;
         final RecognitionRequest request;
-        Recognizer recognizer;
+        Cycle cycle;
+        String accumulated;
         boolean terminal;
+        boolean stopRequested;
         boolean supportResolved;
-        boolean listeningStarted;
-        boolean destroyAttempted;
-        boolean destroySucceeded;
+        boolean captureStarted;
 
         Session(
                 long generation,
@@ -569,6 +704,16 @@ public final class SystemSpeechRecognizerController {
             this.fallbackReason = fallbackReason;
             this.request = request;
         }
+    }
+
+    private static final class Cycle {
+        Recognizer recognizer;
+        boolean terminal;
+        boolean listeningStarted;
+        boolean inStart;
+        String latestPartial;
+        boolean destroyAttempted;
+        boolean destroySucceeded;
     }
 
     private static final class AndroidPlatform implements Platform {
@@ -730,6 +875,10 @@ public final class SystemSpeechRecognizerController {
 
         @Override public void startListening(RecognitionRequest request) {
             delegate.startListening(AndroidPlatform.toIntent(request));
+        }
+
+        @Override public void stopListening() {
+            delegate.stopListening();
         }
 
         @Override public void cancel() {

@@ -10,6 +10,7 @@ public record SpeechShareEvent(Type type, long generation, String text) {
         SUPPORT_UNAVAILABLE,
         PARTIAL_RESULT,
         PROCESSING,
+        LISTENING_CYCLE_STARTED,
         FINAL_RESULT,
         ERROR,
         CANCEL,
@@ -44,6 +45,10 @@ public record SpeechShareEvent(Type type, long generation, String text) {
 
     public static SpeechShareEvent processing(long generation) {
         return new SpeechShareEvent(Type.PROCESSING, generation, null);
+    }
+
+    public static SpeechShareEvent listeningCycleStarted(long generation) {
+        return new SpeechShareEvent(Type.LISTENING_CYCLE_STARTED, generation, null);
     }
 
     public static SpeechShareEvent finalResult(long generation, String text) {
@@ -89,6 +94,7 @@ public record SpeechShareEvent(Type type, long generation, String text) {
     public boolean isGenerationScoped() {
         return switch (type) {
             case SUPPORT_AVAILABLE, SUPPORT_UNAVAILABLE, PARTIAL_RESULT, PROCESSING,
+                    LISTENING_CYCLE_STARTED,
                     FINAL_RESULT, ERROR, CANCEL, KEYBOARD_FALLBACK, SHARE,
                     SHARE_LAUNCH_FAILED, CHOOSER_RETURNED, COMPLETE -> true;
             default -> false;

@@ -43,6 +43,21 @@ class SpeechShareStateMachineTest {
     }
 
     @Test
+    void freshRecognizerCycleReturnsProcessingToListeningWithoutChangingGeneration() {
+        SpeechShareStateMachine machine = listeningMachine();
+        long generation = machine.generation();
+        machine.accept(SpeechShareEvent.processing(generation));
+
+        SpeechShareStateMachine.Transition nextCycle = machine.accept(
+                SpeechShareEvent.listeningCycleStarted(generation));
+
+        assertEquals(SpeechShareStateMachine.State.STT_PROCESSING, nextCycle.previousState());
+        assertEquals(SpeechShareStateMachine.State.STT_LISTENING, nextCycle.nextState());
+        assertEquals(generation, machine.generation());
+        assertEquals(List.of(), nextCycle.effects());
+    }
+
+    @Test
     void shareRequiresExplicitRequestAfterReviewedNonblankFinal() {
         SpeechShareStateMachine beforeReview = listeningMachine();
         SpeechShareStateMachine.Transition rejected = beforeReview.accept(

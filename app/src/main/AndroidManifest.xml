@@ -42,7 +42,7 @@
             android:excludeFromRecents="true"
             android:exported="false"
             android:taskAffinity=""
-            android:theme="@style/Theme.FloatingVoice.TextComposer" />
+            android:theme="@style/Theme.FloatingVoice.SpeechReview" />
         <activity
             android:name=".TextComposerActivity"
             android:excludeFromRecents="true"

@@ -12,6 +12,7 @@ public final class SpeechReviewViewModel extends ViewModel
         implements SystemSpeechRecognizerController.Listener {
     public interface RecognitionPort {
         SystemSpeechRecognizerController.StartResult start();
+        default void stopListening() { }
         void cancel();
         void destroy();
     }
@@ -77,6 +78,11 @@ public final class SpeechReviewViewModel extends ViewModel
 
     public synchronized void cancel() {
         recognition.cancel();
+    }
+
+    /** Ends dictation into review; unlike cancel(), this preserves recognized text. */
+    public synchronized void stopListening() {
+        recognition.stopListening();
     }
 
     public synchronized void close() {
