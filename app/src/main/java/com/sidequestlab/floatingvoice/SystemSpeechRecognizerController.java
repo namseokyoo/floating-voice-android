@@ -4,6 +4,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
 import android.os.Looper;
 import android.speech.RecognitionListener;
 import android.speech.RecognitionSupportCallback;
@@ -138,9 +139,13 @@ public final class SystemSpeechRecognizerController {
         void checkRecognitionSupport(
                 Recognizer recognizer, RecognitionRequest request, SupportCallback callback);
         void triggerModelDownload(Recognizer recognizer, RecognitionRequest request);
+        void postDelayed(Runnable task, long delayMillis);
     }
 
     private static final String KOREAN_LANGUAGE = "ko-KR";
+    private static final long CHAIN_RESTART_DELAY_MILLIS = 350L;
+    private static final long CHAIN_BUSY_RESTART_DELAY_MILLIS = 600L;
+    private static final int MAX_CONSECUTIVE_CHAIN_BUSY_RETRIES = 3;
 
     private final AudioCaptureCoordinator coordinator;
     private final Platform platform;
@@ -320,6 +325,7 @@ public final class SystemSpeechRecognizerController {
 
     private Cycle createCycle(Session session, boolean onDevice) {
         Cycle cycle = new Cycle();
+        cycle.ordinal = ++session.cycleSequence;
         Callback callback = new Callback() {
             @Override public void onPartialResult(String text) {
                 handlePartial(session, cycle, text);
@@ -469,6 +475,7 @@ public final class SystemSpeechRecognizerController {
         platform.assertMainThread();
         if (!isCurrent(session, cycle)) return;
         String normalized = normalize(text);
+        session.consecutiveBusyRetries = 0;
         cycle.latestPartial = normalized;
         String visible = joinSegments(session.accumulated, normalized);
         SpeechShareStateMachine.Transition transition = coordinator.acceptSpeech(
@@ -481,6 +488,7 @@ public final class SystemSpeechRecognizerController {
     private synchronized void handleProcessing(Session session, Cycle cycle) {
         platform.assertMainThread();
         if (!isCurrent(session, cycle)) return;
+        session.consecutiveBusyRetries = 0;
         SpeechShareStateMachine.Transition transition = coordinator.acceptSpeech(
                 SpeechShareEvent.processing(session.generation));
         if (transition.nextState() == SpeechShareStateMachine.State.STT_PROCESSING) {
@@ -492,6 +500,7 @@ public final class SystemSpeechRecognizerController {
         platform.assertMainThread();
         if (!isCurrent(session, cycle)) return;
         String normalized = normalize(text);
+        session.consecutiveBusyRetries = 0;
         session.accumulated = joinSegments(session.accumulated, normalized);
         if (normalized != null) cycle.latestPartial = null;
         cycle.terminal = true;
@@ -527,6 +536,7 @@ public final class SystemSpeechRecognizerController {
             return;
         }
         if (error == PlatformError.NO_MATCH || error == PlatformError.TIMEOUT) {
+            session.consecutiveBusyRetries = 0;
             cycle.terminal = true;
             if (cycle.inStart) {
                 terminate(session, SpeechShareEvent.error(session.generation), OutcomeType.ERROR,
@@ -534,6 +544,16 @@ public final class SystemSpeechRecognizerController {
             } else {
                 continueWithFreshCycle(session, cycle);
             }
+            return;
+        }
+        if (error == PlatformError.BUSY
+                && cycle.ordinal > 1
+                && session.consecutiveBusyRetries
+                        < MAX_CONSECUTIVE_CHAIN_BUSY_RETRIES) {
+            cycle.terminal = true;
+            session.consecutiveBusyRetries++;
+            continueWithFreshCycle(
+                    session, cycle, CHAIN_BUSY_RESTART_DELAY_MILLIS);
             return;
         }
         terminate(session, SpeechShareEvent.error(session.generation), OutcomeType.ERROR,
@@ -551,11 +571,33 @@ public final class SystemSpeechRecognizerController {
     }
 
     private void continueWithFreshCycle(Session session, Cycle completedCycle) {
+        continueWithFreshCycle(session, completedCycle, CHAIN_RESTART_DELAY_MILLIS);
+    }
+
+    private void continueWithFreshCycle(
+            Session session, Cycle completedCycle, long delayMillis) {
         if (!isActive(session) || session.stopRequested) return;
         if (!destroyCycleOnce(session, completedCycle)) {
             session.terminal = true;
             return;
         }
+        if (!isActive(session) || session.stopRequested) return;
+        session.cycle = null;
+        if (session.restartScheduled) return;
+        session.restartScheduled = true;
+        try {
+            platform.postDelayed(() -> resumeFreshCycle(session), delayMillis);
+        } catch (RuntimeException schedulingFailure) {
+            session.restartScheduled = false;
+            terminate(session, SpeechShareEvent.error(session.generation), OutcomeType.ERROR,
+                    ErrorKind.START_FAILED, null, false);
+        }
+    }
+
+    private synchronized void resumeFreshCycle(Session session) {
+        platform.assertMainThread();
+        if (!session.restartScheduled) return;
+        session.restartScheduled = false;
         if (!isActive(session) || session.stopRequested) return;
         Cycle next;
         try {
@@ -693,6 +735,9 @@ public final class SystemSpeechRecognizerController {
         boolean stopRequested;
         boolean supportResolved;
         boolean captureStarted;
+        boolean restartScheduled;
+        int cycleSequence;
+        int consecutiveBusyRetries;
 
         Session(
                 long generation,
@@ -708,6 +753,7 @@ public final class SystemSpeechRecognizerController {
 
     private static final class Cycle {
         Recognizer recognizer;
+        int ordinal;
         boolean terminal;
         boolean listeningStarted;
         boolean inStart;
@@ -718,6 +764,7 @@ public final class SystemSpeechRecognizerController {
 
     private static final class AndroidPlatform implements Platform {
         private final Context context;
+        private final Handler mainHandler = new Handler(Looper.getMainLooper());
 
         AndroidPlatform(Context context) {
             this.context = context;
@@ -788,6 +835,12 @@ public final class SystemSpeechRecognizerController {
                 Recognizer recognizer, RecognitionRequest request) {
             if (Build.VERSION.SDK_INT < 33) throw new UnsupportedOperationException();
             requireAndroidRecognizer(recognizer).delegate.triggerModelDownload(toIntent(request));
+        }
+
+        @Override public void postDelayed(Runnable task, long delayMillis) {
+            if (!mainHandler.postDelayed(task, delayMillis)) {
+                throw new IllegalStateException("failed to schedule recognizer restart");
+            }
         }
 
         private AndroidRecognizer wrap(

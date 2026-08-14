@@ -254,6 +254,7 @@ public class SystemSpeechRecognizerControllerTest {
         firstCycle.onProcessing();
         assertEquals(SpeechShareStateMachine.State.STT_PROCESSING, f.coordinator.speechState());
         firstCycle.onFinalResult(" 첫 문장 ");
+        f.platform.runNextPosted();
 
         assertEquals(generation, f.coordinator.speechGeneration());
         assertEquals(SpeechShareStateMachine.State.STT_LISTENING, f.coordinator.speechState());
@@ -287,6 +288,177 @@ public class SystemSpeechRecognizerControllerTest {
     }
 
     @Test
+    public void finalSchedulesFreshCycleOnlyAfterCallbackUnwinds() {
+        Fixture f = new Fixture(30);
+        f.controller.start();
+        long generation = f.coordinator.speechGeneration();
+        SystemSpeechRecognizerController.Callback first = f.platform.callback;
+
+        first.onProcessing();
+        first.onFinalResult("첫 문장");
+
+        assertEquals(1, f.platform.standardCreates);
+        assertEquals(1, f.platform.postedRestarts.size());
+        assertEquals(generation, f.coordinator.speechGeneration());
+        assertEquals(AudioCaptureOwnership.Owner.STT, f.coordinator.owner());
+        assertEquals(SpeechShareStateMachine.State.STT_PROCESSING,
+                f.coordinator.speechState());
+
+        f.platform.runNextPosted();
+
+        assertEquals(2, f.platform.standardCreates);
+        assertEquals(2, f.platform.totalStarts());
+        assertEquals(generation, f.coordinator.speechGeneration());
+        assertEquals(AudioCaptureOwnership.Owner.STT, f.coordinator.owner());
+        assertEquals(SpeechShareStateMachine.State.STT_LISTENING,
+                f.coordinator.speechState());
+    }
+
+    @Test
+    public void stopWhileFreshCycleIsPendingReviewsAccumulatedTextWithoutRestart() {
+        Fixture f = new Fixture(30);
+        f.controller.start();
+        f.platform.callback.onProcessing();
+        f.platform.callback.onFinalResult("첫 문장");
+
+        assertEquals(1, f.platform.postedRestarts.size());
+        f.controller.stopListening();
+        f.platform.runNextPosted();
+
+        assertEquals(1, f.platform.standardCreates);
+        assertEquals(1, f.platform.totalStarts());
+        assertEquals(0, f.platform.totalStops());
+        assertEquals(AudioCaptureOwnership.Owner.NONE, f.coordinator.owner());
+        assertEquals(SpeechShareStateMachine.State.STT_REVIEW,
+                f.coordinator.speechState());
+        assertEquals(SystemSpeechRecognizerController.OutcomeType.FINAL_RESULT,
+                f.listener.last().type());
+        assertEquals("첫 문장", f.listener.last().text());
+    }
+
+    @Test
+    public void chainedBusySchedulesRetryAndPreservesAccumulatedText() {
+        Fixture f = new Fixture(30);
+        f.controller.start();
+        f.platform.callback.onFinalResult("첫 문장");
+        f.platform.runNextPosted();
+        SystemSpeechRecognizerController.Callback busyCycle = f.platform.callback;
+
+        busyCycle.onError(SystemSpeechRecognizerController.PlatformError.BUSY);
+
+        assertEquals(AudioCaptureOwnership.Owner.STT, f.coordinator.owner());
+        assertEquals(1, f.platform.postedRestarts.size());
+        assertFalse(f.listener.types().contains(
+                SystemSpeechRecognizerController.OutcomeType.ERROR));
+
+        f.platform.runNextPosted();
+        assertEquals(3, f.platform.standardCreates);
+        assertEquals(3, f.platform.totalStarts());
+        f.platform.callback.onPartialResult("둘째 문장");
+        f.controller.stopListening();
+        f.platform.callback.onFinalResult("둘째 문장");
+
+        assertEquals(SpeechShareStateMachine.State.STT_REVIEW,
+                f.coordinator.speechState());
+        assertEquals("첫 문장 둘째 문장", f.listener.last().text());
+        assertEquals(AudioCaptureOwnership.Owner.NONE, f.coordinator.owner());
+    }
+
+    @Test
+    public void synchronousBusyDuringChainedStartDefersRetryWithoutRecursion() {
+        Fixture f = new Fixture(30);
+        f.platform.synchronousErrorCreate = 2;
+        f.platform.synchronousError = SystemSpeechRecognizerController.PlatformError.BUSY;
+        f.controller.start();
+        f.platform.callback.onFinalResult("첫 문장");
+
+        f.platform.runNextPosted();
+
+        assertEquals(2, f.platform.standardCreates);
+        assertEquals(2, f.platform.totalStarts());
+        assertEquals(AudioCaptureOwnership.Owner.STT, f.coordinator.owner());
+        assertEquals(1, f.platform.postedRestarts.size());
+        assertFalse(f.listener.types().contains(
+                SystemSpeechRecognizerController.OutcomeType.ERROR));
+
+        f.platform.runNextPosted();
+
+        assertEquals(3, f.platform.standardCreates);
+        assertEquals(3, f.platform.totalStarts());
+        assertEquals(AudioCaptureOwnership.Owner.STT, f.coordinator.owner());
+        assertEquals(SpeechShareStateMachine.State.STT_LISTENING,
+                f.coordinator.speechState());
+    }
+
+    @Test
+    public void chainedBusyRetriesAreBoundedAndFourthBusyFailsClosed() {
+        Fixture f = new Fixture(30);
+        f.controller.start();
+        f.platform.callback.onFinalResult("첫 문장");
+        f.platform.runNextPosted();
+
+        for (int retry = 0; retry < 3; retry++) {
+            f.platform.callback.onError(SystemSpeechRecognizerController.PlatformError.BUSY);
+            assertEquals(1, f.platform.postedRestarts.size());
+            assertEquals(AudioCaptureOwnership.Owner.STT, f.coordinator.owner());
+            f.platform.runNextPosted();
+        }
+
+        f.platform.callback.onError(SystemSpeechRecognizerController.PlatformError.BUSY);
+
+        assertEquals(5, f.platform.standardCreates);
+        assertEquals(0, f.platform.postedRestarts.size());
+        assertEquals(AudioCaptureOwnership.Owner.NONE, f.coordinator.owner());
+        assertEquals(SpeechShareStateMachine.State.STT_FAILED,
+                f.coordinator.speechState());
+        assertEquals(SystemSpeechRecognizerController.OutcomeType.ERROR,
+                f.listener.last().type());
+        assertEquals(SystemSpeechRecognizerController.ErrorKind.BUSY,
+                f.listener.last().error());
+    }
+
+    @Test
+    public void restartSchedulingFailureReleasesLeaseAndFailsClosed() {
+        Fixture f = new Fixture(30);
+        f.platform.throwOnPostDelayed = true;
+        f.controller.start();
+
+        f.platform.callback.onFinalResult("첫 문장");
+
+        assertEquals(1, f.platform.standardCreates);
+        assertEquals(1, f.platform.totalDestroys());
+        assertEquals(0, f.platform.postedRestarts.size());
+        assertEquals(AudioCaptureOwnership.Owner.NONE, f.coordinator.owner());
+        assertEquals(SpeechShareStateMachine.State.STT_FAILED,
+                f.coordinator.speechState());
+        assertEquals(SystemSpeechRecognizerController.OutcomeType.ERROR,
+                f.listener.last().type());
+        assertEquals(SystemSpeechRecognizerController.ErrorKind.START_FAILED,
+                f.listener.last().error());
+    }
+
+    @Test
+    public void cancelOrDestroyWhileRestartPendingMakesPostedTaskInert() {
+        for (boolean destroy : List.of(false, true)) {
+            Fixture f = new Fixture(30);
+            f.controller.start();
+            f.platform.callback.onFinalResult("첫 문장");
+            assertEquals(1, f.platform.postedRestarts.size());
+
+            if (destroy) f.controller.destroy();
+            else f.controller.cancel();
+            f.platform.runNextPosted();
+
+            assertEquals(1, f.platform.standardCreates);
+            assertEquals(1, f.platform.totalStarts());
+            assertEquals(1, f.platform.totalDestroys());
+            assertEquals(AudioCaptureOwnership.Owner.NONE, f.coordinator.owner());
+            assertNotEquals(SpeechShareStateMachine.State.STT_REVIEW,
+                    f.coordinator.speechState());
+        }
+    }
+
+    @Test
     public void fatalBusyAndNetworkErrorsMapAtPublicSeam() {
         assertErrorMapping(SystemSpeechRecognizerController.PlatformError.BUSY,
                 SystemSpeechRecognizerController.ErrorKind.BUSY);
@@ -300,6 +472,7 @@ public class SystemSpeechRecognizerControllerTest {
         f.controller.start();
         SystemSpeechRecognizerController.Callback first = f.platform.callback;
         first.onFinalResult("아주");
+        f.platform.runNextPosted();
         SystemSpeechRecognizerController.Callback second = f.platform.callback;
 
         second.onPartialResult("아주 좋아");
@@ -323,9 +496,11 @@ public class SystemSpeechRecognizerControllerTest {
             Fixture f = new Fixture(30);
             f.controller.start();
             f.platform.callback.onFinalResult("보존할 문장");
+            f.platform.runNextPosted();
             SystemSpeechRecognizerController.Callback recoverable = f.platform.callback;
 
             recoverable.onError(error);
+            f.platform.runNextPosted();
             assertEquals(AudioCaptureOwnership.Owner.STT, f.coordinator.owner());
             assertNotEquals(recoverable, f.platform.callback);
 
@@ -346,6 +521,7 @@ public class SystemSpeechRecognizerControllerTest {
             Fixture f = new Fixture(30);
             f.controller.start();
             f.platform.callback.onFinalResult("이전 구간");
+            f.platform.runNextPosted();
             f.platform.callback.onPartialResult("현재 부분");
 
             f.controller.stopListening();
@@ -366,6 +542,7 @@ public class SystemSpeechRecognizerControllerTest {
             Fixture f = new Fixture(30);
             f.controller.start();
             f.platform.callback.onFinalResult("이전 구간");
+            f.platform.runNextPosted();
             f.platform.callback.onPartialResult("현재 부분");
 
             f.controller.stopListening();
@@ -401,6 +578,7 @@ public class SystemSpeechRecognizerControllerTest {
         f.controller.start();
         SystemSpeechRecognizerController.Callback stale = f.platform.callback;
         stale.onFinalResult("first");
+        f.platform.runNextPosted();
         int outcomesAfterChain = f.listener.outcomes.size();
 
         stale.onFinalResult("duplicate");
@@ -426,6 +604,7 @@ public class SystemSpeechRecognizerControllerTest {
             f.controller.start();
 
             f.platform.callback.onFinalResult("첫 구간");
+            f.platform.runNextPosted();
 
             assertEquals(2, f.platform.totalStarts());
             assertEquals(2, f.platform.standardCreates);
@@ -679,6 +858,7 @@ public class SystemSpeechRecognizerControllerTest {
         boolean onDeviceAvailable = true;
         boolean throwOnOnDeviceCreate;
         boolean throwOnStandardCreate;
+        boolean throwOnPostDelayed;
         boolean deferSupport;
         int standardCreates;
         int onDeviceAvailabilityChecks;
@@ -692,6 +872,7 @@ public class SystemSpeechRecognizerControllerTest {
         boolean recognizerCreated;
         final List<FakeRecognizer> recognizers = new ArrayList<>();
         final List<SystemSpeechRecognizerController.Callback> callbacks = new ArrayList<>();
+        final List<Runnable> postedRestarts = new ArrayList<>();
         SystemSpeechRecognizerController.Callback callback;
         SystemSpeechRecognizerController.SupportCallback supportCallback;
 
@@ -714,6 +895,16 @@ public class SystemSpeechRecognizerControllerTest {
 
         int totalDestroys() {
             return recognizers.stream().mapToInt(value -> value.destroys).sum();
+        }
+
+        void runNextPosted() {
+            if (postedRestarts.isEmpty()) return;
+            postedRestarts.remove(0).run();
+        }
+
+        @Override public void postDelayed(Runnable task, long delayMillis) {
+            if (throwOnPostDelayed) throw new IllegalStateException("post failed");
+            postedRestarts.add(task);
         }
 
         private FakeRecognizer createFreshRecognizer(
