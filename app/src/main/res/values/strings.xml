@@ -387,4 +387,14 @@
     <string name="permission_settings_message">Android is no longer showing the permission prompt. Open app settings and allow microphone and notification access.</string>
     <string name="open_app_settings">Open app settings</string>
     <string name="dismiss_error">Dismiss</string>
+    <string name="speech_recognition_checking">Checking Korean speech recognition support…</string>
+    <string name="speech_recognition_listening">Listening for a short dictation…</string>
+    <string name="speech_recognition_processing">Processing speech…</string>
+    <string name="speech_recognition_complete">Speech recognition complete.</string>
+    <string name="speech_recognition_mic_busy">The microphone is already in use.</string>
+    <string name="speech_recognition_keyboard_required">Speech recognition is unavailable. Keyboard input is required.</string>
+    <string name="speech_recognition_failed">Speech recognition failed. You can try again.</string>
+    <string name="speech_recognition_canceled">Speech recognition canceled.</string>
+    <string name="speech_recognition_permission_required">Microphone permission is required.</string>
+    <string name="speech_recognition_cancel">Cancel</string>
 </resources>

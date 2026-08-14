@@ -74,8 +74,11 @@ public final class AudioCaptureCoordinator {
         return releaseSpeechLease();
     }
 
-    public synchronized boolean completeSpeechInteraction() {
-        if (speechLease != null || !isInteractionTerminal(speech.state())) return false;
+    public synchronized boolean completeSpeechInteraction(long expectedSpeechGeneration) {
+        if (expectedSpeechGeneration <= 0L
+                || expectedSpeechGeneration != speech.generation()
+                || speechLease != null
+                || !isInteractionTerminal(speech.state())) return false;
         return speech.accept(SpeechShareEvent.complete()).nextState()
                 == SpeechShareStateMachine.State.IDLE;
     }

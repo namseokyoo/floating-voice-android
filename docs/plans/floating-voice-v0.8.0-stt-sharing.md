@@ -12,7 +12,7 @@
 
 **Non-goals:** 녹음된 OGG 사후 STT, bundled Whisper, cloud STT, MediaRecorder+SpeechRecognizer 동시 실행, Kakao 지정방 자동전송, 공유 대상 앱의 최종 수신 성공 추적, 복수 output 동시 실행.
 
-**현재 단계 상태 (2026-08-14 10:23 KST):** `V8-02 COMPLETE / V8-03 APPROVAL PENDING`. V8-02는 speech sub-state, generation-bound stale callback 차단, recorder/STT 전역 상호 배타 ownership, 리소스 해제 확인 전 fail-closed, 연속 interaction reset, Telegram/STT/local capability 독립 판정과 no-fallback 계약을 구현·검증했다. production 메뉴, 실제 `SpeechRecognizer` controller, review/share UI, Release APK, 공개 릴리스는 후속 게이트다.
+**현재 단계 상태 (2026-08-14 13:00 KST):** `V8-03 AUTOMATED COMPLETE / V8-04 ACTIVE`. 형이 승인한 V8-03~04 스프린트에 따라 V8-03 controller·branch·lifecycle 자동검증과 후속 독립 리뷰를 통과했고 V8-04 review/edit/Sharesheet 구현으로 이동했다. V8-03 A52s repeat 20회는 V8-04 중간 APK 실기기 검토에 합쳐 진행하며, 사용자 PASS 전에는 V8-05로 넘어가지 않는다. 폰/ADB 조작·Release APK·공개 릴리스는 승인 범위가 아니다.
 
 ---
 
@@ -271,6 +271,14 @@ TEARING_DOWN
 **완화:** 짧은 user-initiated dictation만 허용, privacy copy 표시, 자동 restart loop 금지, on-device 여부는 실제 support 결과로 표시.
 
 **게이트:** branch/lifecycle matrix와 실제 A52s repeat 20회에서 crash/leak 0.
+
+**자동검증 완료 증빙 (2026-08-14 13:00 KST):**
+
+- API 29/30 standard-only, API 31+ on-device availability와 explicit standard fallback, API 33+ support check 및 model auto-download 0을 public-seam 테스트로 고정했다.
+- generation-scoped completion, stale callback 차단, exactly-once destroy, destroy 실패 fail-closed, recorder/STT 상호 배타 ownership을 검증했다.
+- 1차 독립 리뷰 High 3건을 각각 RED로 재현해 수정했고 후속 bounded review는 `PASS / Blocker 0 / High 0`이었다.
+- 수정 후 clean build `211` tasks, core `178` + app debug `95` + app release `91` tests/fail 0, Debug/Release Lint 오류 0, localization `364` keys, debug/release assembly, ZIP/ELF 16KB, debug APK v2 서명 PASS.
+- 실제 A52s repeat 20회는 사용자 승인대로 V8-03~04 중간 APK 게이트에서 형이 직접 수행한다.
 
 ---
 

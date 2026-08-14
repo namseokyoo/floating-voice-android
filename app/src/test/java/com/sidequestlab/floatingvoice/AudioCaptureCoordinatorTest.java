@@ -121,6 +121,26 @@ public class AudioCaptureCoordinatorTest {
     }
 
     @Test
+    public void interactionCompletionIsGenerationScoped() {
+        AudioCaptureCoordinator coordinator = new AudioCaptureCoordinator();
+        coordinator.startSpeech().orElseThrow();
+        long first = coordinator.speechGeneration();
+        coordinator.acceptSpeech(SpeechShareEvent.error(first));
+        assertTrue(coordinator.finishSpeechCapture(first));
+
+        coordinator.retrySpeech().orElseThrow();
+        long second = coordinator.speechGeneration();
+        coordinator.acceptSpeech(SpeechShareEvent.supportAvailable(second));
+        coordinator.acceptSpeech(SpeechShareEvent.finalResult(second, "현재 결과"));
+        assertTrue(coordinator.finishSpeechCapture(second));
+
+        assertFalse(coordinator.completeSpeechInteraction(first));
+        assertEquals(SpeechShareStateMachine.State.STT_REVIEW, coordinator.speechState());
+        assertTrue(coordinator.completeSpeechInteraction(second));
+        assertEquals(SpeechShareStateMachine.State.IDLE, coordinator.speechState());
+    }
+
+    @Test
     public void twoSuccessfulSpeechInteractionsUseDistinctGenerations() {
         AudioCaptureCoordinator coordinator = new AudioCaptureCoordinator();
         coordinator.startSpeech().orElseThrow();
@@ -128,10 +148,10 @@ public class AudioCaptureCoordinatorTest {
         coordinator.acceptSpeech(SpeechShareEvent.supportAvailable(first));
         coordinator.acceptSpeech(SpeechShareEvent.finalResult(first, "첫 결과"));
 
-        assertFalse(coordinator.completeSpeechInteraction());
+        assertFalse(coordinator.completeSpeechInteraction(first));
         assertTrue(coordinator.finishSpeechCapture(first));
         coordinator.acceptSpeech(SpeechShareEvent.share());
-        assertTrue(coordinator.completeSpeechInteraction());
+        assertTrue(coordinator.completeSpeechInteraction(first));
 
         coordinator.startSpeech().orElseThrow();
         long second = coordinator.speechGeneration();

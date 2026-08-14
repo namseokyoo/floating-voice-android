@@ -11,6 +11,12 @@
 
     <uses-feature android:name="android.hardware.microphone" android:required="true" />
 
+    <queries>
+        <intent>
+            <action android:name="android.speech.RecognitionService" />
+        </intent>
+    </queries>
+
     <application
         android:name=".FloatingVoiceApp"
         android:allowBackup="false"
@@ -31,6 +37,12 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <activity
+            android:name=".SpeechReviewActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:taskAffinity=""
+            android:theme="@style/Theme.FloatingVoice.TextComposer" />
         <activity
             android:name=".TextComposerActivity"
             android:excludeFromRecents="true"

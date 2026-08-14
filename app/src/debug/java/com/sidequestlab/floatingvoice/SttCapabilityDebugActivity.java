@@ -378,7 +378,7 @@ public final class SttCapabilityDebugActivity extends AppCompatActivity {
         }
         if (destroyed && captureGeneration > 0L) {
             audioCaptureCoordinator.finishSpeechCapture(captureGeneration);
-            audioCaptureCoordinator.completeSpeechInteraction();
+            audioCaptureCoordinator.completeSpeechInteraction(captureGeneration);
             captureGeneration = 0L;
         }
     }
