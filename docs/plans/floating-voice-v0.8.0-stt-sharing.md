@@ -377,7 +377,7 @@ TEARING_DOWN
 
 **게이트:** route invariants tests 통과.
 
-**구현 현황 (2026-08-14 21:07 KST):** `OutputRoute`/`OutputSnapshot`/`OutputRouteStateMachine`과 snapshot 기반 `VerifiedTextDispatch`를 추가했다. Speech review는 검증된 기본 Telegram 대상, 다른 검증 대상 선택, 별도 Android 공유를 제공한다. Telegram 미설정 상태에서도 별도 Home action으로 STT·Android 공유에 진입할 수 있고 Telegram 전송 capability는 계속 fail-closed다. Telegram 전송은 speech 전용 queue/pending 상태와 memory-only handoff/attempt ID를 사용하며 delivered 전에는 draft를 닫지 않고 reject 시 같은 review로 복귀한다. 회전 중 destination/handoff/result와 거절 feedback도 memory-only ViewModel/registry로 유지하며 stale ordered receipt는 현재 attempt의 feedback/UI를 바꾸지 않는다. 최종 clean gate는 core 195/debug 149/release 145 tests(실패·오류·skip 0), localization 393/393, Lint Fatal/Error 0, Debug/Release assembly PASS다. 독립 follow-up review는 Blocker/High/Medium/Low 0으로 PASS했다.
+**구현 현황 (2026-08-14 21:13 KST):** `OutputRoute`/`OutputSnapshot`/`OutputRouteStateMachine`과 snapshot 기반 `VerifiedTextDispatch`를 추가했다. Speech review는 검증된 기본 Telegram 대상, 다른 검증 대상 선택, 별도 Android 공유를 제공한다. Telegram 미설정 상태에서도 별도 Home action으로 STT·Android 공유에 진입할 수 있고 Telegram 전송 capability는 계속 fail-closed다. Telegram 전송은 speech 전용 queue/pending 상태와 memory-only handoff/attempt ID를 사용하며 delivered 전에는 draft를 닫지 않고 reject 시 같은 review로 복귀한다. 회전 중 destination/handoff/result와 거절 feedback도 memory-only ViewModel/registry로 유지하며 stale ordered receipt는 현재 attempt의 feedback/UI를 바꾸지 않는다. 최종 clean gate는 core 195/debug 149/release 145 tests(실패·오류·skip 0), localization 393/393, Lint Fatal/Error 0, Debug/Release assembly PASS다. 독립 follow-up review는 Blocker/High/Medium/Low 0으로 PASS했다. V8-05 install identity는 R4의 code 19보다 높은 code 20/name `0.8.0-v8-05`이며 bounded review PASS했다.
 
 ---
 
