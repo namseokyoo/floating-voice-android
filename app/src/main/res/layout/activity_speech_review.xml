@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:clipToPadding="false"
@@ -21,23 +22,45 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:padding="20dp">
+            android:padding="16dp">
 
-            <TextView
-                style="@style/FloatingVoice.StatusText"
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="@string/speech_review_title"
-                android:textAlignment="viewStart"
-                android:textSize="20sp"
-                android:textStyle="bold" />
+                android:baselineAligned="false"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    style="@style/FloatingVoice.StatusText"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/speech_review_title"
+                    android:textAlignment="viewStart"
+                    android:textSize="20sp"
+                    android:textStyle="bold" />
+
+                <Button
+                    android:id="@+id/speech_review_listening_cancel"
+                    style="@style/FloatingVoice.QuietOutlinedButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:filterTouchesWhenObscured="true"
+                    android:minHeight="48dp"
+                    android:minWidth="64dp"
+                    android:text="@string/speech_recognition_cancel"
+                    android:visibility="gone"
+                    tools:ignore="ButtonOrder" />
+            </LinearLayout>
 
             <TextView
                 android:id="@+id/speech_review_status"
                 style="@style/FloatingVoice.StatusText"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
+                android:layout_marginTop="6dp"
                 android:accessibilityLiveRegion="polite"
                 android:text="@string/speech_recognition_checking"
                 android:textAlignment="viewStart" />
@@ -46,15 +69,15 @@
                 style="@style/FloatingVoice.SupportingText"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
+                android:layout_marginTop="4dp"
                 android:text="@string/speech_review_privacy_note"
-                android:textSize="12sp" />
+                android:textSize="11sp" />
 
             <TextView
                 style="@style/FloatingVoice.FieldLabel"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
+                android:layout_marginTop="12dp"
                 android:labelFor="@id/speech_review_draft"
                 android:text="@string/speech_review_draft_label"
                 android:textStyle="bold" />
@@ -63,12 +86,12 @@
                 android:id="@+id/speech_review_draft"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
+                android:layout_marginTop="4dp"
                 android:autofillHints=""
                 android:freezesText="false"
                 android:gravity="top|start"
                 android:inputType="textCapSentences|textMultiLine"
-                android:minHeight="104dp"
+                android:minHeight="96dp"
                 android:saveEnabled="false"
                 android:scrollbars="vertical" />
 
@@ -76,7 +99,7 @@
                 android:id="@+id/speech_review_stop"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="14dp"
+                android:layout_marginTop="10dp"
                 android:filterTouchesWhenObscured="true"
                 android:minHeight="48dp"
                 android:text="@string/speech_review_stop" />
@@ -85,77 +108,108 @@
                 android:id="@+id/speech_review_output_controls"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="14dp"
+                android:layout_marginTop="10dp"
                 android:orientation="vertical"
                 android:visibility="gone">
 
-                <TextView
-                    style="@style/FloatingVoice.FieldLabel"
+                <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="@string/speech_review_output_label"
-                    android:textStyle="bold" />
+                    android:baselineAligned="false"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
 
-                <TextView
-                    android:id="@+id/speech_review_telegram_destination"
-                    style="@style/FloatingVoice.SupportingText"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="4dp"
-                    android:accessibilityLiveRegion="polite"
-                    android:text="@string/speech_review_telegram_destination_none" />
+                    <TextView
+                        android:id="@+id/speech_review_telegram_destination"
+                        style="@style/FloatingVoice.SupportingText"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:accessibilityLiveRegion="polite"
+                        android:gravity="center_vertical|start"
+                        android:minHeight="48dp"
+                        android:text="@string/speech_review_telegram_destination_none" />
 
-                <Button
-                    android:id="@+id/speech_review_choose_destination"
-                    style="@style/FloatingVoice.QuietOutlinedButton"
+                    <Button
+                        android:id="@+id/speech_review_choose_destination"
+                        style="@style/FloatingVoice.QuietOutlinedButton"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="8dp"
+                        android:contentDescription="@string/speech_review_choose_destination"
+                        android:filterTouchesWhenObscured="true"
+                        android:minHeight="48dp"
+                        android:minWidth="64dp"
+                        android:text="@string/speech_review_choose_destination_compact" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/speech_review_primary_actions"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
-                    android:filterTouchesWhenObscured="true"
-                    android:minHeight="48dp"
-                    android:text="@string/speech_review_choose_destination" />
+                    android:baselineAligned="false"
+                    android:orientation="horizontal">
 
-                <Button
-                    android:id="@+id/speech_review_send_telegram"
+                    <Button
+                        android:id="@+id/speech_review_send_telegram"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:enabled="false"
+                        android:filterTouchesWhenObscured="true"
+                        android:minHeight="56dp"
+                        android:minWidth="0dp"
+                        android:text="@string/speech_review_send_telegram"
+                        tools:ignore="ButtonStyle" />
+
+                    <Button
+                        android:id="@+id/speech_review_share"
+                        style="@style/FloatingVoice.QuietOutlinedButton"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="8dp"
+                        android:layout_weight="1"
+                        android:enabled="false"
+                        android:filterTouchesWhenObscured="true"
+                        android:minHeight="56dp"
+                        android:minWidth="0dp"
+                        android:text="@string/speech_review_share" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/speech_review_secondary_actions"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
-                    android:enabled="false"
-                    android:filterTouchesWhenObscured="true"
-                    android:minHeight="48dp"
-                    android:text="@string/speech_review_send_telegram" />
+                    android:baselineAligned="false"
+                    android:orientation="horizontal">
+
+                    <Button
+                        android:id="@+id/speech_review_retry"
+                        style="@style/FloatingVoice.QuietOutlinedButton"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:enabled="false"
+                        android:filterTouchesWhenObscured="true"
+                        android:minHeight="48dp"
+                        android:minWidth="0dp"
+                        android:text="@string/speech_review_retry" />
+
+                    <Button
+                        android:id="@+id/speech_review_cancel"
+                        style="@style/FloatingVoice.QuietOutlinedButton"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="8dp"
+                        android:layout_weight="1"
+                        android:filterTouchesWhenObscured="true"
+                        android:minHeight="48dp"
+                        android:minWidth="0dp"
+                        android:text="@string/speech_review_close" />
+                </LinearLayout>
             </LinearLayout>
-
-            <Button
-                android:id="@+id/speech_review_share"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="14dp"
-                android:enabled="false"
-                android:filterTouchesWhenObscured="true"
-                android:minHeight="48dp"
-                android:text="@string/speech_review_share"
-                android:visibility="gone" />
-
-            <Button
-                android:id="@+id/speech_review_retry"
-                style="@style/FloatingVoice.QuietOutlinedButton"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:enabled="false"
-                android:minHeight="48dp"
-                android:text="@string/speech_review_retry"
-                android:visibility="gone" />
-
-            <Button
-                android:id="@+id/speech_review_cancel"
-                style="@style/FloatingVoice.QuietOutlinedButton"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:minHeight="48dp"
-                android:text="@string/speech_recognition_cancel" />
         </LinearLayout>
     </ScrollView>
 </com.google.android.material.card.MaterialCardView>

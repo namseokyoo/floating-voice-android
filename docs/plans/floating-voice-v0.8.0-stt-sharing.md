@@ -12,7 +12,7 @@
 
 **Non-goals:** 녹음된 OGG 사후 STT, bundled Whisper, cloud STT, MediaRecorder+SpeechRecognizer 동시 실행, Kakao 지정방 자동전송, 공유 대상 앱의 최종 수신 성공 추적, 복수 output 동시 실행.
 
-**현재 단계 상태 (2026-08-14 18:36 KST):** `V8-05 OUTPUT ROUTE DOMAIN MODEL`. V8-04 R4는 Android 13+ complete-silence segmented STT, API 29–32 bounded chained fallback, explicit Stop review, premature-end visible draft 보존을 구현해 공식 서명 APK로 전달했으며 자동 gate와 독립 후속 리뷰 PASS(Blocker 0/High 0)다. A52s 실기기 판정은 대기 중이지만 형의 “이어서 진행” 승인으로 R4 APK 바이트를 변경하지 않고 V8-05를 시작한다. STT text는 현재 검증된 Telegram 기본 목적지를 기본값으로 삼고, 다른 검증 목적지는 명시 선택하며, Android Sharesheet는 chat destination이 아닌 별도 `SYSTEM_TEXT_SHARE` action이다. 한 capture의 content/output/Telegram identity+revision을 실행 직전에 한 번만 freeze하고 callback 자동 실행·복합 output·실패 시 자동 fallback을 금지한다. 기존 legacy `sendText()` 대신 verified `DispatchTargetSnapshot` 기반 text send seam을 TDD로 연결한다. 폰/ADB 조작과 공개 릴리스는 승인 범위가 아니다.
+**현재 단계 상태 (2026-08-14 22:37 KST):** `V8-05 R2 CONTINUOUS STT + COMPACT REVIEW DEVICE REMEDIATION`. code 20은 A52s Android 16에서 첫 문장 뒤 인식이 끝나고 review actions가 긴 세로열로 표시돼 실기기 FAIL·폐기 처리했다. R2 code 21은 API 33+ standard segmented recognizer 우선, regular final/premature end/NO_MATCH/TIMEOUT compatibility recovery, visible partial 보존, Stop 재진입 즉시 review, BUSY 최대 3회 제한을 구현했다. review는 목적지+변경 1행, Telegram/Android 2열, 다시 말하기/닫기 2열이며 200% 글꼴에서만 액션을 세로 stack한다. output snapshot·verified destination·no-auto-fallback·memory-only draft 계약은 유지한다. 자동 gate와 최종 독립 review는 PASS지만 A52s의 실제 segmented 지원과 restart-gap clipping은 새 서명 APK로 다시 검증해야 하며 아직 실기기 PASS가 아니다. 폰/ADB 조작과 공개 릴리스는 승인 범위가 아니다.
 
 ---
 
@@ -250,9 +250,10 @@ TEARING_DOWN
 
 - main application thread에서 create/start/stop/cancel/destroy
 - API 29–30은 `SpeechRecognizer.isRecognitionAvailable()` 후 일반 system recognizer만 사용
-- API 31+에서 runtime on-device availability 확인 후에만 on-device recognizer 생성
+- API 31–32에서 runtime on-device availability 확인 후에만 on-device recognizer 생성
+- API 33+ 연속 dictation은 standard recognizer의 complete-silence segmented session을 우선하고 `EXTRA_PREFER_OFFLINE`을 강제하지 않음
 - unsupported/creation exception은 일반 system recognizer 또는 keyboard fallback으로 명시
-- API 33+ `checkRecognitionSupport(ko-KR)` 결과를 확인하고, model download는 Activity의 별도 사용자 버튼과 승인으로만 `triggerModelDownload()` 호출
+- API 33+ standard segmented request의 `checkRecognitionSupport(ko-KR)` 결과를 확인하고 model download를 자동 실행하지 않음
 - `ko-KR`, partial results, calling package 등 최소 intent extras
 - `EXTRA_PREFER_OFFLINE`을 offline 보장으로 표현하지 않음
 - finish/cancel/error/teardown에서 exactly-once destroy
@@ -268,7 +269,7 @@ TEARING_DOWN
 
 **위험:** `SpeechRecognizer`는 continuous recognition용이 아니며 implementation이 remote server로 audio를 보낼 수 있다.
 
-**완화:** 짧은 user-initiated dictation만 허용, privacy copy 표시, 자동 restart loop 금지, on-device 여부는 실제 support 결과로 표시.
+**완화:** user-initiated dictation과 privacy copy를 유지한다. segmented callback을 우선하되 vendor가 regular final/end/no-match/timeout을 반환하면 visible text를 보존해 즉시 새 cycle로 복구하고, stale callback·Stop 재진입·BUSY 최대 3회 제한으로 ownership과 retry를 통제한다.
 
 **게이트:** branch/lifecycle matrix와 실제 A52s repeat 20회에서 crash/leak 0.
 
@@ -377,7 +378,7 @@ TEARING_DOWN
 
 **게이트:** route invariants tests 통과.
 
-**구현 현황 (2026-08-14 21:13 KST):** `OutputRoute`/`OutputSnapshot`/`OutputRouteStateMachine`과 snapshot 기반 `VerifiedTextDispatch`를 추가했다. Speech review는 검증된 기본 Telegram 대상, 다른 검증 대상 선택, 별도 Android 공유를 제공한다. Telegram 미설정 상태에서도 별도 Home action으로 STT·Android 공유에 진입할 수 있고 Telegram 전송 capability는 계속 fail-closed다. Telegram 전송은 speech 전용 queue/pending 상태와 memory-only handoff/attempt ID를 사용하며 delivered 전에는 draft를 닫지 않고 reject 시 같은 review로 복귀한다. 회전 중 destination/handoff/result와 거절 feedback도 memory-only ViewModel/registry로 유지하며 stale ordered receipt는 현재 attempt의 feedback/UI를 바꾸지 않는다. 최종 clean gate는 core 195/debug 149/release 145 tests(실패·오류·skip 0), localization 393/393, Lint Fatal/Error 0, Debug/Release assembly PASS다. 독립 follow-up review는 Blocker/High/Medium/Low 0으로 PASS했다. V8-05 install identity는 R4의 code 19보다 높은 code 20/name `0.8.0-v8-05`이며 bounded review PASS했다.
+**구현 현황 (2026-08-14 22:37 KST):** `OutputRoute`/`OutputSnapshot`/`OutputRouteStateMachine`과 snapshot 기반 `VerifiedTextDispatch`를 유지하면서 code 20 실기기 FAIL을 R2로 보완했다. API 33+ standard segmented 우선과 compatibility recovery로 Stop 전 여러 문장을 누적하며, blank callback은 BUSY 예산이나 visible partial을 지우지 않는다. review UI는 현재 Telegram 목적지와 `변경`을 같은 행에 두고 `Telegram 전송 | Android 공유`, `다시 말하기 | 닫기` 두 action rows로 구성한다. normal font는 compact 2열, fontScale 1.5+는 무클리핑 stack이며 touch target 48/56dp와 TalkBack full label을 유지한다. Telegram 미설정 local-share 진입, frozen output/destination snapshot, delivered 전 draft 유지, rotation/handoff feedback, stale callback 차단, no-auto-fallback 계약은 그대로다. code 21/name `0.8.0-v8-05-r2`; 최종 clean gate는 core 195/debug 156/release 152 tests(실패·오류·skip 0), localization 395/395, changed-file Lint warning/error 0, Debug/Release assembly PASS다. 최종 독립 follow-up review는 Blocker/High/Medium/Low 0으로 PASS했다. A52s 재검증은 pending이다.
 
 ---
 

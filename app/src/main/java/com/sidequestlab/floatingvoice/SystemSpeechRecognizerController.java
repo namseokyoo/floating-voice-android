@@ -153,6 +153,7 @@ public final class SystemSpeechRecognizerController {
 
     private static final String KOREAN_LANGUAGE = "ko-KR";
     private static final long SEGMENT_COMPLETE_SILENCE_MILLIS = 1_200L;
+    private static final long SEGMENTED_RECOVERY_DELAY_MILLIS = 0L;
     private static final long CHAIN_RESTART_DELAY_MILLIS = 350L;
     private static final long CHAIN_BUSY_RESTART_DELAY_MILLIS = 600L;
     private static final int MAX_CONSECUTIVE_CHAIN_BUSY_RETRIES = 3;
@@ -207,7 +208,7 @@ public final class SystemSpeechRecognizerController {
                 SpeechRecognitionSupport.FallbackReason.NONE;
         Session session = null;
 
-        if (api >= 31) {
+        if (api >= 31 && api < 33) {
             if (platform.isOnDeviceRecognitionAvailable()) {
                 try {
                     session = createSession(generation, SpeechRecognitionSupport.Route.ON_DEVICE,
@@ -327,11 +328,12 @@ public final class SystemSpeechRecognizerController {
             SpeechRecognitionSupport.Route route,
             SpeechRecognitionSupport.FallbackReason fallback,
             boolean onDevice) {
+        boolean segmentedSession = platform.apiLevel() >= 33;
         Session session = new Session(generation, route, fallback,
                 new RecognitionRequest(
-                        KOREAN_LANGUAGE, true, true, platform.callingPackage(),
-                        platform.apiLevel() >= 33,
-                        platform.apiLevel() >= 33 ? SEGMENT_COMPLETE_SILENCE_MILLIS : 0L));
+                        KOREAN_LANGUAGE, true, !segmentedSession || onDevice,
+                        platform.callingPackage(), segmentedSession,
+                        segmentedSession ? SEGMENT_COMPLETE_SILENCE_MILLIS : 0L));
         session.cycle = createCycle(session, onDevice);
         return session;
     }
@@ -496,6 +498,7 @@ public final class SystemSpeechRecognizerController {
         platform.assertMainThread();
         if (!isCurrent(session, cycle)) return;
         String normalized = normalize(text);
+        if (normalized == null) return;
         session.consecutiveBusyRetries = 0;
         cycle.latestPartial = normalized;
         String visible = joinSegments(session.accumulated, normalized);
@@ -509,7 +512,6 @@ public final class SystemSpeechRecognizerController {
     private synchronized void handleProcessing(Session session, Cycle cycle) {
         platform.assertMainThread();
         if (!isCurrent(session, cycle)) return;
-        session.consecutiveBusyRetries = 0;
         SpeechShareStateMachine.Transition transition = coordinator.acceptSpeech(
                 SpeechShareEvent.processing(session.generation));
         if (transition.nextState() == SpeechShareStateMachine.State.STT_PROCESSING) {
@@ -521,9 +523,10 @@ public final class SystemSpeechRecognizerController {
         platform.assertMainThread();
         if (!isCurrent(session, cycle)) return;
         String normalized = normalize(text);
-        session.consecutiveBusyRetries = 0;
-        session.accumulated = joinSegments(session.accumulated, normalized);
-        if (normalized != null) cycle.latestPartial = null;
+        String committed = normalized == null ? cycle.latestPartial : normalized;
+        if (committed != null) session.consecutiveBusyRetries = 0;
+        session.accumulated = joinSegments(session.accumulated, committed);
+        if (committed != null) cycle.latestPartial = null;
         cycle.terminal = true;
 
         if (session.stopRequested) {
@@ -532,15 +535,18 @@ public final class SystemSpeechRecognizerController {
         }
 
         emitAccumulatedPreview(session);
-        if (!isActive(session)) return;
-        if (session.request.segmentedSession()) {
-            terminate(session, SpeechShareEvent.error(session.generation), OutcomeType.ERROR,
-                    ErrorKind.CLIENT, null, false);
+        if (session.stopRequested) {
+            finishStoppedSession(session, cycle, ErrorKind.NO_MATCH);
             return;
         }
+        if (!isActive(session)) return;
         if (cycle.inStart) {
             terminate(session, SpeechShareEvent.error(session.generation), OutcomeType.ERROR,
                     ErrorKind.START_FAILED, null, false);
+            return;
+        }
+        if (session.request.segmentedSession()) {
+            continueWithFreshCycle(session, cycle, SEGMENTED_RECOVERY_DELAY_MILLIS);
             return;
         }
         continueWithFreshCycle(session, cycle);
@@ -561,19 +567,22 @@ public final class SystemSpeechRecognizerController {
                     SpeechRecognitionSupport.FallbackReason.ON_DEVICE_LANGUAGE_ERROR);
             return;
         }
-        if (session.request.segmentedSession()) {
-            terminate(session, SpeechShareEvent.error(session.generation), OutcomeType.ERROR,
-                    mapError(error), null, false);
-            return;
-        }
         if (error == PlatformError.NO_MATCH || error == PlatformError.TIMEOUT) {
             session.consecutiveBusyRetries = 0;
+            if (session.request.segmentedSession()) {
+                session.accumulated = joinSegments(
+                        session.accumulated, cycle.latestPartial);
+                cycle.latestPartial = null;
+            }
             cycle.terminal = true;
             if (cycle.inStart) {
                 terminate(session, SpeechShareEvent.error(session.generation), OutcomeType.ERROR,
                         ErrorKind.START_FAILED, null, false);
             } else {
-                continueWithFreshCycle(session, cycle);
+                continueWithFreshCycle(session, cycle,
+                        session.request.segmentedSession()
+                                ? SEGMENTED_RECOVERY_DELAY_MILLIS
+                                : CHAIN_RESTART_DELAY_MILLIS);
             }
             return;
         }
@@ -585,6 +594,11 @@ public final class SystemSpeechRecognizerController {
             session.consecutiveBusyRetries++;
             continueWithFreshCycle(
                     session, cycle, CHAIN_BUSY_RESTART_DELAY_MILLIS);
+            return;
+        }
+        if (session.request.segmentedSession()) {
+            terminate(session, SpeechShareEvent.error(session.generation), OutcomeType.ERROR,
+                    mapError(error), null, false);
             return;
         }
         terminate(session, SpeechShareEvent.error(session.generation), OutcomeType.ERROR,
@@ -618,11 +632,20 @@ public final class SystemSpeechRecognizerController {
             finishStoppedSession(session, cycle, ErrorKind.NO_MATCH);
             return;
         }
-        emitVisiblePreview(session,
-                joinSegments(session.accumulated, cycle.latestPartial));
+        session.accumulated = joinSegments(session.accumulated, cycle.latestPartial);
+        cycle.latestPartial = null;
+        emitAccumulatedPreview(session);
+        if (session.stopRequested) {
+            finishStoppedSession(session, cycle, ErrorKind.NO_MATCH);
+            return;
+        }
         if (!isActive(session)) return;
-        terminate(session, SpeechShareEvent.error(session.generation), OutcomeType.ERROR,
-                ErrorKind.CLIENT, null, false);
+        if (cycle.inStart) {
+            terminate(session, SpeechShareEvent.error(session.generation), OutcomeType.ERROR,
+                    ErrorKind.START_FAILED, null, false);
+            return;
+        }
+        continueWithFreshCycle(session, cycle, SEGMENTED_RECOVERY_DELAY_MILLIS);
     }
 
     private void emitAccumulatedPreview(Session session) {

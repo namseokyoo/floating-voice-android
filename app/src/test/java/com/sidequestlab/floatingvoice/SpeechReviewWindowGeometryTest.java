@@ -11,7 +11,7 @@ public class SpeechReviewWindowGeometryTest {
                 SpeechReviewWindowGeometry.calculate(360, 800, 1f);
 
         assertEquals(328, size.widthPx());
-        assertEquals(528, size.heightPx());
+        assertEquals(480, size.heightPx());
     }
 
     @Test
@@ -20,7 +20,7 @@ public class SpeechReviewWindowGeometryTest {
                 SpeechReviewWindowGeometry.calculate(1200, 1600, 1f);
 
         assertEquals(360, size.widthPx());
-        assertEquals(580, size.heightPx());
+        assertEquals(520, size.heightPx());
     }
 
     @Test
@@ -29,6 +29,6 @@ public class SpeechReviewWindowGeometryTest {
                 SpeechReviewWindowGeometry.calculate(800, 360, 1f);
 
         assertEquals(360, size.widthPx());
-        assertEquals(238, size.heightPx());
+        assertEquals(216, size.heightPx());
     }
 }

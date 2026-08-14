@@ -14,9 +14,11 @@ import android.text.TextWatcher;
 import android.util.DisplayMetrics;
 import android.view.Gravity;
 import android.view.View;
+import android.view.ViewGroup;
 import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
@@ -45,6 +47,7 @@ public final class SpeechReviewActivity extends AppCompatActivity {
     private Button share;
     private Button retry;
     private Button stop;
+    private Button listeningCancel;
     private View outputControls;
     private TextView telegramDestination;
     private Button chooseDestination;
@@ -62,12 +65,14 @@ public final class SpeechReviewActivity extends AppCompatActivity {
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_SECURE);
         if (Build.VERSION.SDK_INT >= 31) getWindow().setHideOverlayWindows(true);
         setContentView(R.layout.activity_speech_review);
+        configureResponsiveActionRows();
 
         status = findViewById(R.id.speech_review_status);
         draft = findViewById(R.id.speech_review_draft);
         share = findViewById(R.id.speech_review_share);
         retry = findViewById(R.id.speech_review_retry);
         stop = findViewById(R.id.speech_review_stop);
+        listeningCancel = findViewById(R.id.speech_review_listening_cancel);
         outputControls = findViewById(R.id.speech_review_output_controls);
         telegramDestination = findViewById(R.id.speech_review_telegram_destination);
         chooseDestination = findViewById(R.id.speech_review_choose_destination);
@@ -109,6 +114,7 @@ public final class SpeechReviewActivity extends AppCompatActivity {
         sendTelegram.setOnClickListener(view -> sendDraftToTelegram());
         retry.setOnClickListener(view -> model.retry());
         stop.setOnClickListener(view -> model.stopListening());
+        listeningCancel.setOnClickListener(view -> closeWithoutSharing());
         findViewById(R.id.speech_review_cancel).setOnClickListener(view -> closeWithoutSharing());
         getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
             @Override public void handleOnBackPressed() {
@@ -364,6 +370,28 @@ public final class SpeechReviewActivity extends AppCompatActivity {
         finish();
     }
 
+    private void configureResponsiveActionRows() {
+        boolean stack = SpeechReviewActionLayoutPolicy.shouldStack(
+                getResources().getConfiguration().fontScale);
+        configureActionRow(findViewById(R.id.speech_review_primary_actions), stack);
+        configureActionRow(findViewById(R.id.speech_review_secondary_actions), stack);
+    }
+
+    private void configureActionRow(LinearLayout row, boolean stack) {
+        row.setOrientation(stack ? LinearLayout.VERTICAL : LinearLayout.HORIZONTAL);
+        int gap = Math.round(8f * getResources().getDisplayMetrics().density);
+        for (int index = 0; index < row.getChildCount(); index++) {
+            View child = row.getChildAt(index);
+            LinearLayout.LayoutParams params =
+                    (LinearLayout.LayoutParams) child.getLayoutParams();
+            params.width = stack ? ViewGroup.LayoutParams.MATCH_PARENT : 0;
+            params.weight = stack ? 0f : 1f;
+            params.topMargin = stack && index > 0 ? gap : 0;
+            params.setMarginStart(!stack && index > 0 ? gap : 0);
+            child.setLayoutParams(params);
+        }
+    }
+
     private void render(SpeechReviewSession.UiState state) {
         if (state == null || draft == null) return;
         String nextDraft = state.draft();
@@ -378,11 +406,13 @@ public final class SpeechReviewActivity extends AppCompatActivity {
         retry.setEnabled(state.retryEnabled());
         boolean dictating = state.stage() == SpeechReviewSession.Stage.LISTENING
                 || state.stage() == SpeechReviewSession.Stage.PROCESSING;
+        boolean captureActive = state.stage() == SpeechReviewSession.Stage.CHECKING || dictating;
         boolean reviewing = state.stage() == SpeechReviewSession.Stage.EDITING
                 || state.stage() == SpeechReviewSession.Stage.KEYBOARD_FALLBACK
                 || state.stage() == SpeechReviewSession.Stage.SHARE_FAILED;
         stop.setVisibility(dictating ? View.VISIBLE : View.GONE);
         stop.setEnabled(dictating);
+        listeningCancel.setVisibility(captureActive ? View.VISIBLE : View.GONE);
         outputControls.setVisibility(reviewing ? View.VISIBLE : View.GONE);
         if (reviewing) refreshTelegramDestination();
         SpeechReviewViewModel.TelegramOutputState output = model.telegramOutputState();

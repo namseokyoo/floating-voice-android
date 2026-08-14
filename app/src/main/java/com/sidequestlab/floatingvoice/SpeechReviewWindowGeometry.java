@@ -12,9 +12,9 @@ public final class SpeechReviewWindowGeometry {
         }
         int sideInset = Math.round(16f * density);
         int maxWidth = Math.round(360f * density);
-        int maxHeight = Math.round(580f * density);
+        int maxHeight = Math.round(520f * density);
         int width = Math.min(maxWidth, Math.max(1, screenWidthPx - sideInset * 2));
-        int height = Math.min(maxHeight, Math.max(1, Math.round(screenHeightPx * 0.66f)));
+        int height = Math.min(maxHeight, Math.max(1, Math.round(screenHeightPx * 0.60f)));
         return new Size(width, height);
     }
 }
