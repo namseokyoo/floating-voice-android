@@ -61,6 +61,8 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
             "com.sidequestlab.floatingvoice.COMPOSER_CLOSED";
     public static final String ACTION_COMPOSER_SUBMIT =
             "com.sidequestlab.floatingvoice.COMPOSER_SUBMIT";
+    public static final String ACTION_SPEECH_REVIEW_CLOSED =
+            "com.sidequestlab.floatingvoice.SPEECH_REVIEW_CLOSED";
     public static final String ACTION_DESTINATION_PICKED =
             "com.sidequestlab.floatingvoice.DESTINATION_PICKED";
     public static final String ACTION_DESTINATION_PICKER_CLOSED =
@@ -185,6 +187,15 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
                     }
                     return;
                 }
+                if (ACTION_SPEECH_REVIEW_CLOSED.equals(intent.getAction())) {
+                    OverlayStateMachine.State state = overlayStateMachine.state();
+                    if (state == OverlayStateMachine.State.SPEECH_REVIEW_OPEN
+                            || state == OverlayStateMachine.State.SPEECH_REVIEW_OPENING) {
+                        dispatchOverlayEvent(OverlayEvent.CLOSE_SPEECH_REVIEW);
+                    }
+                    restorePrimaryOverlay();
+                    return;
+                }
                 if (!ACTION_COMPOSER_CLOSED.equals(intent.getAction())) return;
                 if (overlayStateMachine.state() == OverlayStateMachine.State.TEXT_COMPOSING) {
                     dispatchOverlayEvent(OverlayEvent.CLOSE_COMPOSER);
@@ -194,6 +205,7 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
         };
         IntentFilter composerFilter = new IntentFilter(ACTION_COMPOSER_CLOSED);
         composerFilter.addAction(ACTION_COMPOSER_SUBMIT);
+        composerFilter.addAction(ACTION_SPEECH_REVIEW_CLOSED);
         composerFilter.addAction(ACTION_DESTINATION_PICKED);
         composerFilter.addAction(ACTION_DESTINATION_PICKER_CLOSED);
         ContextCompat.registerReceiver(this, composerClosedReceiver, composerFilter,
@@ -386,6 +398,16 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
                 dispatchOverlayEvent(OverlayEvent.COMPOSE_TEXT);
             }
 
+            @Override public void onSpeechShare() {
+                if (isTearingDown() || recorder != null || audioCaptureCoordinator == null
+                        || audioCaptureCoordinator.owner()
+                        != AudioCaptureOwnership.Owner.NONE) {
+                    dispatchOverlayEvent(OverlayEvent.GESTURE_CANCELED);
+                    return;
+                }
+                dispatchOverlayEvent(OverlayEvent.OPEN_SPEECH_REVIEW);
+            }
+
             @Override public void onChooseDestination() {
                 if (isTearingDown()) return;
                 dispatchOverlayEvent(OverlayEvent.GESTURE_CANCELED);
@@ -451,6 +473,8 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
                 case SHOW_MENU -> showActionMenu();
                 case HIDE_MENU -> hideActionMenu();
                 case OPEN_TEXT_COMPOSER -> openTextComposer();
+                case OPEN_SPEECH_REVIEW -> openSpeechReview();
+                case RESTORE_PRIMARY_OVERLAY -> restorePrimaryOverlay();
                 case SEND_TEXT -> sendReadyText();
             }
         }
@@ -784,6 +808,21 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
         }
     }
 
+    private void openSpeechReview() {
+        Intent review = new Intent(this, SpeechReviewActivity.class)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK
+                        | Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS
+                        | Intent.FLAG_ACTIVITY_NO_ANIMATION);
+        try {
+            startActivity(review);
+            dispatchOverlayEvent(OverlayEvent.SPEECH_REVIEW_OPENED);
+            hidePrimaryOverlay();
+        } catch (RuntimeException ignored) {
+            dispatchOverlayEvent(OverlayEvent.SPEECH_REVIEW_LAUNCH_FAILED);
+            restorePrimaryOverlay();
+        }
+    }
+
     private synchronized void initializeRouteState(DestinationCatalog catalog) {
         if (routeStateMachine != null || telegram == null || catalog == null) return;
         long accountUserId = telegram.authenticatedAccountUserId();
@@ -948,7 +987,10 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
     private void hidePrimaryOverlay() {
         View currentOverlay = primaryOverlay;
         if (currentOverlay == null || windowRegistry == null || !primaryOverlayAttached) return;
-        if (overlayStateMachine.state() != OverlayStateMachine.State.TEXT_COMPOSING) return;
+        OverlayStateMachine.State state = overlayStateMachine.state();
+        if (state != OverlayStateMachine.State.TEXT_COMPOSING
+                && state != OverlayStateMachine.State.SPEECH_REVIEW_OPENING
+                && state != OverlayStateMachine.State.SPEECH_REVIEW_OPEN) return;
         if (windowRegistry.remove(currentOverlay)) primaryOverlayAttached = false;
     }
 

@@ -387,12 +387,68 @@ class OverlayStateMachineTest {
         }
     }
 
+    @Test
+    void speechReviewMenuActionHasExplicitOpenCloseLifecycleAndNeverStartsVoice() {
+        OverlayStateMachine machine = new OverlayStateMachine();
+        machine.accept(OverlayEvent.LONG_PRESS);
+
+        OverlayStateMachine.Transition opening = machine.accept(OverlayEvent.OPEN_SPEECH_REVIEW);
+        assertEquals(OverlayStateMachine.State.SPEECH_REVIEW_OPENING, opening.nextState());
+        assertEquals(List.of(
+                OverlayStateMachine.Effect.HIDE_MENU,
+                OverlayStateMachine.Effect.OPEN_SPEECH_REVIEW), opening.effects());
+        assertEquals(0, opening.effects().stream()
+                .filter(effect -> effect == OverlayStateMachine.Effect.START_VOICE).count());
+
+        OverlayStateMachine.Transition opened = machine.accept(
+                OverlayEvent.SPEECH_REVIEW_OPENED);
+        assertEquals(OverlayStateMachine.State.SPEECH_REVIEW_OPEN, opened.nextState());
+        assertEquals(List.of(), opened.effects());
+
+        OverlayStateMachine.Transition closed = machine.accept(
+                OverlayEvent.CLOSE_SPEECH_REVIEW);
+        assertEquals(OverlayStateMachine.State.IDLE, closed.nextState());
+        assertEquals(List.of(OverlayStateMachine.Effect.RESTORE_PRIMARY_OVERLAY),
+                closed.effects());
+    }
+
+    @Test
+    void speechReviewCloseWhileOpeningRestoresIdleOverlay() {
+        OverlayStateMachine machine = new OverlayStateMachine();
+        machine.accept(OverlayEvent.LONG_PRESS);
+        machine.accept(OverlayEvent.OPEN_SPEECH_REVIEW);
+
+        OverlayStateMachine.Transition closed = machine.accept(
+                OverlayEvent.CLOSE_SPEECH_REVIEW);
+
+        assertEquals(OverlayStateMachine.State.IDLE, closed.nextState());
+        assertEquals(List.of(OverlayStateMachine.Effect.RESTORE_PRIMARY_OVERLAY),
+                closed.effects());
+    }
+
+    @Test
+    void speechReviewLaunchFailureRestoresIdleOverlayWithoutStartingStt() {
+        OverlayStateMachine machine = new OverlayStateMachine();
+        machine.accept(OverlayEvent.LONG_PRESS);
+        machine.accept(OverlayEvent.OPEN_SPEECH_REVIEW);
+
+        OverlayStateMachine.Transition failed = machine.accept(
+                OverlayEvent.SPEECH_REVIEW_LAUNCH_FAILED);
+
+        assertEquals(OverlayStateMachine.State.IDLE, failed.nextState());
+        assertEquals(List.of(OverlayStateMachine.Effect.RESTORE_PRIMARY_OVERLAY),
+                failed.effects());
+        assertEquals(0, failed.effects().stream()
+                .filter(effect -> effect == OverlayStateMachine.Effect.START_VOICE).count());
+    }
+
     private static Map<OverlayStateMachine.State, EnumSet<OverlayEvent>> legalEvents() {
         Map<OverlayStateMachine.State, EnumSet<OverlayEvent>> legal =
                 new EnumMap<>(OverlayStateMachine.State.class);
         legal.put(OverlayStateMachine.State.IDLE, EnumSet.of(OverlayEvent.TAP, OverlayEvent.LONG_PRESS));
         legal.put(OverlayStateMachine.State.MENU_OPEN, EnumSet.of(
-                OverlayEvent.TAP, OverlayEvent.GESTURE_CANCELED, OverlayEvent.COMPOSE_TEXT));
+                OverlayEvent.TAP, OverlayEvent.GESTURE_CANCELED, OverlayEvent.COMPOSE_TEXT,
+                OverlayEvent.OPEN_SPEECH_REVIEW));
         legal.put(OverlayStateMachine.State.VOICE_STARTING, EnumSet.of(
                 OverlayEvent.VOICE_START_SUCCEEDED, OverlayEvent.VOICE_START_FAILED));
         legal.put(OverlayStateMachine.State.RECORDING, EnumSet.of(
@@ -407,6 +463,12 @@ class OverlayStateMachineTest {
                 OverlayEvent.VOICE_REJECTED, OverlayEvent.TAP));
         legal.put(OverlayStateMachine.State.TEXT_COMPOSING, EnumSet.of(
                 OverlayEvent.SUBMIT_TEXT, OverlayEvent.CLOSE_COMPOSER));
+        legal.put(OverlayStateMachine.State.SPEECH_REVIEW_OPENING, EnumSet.of(
+                OverlayEvent.SPEECH_REVIEW_OPENED,
+                OverlayEvent.SPEECH_REVIEW_LAUNCH_FAILED,
+                OverlayEvent.CLOSE_SPEECH_REVIEW));
+        legal.put(OverlayStateMachine.State.SPEECH_REVIEW_OPEN, EnumSet.of(
+                OverlayEvent.CLOSE_SPEECH_REVIEW));
         legal.put(OverlayStateMachine.State.TEXT_QUEUEING, EnumSet.of(
                 OverlayEvent.TEXT_QUEUED, OverlayEvent.TEXT_REJECTED,
                 OverlayEvent.TEXT_DELIVERED, OverlayEvent.TAP));
@@ -448,6 +510,15 @@ class OverlayStateMachineTest {
             case TEXT_COMPOSING -> {
                 machine.accept(OverlayEvent.LONG_PRESS);
                 machine.accept(OverlayEvent.COMPOSE_TEXT);
+            }
+            case SPEECH_REVIEW_OPENING -> {
+                machine.accept(OverlayEvent.LONG_PRESS);
+                machine.accept(OverlayEvent.OPEN_SPEECH_REVIEW);
+            }
+            case SPEECH_REVIEW_OPEN -> {
+                machine.accept(OverlayEvent.LONG_PRESS);
+                machine.accept(OverlayEvent.OPEN_SPEECH_REVIEW);
+                machine.accept(OverlayEvent.SPEECH_REVIEW_OPENED);
             }
             case TEXT_QUEUEING -> {
                 machine = textComposingMachine();

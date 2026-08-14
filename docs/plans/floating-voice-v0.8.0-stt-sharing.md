@@ -12,7 +12,7 @@
 
 **Non-goals:** 녹음된 OGG 사후 STT, bundled Whisper, cloud STT, MediaRecorder+SpeechRecognizer 동시 실행, Kakao 지정방 자동전송, 공유 대상 앱의 최종 수신 성공 추적, 복수 output 동시 실행.
 
-**현재 단계 상태 (2026-08-14 13:00 KST):** `V8-03 AUTOMATED COMPLETE / V8-04 ACTIVE`. 형이 승인한 V8-03~04 스프린트에 따라 V8-03 controller·branch·lifecycle 자동검증과 후속 독립 리뷰를 통과했고 V8-04 review/edit/Sharesheet 구현으로 이동했다. V8-03 A52s repeat 20회는 V8-04 중간 APK 실기기 검토에 합쳐 진행하며, 사용자 PASS 전에는 V8-05로 넘어가지 않는다. 폰/ADB 조작·Release APK·공개 릴리스는 승인 범위가 아니다.
+**현재 단계 상태 (2026-08-14 14:10 KST):** `V8-04 AUTOMATED COMPLETE / INTERMEDIATE APK USER GATE`. V8-03 system recognizer와 V8-04 메모리 내 review/edit, explicit text Sharesheet, 세 번째 overlay action, generation/rotation/lifecycle 안전성을 구현했다. V8-04 최초 독립 리뷰 High 3건을 수정했고 후속 리뷰 PASS(Blocker 0/High 0), clean 211 tasks, core 185 + app debug 114 + app release 110 tests/fail 0, Debug/Release Lint 오류 0, localization 382/382를 통과했다. 공식 서명 중간 APK에서 형이 A52s 검토를 PASS하기 전에는 V8-05로 넘어가지 않는다. 폰/ADB 조작과 공개 릴리스는 승인 범위가 아니다.
 
 ---
 

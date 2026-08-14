@@ -1,20 +1,91 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:gravity="center"
-    android:orientation="vertical"
-    android:padding="24dp">
+    android:fillViewport="true"
+    android:importantForAutofill="noExcludeDescendants">
 
-    <TextView
-        android:id="@+id/speech_review_status"
-        style="@style/FloatingVoice.StatusText"
-        android:text="@string/speech_recognition_checking"
-        android:textAlignment="center" />
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="24dp">
 
-    <Button
-        android:id="@+id/speech_review_cancel"
-        style="@style/FloatingVoice.QuietOutlinedButton"
-        android:layout_marginTop="24dp"
-        android:text="@string/speech_recognition_cancel" />
-</LinearLayout>
+        <TextView
+            style="@style/FloatingVoice.StatusText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/speech_review_title"
+            android:textAlignment="viewStart"
+            android:textSize="24sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/speech_review_status"
+            style="@style/FloatingVoice.StatusText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:accessibilityLiveRegion="polite"
+            android:text="@string/speech_recognition_checking"
+            android:textAlignment="viewStart" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="@string/speech_review_privacy_note"
+            android:textSize="13sp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:labelFor="@id/speech_review_draft"
+            android:text="@string/speech_review_draft_label"
+            android:textStyle="bold" />
+
+        <EditText
+            android:id="@+id/speech_review_draft"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:autofillHints=""
+            android:freezesText="false"
+            android:gravity="top|start"
+            android:hint="@string/speech_review_draft_hint"
+            android:inputType="textCapSentences|textMultiLine"
+            android:minHeight="160dp"
+            android:saveEnabled="false"
+            android:scrollbars="vertical" />
+
+        <Button
+            android:id="@+id/speech_review_share"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:enabled="false"
+            android:filterTouchesWhenObscured="true"
+            android:minHeight="48dp"
+            android:text="@string/speech_review_share" />
+
+        <Button
+            android:id="@+id/speech_review_retry"
+            style="@style/FloatingVoice.QuietOutlinedButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:enabled="false"
+            android:minHeight="48dp"
+            android:text="@string/speech_review_retry" />
+
+        <Button
+            android:id="@+id/speech_review_cancel"
+            style="@style/FloatingVoice.QuietOutlinedButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:minHeight="48dp"
+            android:text="@string/speech_recognition_cancel" />
+    </LinearLayout>
+</ScrollView>

@@ -14,6 +14,8 @@ public final class OverlayStateMachine {
         VOICE_QUEUEING,
         VOICE_PENDING,
         TEXT_COMPOSING,
+        SPEECH_REVIEW_OPENING,
+        SPEECH_REVIEW_OPEN,
         TEXT_QUEUEING,
         TEXT_PENDING,
         TEARING_DOWN
@@ -27,7 +29,9 @@ public final class OverlayStateMachine {
         SEND_TEXT,
         SHOW_MENU,
         HIDE_MENU,
-        OPEN_TEXT_COMPOSER
+        OPEN_TEXT_COMPOSER,
+        OPEN_SPEECH_REVIEW,
+        RESTORE_PRIMARY_OVERLAY
     }
 
     public record Transition(State previousState, State nextState, List<Effect> effects) {
@@ -90,6 +94,9 @@ public final class OverlayStateMachine {
                 } else if (event == OverlayEvent.COMPOSE_TEXT) {
                     state = State.TEXT_COMPOSING;
                     effects = List.of(Effect.HIDE_MENU, Effect.OPEN_TEXT_COMPOSER);
+                } else if (event == OverlayEvent.OPEN_SPEECH_REVIEW) {
+                    state = State.SPEECH_REVIEW_OPENING;
+                    effects = List.of(Effect.HIDE_MENU, Effect.OPEN_SPEECH_REVIEW);
                 }
             }
             case VOICE_STARTING -> {
@@ -148,6 +155,21 @@ public final class OverlayStateMachine {
                     effects = List.of(Effect.SEND_TEXT);
                 } else if (event == OverlayEvent.CLOSE_COMPOSER) {
                     state = State.IDLE;
+                }
+            }
+            case SPEECH_REVIEW_OPENING -> {
+                if (event == OverlayEvent.SPEECH_REVIEW_OPENED) {
+                    state = State.SPEECH_REVIEW_OPEN;
+                } else if (event == OverlayEvent.SPEECH_REVIEW_LAUNCH_FAILED
+                        || event == OverlayEvent.CLOSE_SPEECH_REVIEW) {
+                    state = State.IDLE;
+                    effects = List.of(Effect.RESTORE_PRIMARY_OVERLAY);
+                }
+            }
+            case SPEECH_REVIEW_OPEN -> {
+                if (event == OverlayEvent.CLOSE_SPEECH_REVIEW) {
+                    state = State.IDLE;
+                    effects = List.of(Effect.RESTORE_PRIMARY_OVERLAY);
                 }
             }
             case TEXT_QUEUEING -> {

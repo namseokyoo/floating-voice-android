@@ -398,4 +398,19 @@
     <string name="speech_recognition_canceled">음성 인식을 취소했습니다.</string>
     <string name="speech_recognition_permission_required">마이크 권한이 필요합니다.</string>
     <string name="speech_recognition_cancel">취소</string>
+    <string name="speech_review_title">텍스트 확인 후 공유</string>
+    <string name="speech_review_privacy_note">초안은 메모리에만 유지됩니다. 음성 인식에 네트워크 서비스가 사용될 수 있습니다. 공유를 누르고 앱을 선택하기 전에는 아무것도 공유하지 않습니다.</string>
+    <string name="speech_review_draft_label">편집 가능한 초안</string>
+    <string name="speech_review_draft_hint">공유할 내용을 말하거나 키보드로 입력하세요</string>
+    <string name="speech_review_share">공유…</string>
+    <string name="speech_review_retry">음성 인식 다시 시도</string>
+    <string name="speech_review_editing">초안을 확인하거나 수정한 뒤 공유를 누르세요.</string>
+    <string name="speech_review_keyboard_fallback">음성 인식을 사용할 수 없습니다. 보이던 초안을 유지했으니 키보드로 편집할 수 있습니다.</string>
+    <string name="speech_review_share_opened">공유창을 열었습니다 — 앱을 선택하고 그곳에서 확인해 주세요.</string>
+    <string name="speech_review_share_failed">공유창을 열지 못했습니다. 초안은 그대로이며 안전하게 다시 시도할 수 있습니다.</string>
+    <string name="speech_review_no_handler">일반 텍스트를 받을 앱이 없습니다. 초안은 그대로 유지됩니다.</string>
+    <string name="speech_review_share_chooser_title">확인한 텍스트 공유</string>
+    <string name="overlay_speech_share_action_title">말해서 텍스트 공유</string>
+    <string name="overlay_speech_share_action_supporting">말하고 수정한 뒤 공유창 열기</string>
+    <string name="content_description_open_speech_share">음성으로 작성한 텍스트 확인 및 명시적 공유 화면 열기</string>
 </resources>

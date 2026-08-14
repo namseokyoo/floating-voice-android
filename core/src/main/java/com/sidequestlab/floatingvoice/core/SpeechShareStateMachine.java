@@ -65,6 +65,7 @@ public final class SpeechShareStateMachine {
     private State state = State.IDLE;
     private long generation;
     private String reviewedText;
+    private String visibleDraft;
 
     public synchronized State state() {
         return state;
@@ -80,6 +81,7 @@ public final class SpeechShareStateMachine {
         if (state == State.TEARING_DOWN) return inert(previous);
         if (event.type() == SpeechShareEvent.Type.TEARDOWN) {
             reviewedText = null;
+            visibleDraft = null;
             state = State.TEARING_DOWN;
             return inert(previous);
         }
@@ -91,9 +93,7 @@ public final class SpeechShareStateMachine {
         List<Effect> effects = List.of();
         switch (state) {
             case IDLE -> {
-                if (event.type() == SpeechShareEvent.Type.START) {
-                    effects = beginAttempt();
-                }
+                if (event.type() == SpeechShareEvent.Type.START) effects = beginAttempt();
             }
             case STT_CHECKING_SUPPORT -> {
                 if (event.type() == SpeechShareEvent.Type.SUPPORT_AVAILABLE) {
@@ -110,7 +110,10 @@ public final class SpeechShareStateMachine {
             case STT_LISTENING, STT_PROCESSING -> {
                 if (event.type() == SpeechShareEvent.Type.PARTIAL_RESULT) {
                     String draft = normalize(event.text());
-                    if (draft != null) effects = List.of(Effect.draftPreview(draft));
+                    if (draft != null) {
+                        visibleDraft = draft;
+                        effects = List.of(Effect.draftPreview(draft));
+                    }
                 } else if (event.type() == SpeechShareEvent.Type.PROCESSING) {
                     state = State.STT_PROCESSING;
                 } else if (event.type() == SpeechShareEvent.Type.FINAL_RESULT) {
@@ -120,6 +123,7 @@ public final class SpeechShareStateMachine {
                         effects = List.of(Effect.retry());
                     } else {
                         reviewedText = result;
+                        visibleDraft = result;
                         state = State.STT_REVIEW;
                         effects = List.of(Effect.review(result));
                     }
@@ -131,9 +135,16 @@ public final class SpeechShareStateMachine {
                 }
             }
             case STT_REVIEW -> {
-                if (event.type() == SpeechShareEvent.Type.SHARE && reviewedText != null) {
-                    state = State.SHARE_CHOOSER_LAUNCHED;
-                    effects = List.of(Effect.shareChooser(reviewedText));
+                if (event.type() == SpeechShareEvent.Type.SHARE) {
+                    String edited = normalize(event.text());
+                    if (edited != null) {
+                        reviewedText = edited;
+                        visibleDraft = edited;
+                        state = State.SHARE_CHOOSER_LAUNCHED;
+                        effects = List.of(Effect.shareChooser(edited));
+                    }
+                } else if (event.type() == SpeechShareEvent.Type.RETRY) {
+                    effects = beginAttempt();
                 } else if (event.type() == SpeechShareEvent.Type.COMPLETE) {
                     completeInteraction();
                 }
@@ -141,12 +152,21 @@ public final class SpeechShareStateMachine {
             case STT_FAILED, STT_CANCELED -> {
                 if (event.type() == SpeechShareEvent.Type.RETRY) {
                     effects = beginAttempt();
+                } else if (event.type() == SpeechShareEvent.Type.KEYBOARD_FALLBACK) {
+                    reviewedText = visibleDraft == null ? "" : visibleDraft;
+                    state = State.STT_REVIEW;
+                    effects = List.of(Effect.review(reviewedText));
                 } else if (event.type() == SpeechShareEvent.Type.COMPLETE) {
                     completeInteraction();
                 }
             }
             case SHARE_CHOOSER_LAUNCHED -> {
-                if (event.type() == SpeechShareEvent.Type.COMPLETE) completeInteraction();
+                if (event.type() == SpeechShareEvent.Type.SHARE_LAUNCH_FAILED
+                        || event.type() == SpeechShareEvent.Type.CHOOSER_RETURNED) {
+                    state = State.STT_REVIEW;
+                } else if (event.type() == SpeechShareEvent.Type.COMPLETE) {
+                    completeInteraction();
+                }
             }
             case TEARING_DOWN -> {
                 // Process-lifetime terminal state.
@@ -158,12 +178,14 @@ public final class SpeechShareStateMachine {
     private List<Effect> beginAttempt() {
         generation++;
         reviewedText = null;
+        visibleDraft = null;
         state = State.STT_CHECKING_SUPPORT;
         return List.of(Effect.checkSupport(generation));
     }
 
     private void completeInteraction() {
         reviewedText = null;
+        visibleDraft = null;
         state = State.IDLE;
     }
 

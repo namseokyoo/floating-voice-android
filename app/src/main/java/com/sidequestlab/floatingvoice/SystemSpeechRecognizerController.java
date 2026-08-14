@@ -272,7 +272,8 @@ public final class SystemSpeechRecognizerController {
         SpeechShareStateMachine.State state = coordinator.speechState();
         if (state == SpeechShareStateMachine.State.IDLE) return coordinator.startSpeech();
         if (state == SpeechShareStateMachine.State.STT_FAILED
-                || state == SpeechShareStateMachine.State.STT_CANCELED) {
+                || state == SpeechShareStateMachine.State.STT_CANCELED
+                || state == SpeechShareStateMachine.State.STT_REVIEW) {
             return coordinator.retrySpeech();
         }
         return Optional.empty();

@@ -45,7 +45,8 @@ class SpeechShareStateMachineTest {
     @Test
     void shareRequiresExplicitRequestAfterReviewedNonblankFinal() {
         SpeechShareStateMachine beforeReview = listeningMachine();
-        SpeechShareStateMachine.Transition rejected = beforeReview.accept(SpeechShareEvent.share());
+        SpeechShareStateMachine.Transition rejected = beforeReview.accept(
+                SpeechShareEvent.share(beforeReview.generation(), "too early"));
         assertEquals(SpeechShareStateMachine.State.STT_LISTENING, rejected.nextState());
         assertEquals(List.of(), rejected.effects());
 
@@ -54,12 +55,14 @@ class SpeechShareStateMachineTest {
         assertEquals(List.of(), reviewed.accept(SpeechShareEvent.partialResult(
                 reviewed.generation(), "늦은 부분 결과")).effects());
 
-        SpeechShareStateMachine.Transition shared = reviewed.accept(SpeechShareEvent.share());
+        SpeechShareStateMachine.Transition shared = reviewed.accept(
+                SpeechShareEvent.share(reviewed.generation(), "검토할 문장"));
         assertEquals(SpeechShareStateMachine.State.SHARE_CHOOSER_LAUNCHED,
                 shared.nextState());
         assertEquals(List.of(SpeechShareStateMachine.Effect.shareChooser("검토할 문장")),
                 shared.effects());
-        assertEquals(List.of(), reviewed.accept(SpeechShareEvent.share()).effects());
+        assertEquals(List.of(), reviewed.accept(SpeechShareEvent.share(
+                reviewed.generation(), "duplicate")).effects());
     }
 
     @Test
@@ -124,10 +127,10 @@ class SpeechShareStateMachineTest {
         SpeechShareStateMachine machine = listeningMachine();
         long first = machine.generation();
         machine.accept(SpeechShareEvent.finalResult(first, "첫 결과"));
-        machine.accept(SpeechShareEvent.share());
+        machine.accept(SpeechShareEvent.share(first, "첫 결과"));
 
         SpeechShareStateMachine.Transition completed =
-                machine.accept(SpeechShareEvent.complete());
+                machine.accept(SpeechShareEvent.complete(first));
         assertEquals(SpeechShareStateMachine.State.IDLE, completed.nextState());
 
         machine.accept(SpeechShareEvent.start());
@@ -136,6 +139,76 @@ class SpeechShareStateMachineTest {
         assertEquals(List.of(), machine.accept(
                 SpeechShareEvent.finalResult(first, "stale")).effects());
         assertEquals(SpeechShareStateMachine.State.STT_CHECKING_SUPPORT, machine.state());
+    }
+
+    @Test
+    void editedReviewTextNotRecognizerFinalBecomesChooserPayload() {
+        SpeechShareStateMachine machine = listeningMachine();
+        long generation = machine.generation();
+        machine.accept(SpeechShareEvent.finalResult(generation, "stale recognizer final"));
+
+        SpeechShareStateMachine.Transition shared = machine.accept(
+                SpeechShareEvent.share(generation, "사용자가 고친 문장 ✨"));
+
+        assertEquals(List.of(SpeechShareStateMachine.Effect.shareChooser(
+                "사용자가 고친 문장 ✨")), shared.effects());
+    }
+
+    @Test
+    void recognitionErrorCanEnterKeyboardReviewWithVisiblePartialAndNoChooser() {
+        SpeechShareStateMachine machine = listeningMachine();
+        long generation = machine.generation();
+        machine.accept(SpeechShareEvent.partialResult(generation, "남아 있는 부분"));
+        machine.accept(SpeechShareEvent.error(generation));
+
+        SpeechShareStateMachine.Transition fallback = machine.accept(
+                SpeechShareEvent.keyboardFallback(generation));
+
+        assertEquals(SpeechShareStateMachine.State.STT_REVIEW, fallback.nextState());
+        assertEquals(List.of(SpeechShareStateMachine.Effect.review("남아 있는 부분")),
+                fallback.effects());
+        assertEquals(0, fallback.effects().stream()
+                .filter(effect -> effect.type()
+                        == SpeechShareStateMachine.EffectType.LAUNCH_SHARE_CHOOSER)
+                .count());
+    }
+
+    @Test
+    void chooserLaunchFailureRollsBackForSafeExplicitRetry() {
+        SpeechShareStateMachine machine = listeningMachine();
+        long generation = machine.generation();
+        machine.accept(SpeechShareEvent.finalResult(generation, "draft"));
+        machine.accept(SpeechShareEvent.share(generation, "edited"));
+
+        SpeechShareStateMachine.Transition failed = machine.accept(
+                SpeechShareEvent.shareLaunchFailed(generation));
+        assertEquals(SpeechShareStateMachine.State.STT_REVIEW, failed.nextState());
+        assertEquals(List.of(), failed.effects());
+
+        SpeechShareStateMachine.Transition retry = machine.accept(
+                SpeechShareEvent.share(generation, "edited again"));
+        assertEquals(List.of(SpeechShareStateMachine.Effect.shareChooser("edited again")),
+                retry.effects());
+    }
+
+    @Test
+    void completionAndChooserReturnAreGenerationScoped() {
+        SpeechShareStateMachine machine = listeningMachine();
+        long generation = machine.generation();
+        machine.accept(SpeechShareEvent.finalResult(generation, "draft"));
+        assertEquals(List.of(), machine.accept(
+                SpeechShareEvent.share(generation + 1L, "stale share")).effects());
+        assertEquals(SpeechShareStateMachine.State.STT_REVIEW, machine.state());
+        machine.accept(SpeechShareEvent.share(generation, "draft"));
+
+        assertEquals(SpeechShareStateMachine.State.SHARE_CHOOSER_LAUNCHED,
+                machine.accept(SpeechShareEvent.complete(generation + 1L)).nextState());
+        assertEquals(SpeechShareStateMachine.State.SHARE_CHOOSER_LAUNCHED,
+                machine.accept(SpeechShareEvent.chooserReturned(generation + 1L)).nextState());
+        assertEquals(SpeechShareStateMachine.State.STT_REVIEW,
+                machine.accept(SpeechShareEvent.chooserReturned(generation)).nextState());
+        assertEquals(SpeechShareStateMachine.State.IDLE,
+                machine.accept(SpeechShareEvent.complete(generation)).nextState());
     }
 
     private static SpeechShareStateMachine listeningMachine() {

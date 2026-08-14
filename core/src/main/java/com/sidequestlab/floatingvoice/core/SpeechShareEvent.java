@@ -14,7 +14,10 @@ public record SpeechShareEvent(Type type, long generation, String text) {
         ERROR,
         CANCEL,
         RETRY,
+        KEYBOARD_FALLBACK,
         SHARE,
+        SHARE_LAUNCH_FAILED,
+        CHOOSER_RETURNED,
         COMPLETE,
         TEARDOWN
     }
@@ -59,12 +62,24 @@ public record SpeechShareEvent(Type type, long generation, String text) {
         return new SpeechShareEvent(Type.RETRY, 0L, null);
     }
 
-    public static SpeechShareEvent share() {
-        return new SpeechShareEvent(Type.SHARE, 0L, null);
+    public static SpeechShareEvent keyboardFallback(long generation) {
+        return new SpeechShareEvent(Type.KEYBOARD_FALLBACK, generation, null);
     }
 
-    public static SpeechShareEvent complete() {
-        return new SpeechShareEvent(Type.COMPLETE, 0L, null);
+    public static SpeechShareEvent share(long generation, String editedText) {
+        return new SpeechShareEvent(Type.SHARE, generation, editedText);
+    }
+
+    public static SpeechShareEvent shareLaunchFailed(long generation) {
+        return new SpeechShareEvent(Type.SHARE_LAUNCH_FAILED, generation, null);
+    }
+
+    public static SpeechShareEvent chooserReturned(long generation) {
+        return new SpeechShareEvent(Type.CHOOSER_RETURNED, generation, null);
+    }
+
+    public static SpeechShareEvent complete(long generation) {
+        return new SpeechShareEvent(Type.COMPLETE, generation, null);
     }
 
     public static SpeechShareEvent teardown() {
@@ -74,7 +89,8 @@ public record SpeechShareEvent(Type type, long generation, String text) {
     public boolean isGenerationScoped() {
         return switch (type) {
             case SUPPORT_AVAILABLE, SUPPORT_UNAVAILABLE, PARTIAL_RESULT, PROCESSING,
-                    FINAL_RESULT, ERROR, CANCEL -> true;
+                    FINAL_RESULT, ERROR, CANCEL, KEYBOARD_FALLBACK, SHARE,
+                    SHARE_LAUNCH_FAILED, CHOOSER_RETURNED, COMPLETE -> true;
             default -> false;
         };
     }

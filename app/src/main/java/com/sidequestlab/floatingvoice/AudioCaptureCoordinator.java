@@ -37,7 +37,8 @@ public final class AudioCaptureCoordinator {
 
     public synchronized Optional<SpeechShareStateMachine.Transition> retrySpeech() {
         if (tearingDown || (speech.state() != SpeechShareStateMachine.State.STT_FAILED
-                && speech.state() != SpeechShareStateMachine.State.STT_CANCELED)) {
+                && speech.state() != SpeechShareStateMachine.State.STT_CANCELED
+                && speech.state() != SpeechShareStateMachine.State.STT_REVIEW)) {
             return Optional.empty();
         }
         Optional<AudioCaptureOwnership.Lease> lease =
@@ -79,7 +80,7 @@ public final class AudioCaptureCoordinator {
                 || expectedSpeechGeneration != speech.generation()
                 || speechLease != null
                 || !isInteractionTerminal(speech.state())) return false;
-        return speech.accept(SpeechShareEvent.complete()).nextState()
+        return speech.accept(SpeechShareEvent.complete(expectedSpeechGeneration)).nextState()
                 == SpeechShareStateMachine.State.IDLE;
     }
 

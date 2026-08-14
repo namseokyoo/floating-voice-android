@@ -150,7 +150,7 @@ public class AudioCaptureCoordinatorTest {
 
         assertFalse(coordinator.completeSpeechInteraction(first));
         assertTrue(coordinator.finishSpeechCapture(first));
-        coordinator.acceptSpeech(SpeechShareEvent.share());
+        coordinator.acceptSpeech(SpeechShareEvent.share(first, "첫 결과"));
         assertTrue(coordinator.completeSpeechInteraction(first));
 
         coordinator.startSpeech().orElseThrow();

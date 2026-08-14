@@ -1,0 +1,102 @@
+package com.sidequestlab.floatingvoice;
+
+import com.sidequestlab.floatingvoice.core.SpeechShareEvent;
+
+import org.junit.Test;
+
+import static org.junit.Assert.assertEquals;
+
+public class SpeechReviewViewModelTest {
+    @Test
+    public void recreatedActivityStartRequestDoesNotDuplicateRecognitionAndDraftStaysInMemory() {
+        AudioCaptureCoordinator coordinator = new AudioCaptureCoordinator();
+        FakeRecognitionFactory factory = new FakeRecognitionFactory(coordinator);
+        SpeechReviewViewModel model = new SpeechReviewViewModel(coordinator, factory);
+
+        model.startOnce();
+        long generation = coordinator.speechGeneration();
+        coordinator.acceptSpeech(SpeechShareEvent.finalResult(generation, "final"));
+        coordinator.finishSpeechCapture(generation);
+        factory.listener.onOutcome(new SystemSpeechRecognizerController.Outcome(
+                SystemSpeechRecognizerController.OutcomeType.FINAL_RESULT,
+                generation, "final", null, null));
+        model.session().editDraft("rotation edit");
+
+        model.startOnce();
+
+        assertEquals(1, factory.port.starts);
+        assertEquals("rotation edit", model.session().uiState().draft());
+    }
+
+    @Test
+    public void synchronousRetryOutcomeAdvancesSessionBeforeApplyingNewGeneration() {
+        AudioCaptureCoordinator coordinator = new AudioCaptureCoordinator();
+        FakeRecognitionFactory factory = new FakeRecognitionFactory(coordinator);
+        SpeechReviewViewModel model = new SpeechReviewViewModel(coordinator, factory);
+        factory.emitListeningOnStart = true;
+
+        model.startOnce();
+        long firstGeneration = coordinator.speechGeneration();
+        coordinator.acceptSpeech(SpeechShareEvent.error(firstGeneration));
+        coordinator.finishSpeechCapture(firstGeneration);
+        factory.listener.onOutcome(new SystemSpeechRecognizerController.Outcome(
+                SystemSpeechRecognizerController.OutcomeType.ERROR,
+                firstGeneration, null,
+                SystemSpeechRecognizerController.ErrorKind.NO_MATCH, null));
+
+        model.retry();
+
+        assertEquals(firstGeneration + 1L, model.session().generation());
+        assertEquals(SpeechReviewSession.Stage.LISTENING,
+                model.session().uiState().stage());
+        assertEquals(2, factory.port.starts);
+    }
+
+    private static final class FakeRecognitionFactory
+            implements SpeechReviewViewModel.RecognitionFactory {
+        final AudioCaptureCoordinator coordinator;
+        final FakeRecognitionPort port = new FakeRecognitionPort();
+        SystemSpeechRecognizerController.Listener listener;
+        boolean emitListeningOnStart;
+
+        FakeRecognitionFactory(AudioCaptureCoordinator coordinator) {
+            this.coordinator = coordinator;
+        }
+
+        @Override public SpeechReviewViewModel.RecognitionPort create(
+                SystemSpeechRecognizerController.Listener listener) {
+            this.listener = listener;
+            port.onStart = () -> {
+                if (coordinator.speechState()
+                        == com.sidequestlab.floatingvoice.core.SpeechShareStateMachine.State.IDLE) {
+                    coordinator.startSpeech().orElseThrow();
+                } else {
+                    coordinator.retrySpeech().orElseThrow();
+                }
+                long generation = coordinator.speechGeneration();
+                coordinator.acceptSpeech(SpeechShareEvent.supportAvailable(generation));
+                if (emitListeningOnStart) {
+                    listener.onOutcome(new SystemSpeechRecognizerController.Outcome(
+                            SystemSpeechRecognizerController.OutcomeType.LISTENING,
+                            generation, null, null, null));
+                }
+            };
+            return port;
+        }
+    }
+
+    private static final class FakeRecognitionPort
+            implements SpeechReviewViewModel.RecognitionPort {
+        int starts;
+        Runnable onStart;
+
+        @Override public SystemSpeechRecognizerController.StartResult start() {
+            starts++;
+            onStart.run();
+            return SystemSpeechRecognizerController.StartResult.STARTED;
+        }
+
+        @Override public void cancel() { }
+        @Override public void destroy() { }
+    }
+}

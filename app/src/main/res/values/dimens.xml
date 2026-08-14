@@ -6,7 +6,7 @@
     <dimen name="overlay_stop_size">48dp</dimen>
     <dimen name="overlay_cancel_size">48dp</dimen>
     <dimen name="overlay_palette_width">320dp</dimen>
-    <dimen name="overlay_palette_height">129dp</dimen>
+    <dimen name="overlay_palette_height">194dp</dimen>
     <dimen name="overlay_safe_margin">16dp</dimen>
     <dimen name="overlay_gap">8dp</dimen>
 </resources>

@@ -2,10 +2,10 @@
 
 > **For Hermes:** 이 문서는 재시작 후에도 유지되는 단일 릴리즈 로드맵이다. 한 번에 한 버전만 구현하고, 각 버전의 선행검증·구현·실기기·릴리즈 게이트가 모두 통과한 뒤 사용자 승인으로 다음 버전으로 이동한다.
 
-**기준 시각:** 2026-08-14 13:00 KST<br>
+**기준 시각:** 2026-08-14 14:10 KST<br>
 **현재 안정 기준선:** `v0.7.0` (tag `760075e02bf7de6dbf248d49a83b360b1d2182c1`, post-release closeout `629ecea1300a3a923276a46568ec93b5e702943a`)<br>
-**current_stage:** `V8-04 STT REVIEW / EDIT / TEXT SHARE`<br>
-**status:** `v8_03_automated_complete_v8_04_active` — V8-03은 API 29/30 standard, API 31+ on-device/standard fallback, API 33+ support check와 no-auto-download, generation-scoped lifecycle, 전역 audio ownership을 구현했다. 1차 독립 리뷰 High 3건(이전 controller의 새 interaction 완료, API 31/32 language fallback 누락, 동기 outcome 재진입)을 RED로 재현해 수정했고 후속 리뷰 PASS(Blocker 0/High 0), clean 211 tasks, core 178 + app debug 95 + app release 91 tests/fail 0, Debug/Release Lint 오류 0, localization 364 keys, 양쪽 assembly, ZIP/ELF 16KB와 debug APK v2 서명을 통과했다. V8-03의 A52s repeat 20회 실기기 게이트는 승인된 V8-03~04 중간 APK에서 형이 직접 확인하도록 합쳤다. 중간 APK PASS 전에는 V8-05로 넘어가지 않으며 폰/ADB 조작·Release APK·공개 릴리스는 승인 범위가 아니다.<br>
+**current_stage:** `V8-04 USER DEVICE GATE`<br>
+**status:** `v8_04_automated_complete_intermediate_apk_pending` — V8-03 system recognizer와 V8-04 메모리 내 review/edit, explicit text Sharesheet, 세 번째 overlay action, generation/rotation/lifecycle 안전성을 구현했다. V8-04 최초 독립 리뷰 High 3건(package visibility 사전검사, chooser rotation 상태, retry stale draft)을 수정했고 후속 리뷰 PASS(Blocker 0/High 0)를 받았다. 최종 clean 211 tasks, core 185 + app debug 114 + app release 110 tests/fail 0, Debug/Release Lint 오류 0, localization 382 keys, 양쪽 assembly를 통과했다. 공식 서명 중간 APK의 A52s 사용자 검토 PASS 전에는 V8-05로 넘어가지 않으며 공개 릴리스 승인은 아니다.<br>
 **구현 상태:** v0.5.0 인터랙션 기반, v0.6.0 Quiet Recorder, v0.6.1 플로팅 스타일·safe area, v0.6.2 Telegram 세션 유지 대상 변경, v0.6.3 개별 설정 페이지, v0.6.4 연결정보 인라인·톱니 anchored PopupMenu까지 완료. v0.6.4는 tests 110/fail 0, lint 오류 0, 공식 인증서·v2/v3·ZIP/ELF 16KB 검증과 local/origin/GitHub 일치를 통과함. V7-01은 legacy account/target pure migration model을 커밋 `f1d45e4`로 고정함. V7-02는 destination/catalog/scope/route state machine/dispatch snapshot과 default·next-one·current-recording·FREEZING·no-fallback 계약을 TDD로 구현함. latest catalog identity/revision revalidation, route-attempt-bound completion/abort, scalar-only snapshot, local-ID 재바인딩 차단까지 보완했으며 전체 tests 140/fail 0, lint 오류 0, debug/release assembly와 독립 follow-up review Blocker/High 0을 통과함. 실제 Android 저장소·UI 연결은 건드리지 않음. V7-03은 versioned catalog codec, Android Keystore 암호화 AtomicFile, copy→validate→persist→read-back→publish, raw V7-01 migration, schema marker, backup-only/corrupt recovery, legacy·pending 보존을 구현함. 최종 clean tests 188/fail 0, lint 오류 0, debug/release assembly와 독립 follow-up review Blocker/High 0을 통과함. 공식 서명 내부 APK `r1`은 기존 앱 위 설치·실제 Telegram 전송 후 형의 “이 메시지를 받으면 테스트는 성공이야” 확인으로 A52s 실기기 PASS 처리함. V7-04는 request token, expected client/account, private-chat·bot·canonical ID 검증, duplicate/identity-change 차단, account 전환·저장 race 직렬화, disabled-state 보존, TDLib lookup adapter를 구현함. 최종 core 138 + app 42 = 고유 tests 180/fail 0, Debug/Release Lint 오류 0, 양쪽 assembly·ZIP/ELF 16KB와 독립 review Blocker/High/Medium/Low 0을 통과함. 실제 봇 2개 A52s 게이트는 사용자 결정으로 V7-06 UI 뒤로 이월하고, Hermes의 기기 조작 없이 형이 전달받은 APK로 직접 검증함.
 
 ## 1. 목표와 제품 원칙
@@ -51,7 +51,7 @@ TDLib 최종 성공 확인 → 로컬 파일 삭제
 | 2.3 | `0.6.3` | 톱니 메뉴에서 개별 설정 페이지 직접 진입 | `docs/releases/v0.6.3.md` | 완료 |
 | 2.4 | `0.6.4` | 연결정보 인라인·anchored PopupMenu | `docs/releases/v0.6.4.md` | 완료 |
 | 3 | `0.7.0` | 여러 private bot 목적지·기본/다음 1회/이번 녹음·불변 dispatch | [v0.7.0 다중 목적지 계획](floating-voice-v0.7.0-multi-destination.md) | **V7 완료 · 공개 릴리스** |
-| 4 | `0.8.0` | 시스템 STT 텍스트 공유·Android Sharesheet·로컬 OGG 출력 | [v0.8.0 STT·공유 계획](floating-voice-v0.8.0-stt-sharing.md) | **V8-03 자동검증 완료 · V8-04 구현 중** |
+| 4 | `0.8.0` | 시스템 STT 텍스트 공유·Android Sharesheet·로컬 OGG 출력 | [v0.8.0 STT·공유 계획](floating-voice-v0.8.0-stt-sharing.md) | **V8-04 자동검증 완료 · 중간 APK 사용자 검토 대기** |
 | 5 | `0.9.0` | 메인 버튼 역할 지정: Telegram 음성·텍스트 공유·빠른 메모 | v0.8.0 실기기 PASS 후 상세화 | 범위 확정 |
 | 안정화 | `0.10.x+` | 실사용 피드백·회귀 수정·성능·복구 강화 | 버전별 이슈로 생성 | 미정 |
 | 안정판 | `1.0.0` | 핵심 계약과 업데이트 안정성 보장 | 아래 1.0 게이트 | 미정 |
@@ -259,6 +259,7 @@ python3 ~/.hermes/skills/software-development/android-native-app-delivery/script
 | 2026-08-13 13:22 KST | V8-01 debug STT spike 자동검증 PASS | 별도 `.debug` 런처와 20문장 메모리 측정 harness 구현. tests 290/fail 0, Debug/Release Lint 오류 0, localization·assembly·서명·16KB·release 제외 PASS. A52s 사용자 측정은 미실행 |
 | 2026-08-14 09:18 KST | V8-01 R2 A52s 사용자 GO/PASS | 온라인 corpus `20/20` 화면과 표시된 STANDARD 집계 `2/2`, 중앙 지연 `87ms`, 중앙 수정 부담률 `7.8%`, 비행기모드 기기 내 인식 동작을 확인한 뒤 형이 “패스처리”를 승인. 비행기모드 한 문장의 `아이 약은 → 아이야금` 오인과 전체 ledger 미확인은 증빙 한계로 유지하며, 이 결정은 V8-02 진행 GO일 뿐 production/Release/공개 승인이 아님 |
 | 2026-08-14 09:18 KST | V8-02 구현 진행 승인 | 형의 “이번거 패스 다음버전 진행 승인”에 따라 speech state·audio ownership·capability no-fallback TDD와 app coordinator 기반을 진행. V8-03 recognizer controller, 제품 UI, Release·공개는 별도 승인 경계로 유지 |
+| 2026-08-14 14:10 KST | V8-04 자동검증 완료 | explicit review/edit/text Sharesheet와 overlay lifecycle 통합. 최초 독립 리뷰 High 3건을 RED→GREEN으로 수정하고 후속 리뷰 PASS(Blocker 0/High 0), clean 211 tasks와 core 185/app debug 114/app release 110 tests, Lint 오류 0, localization 382/382 통과. 공식 서명 중간 APK의 A52s 사용자 PASS 전 V8-05 진입 금지 |
 
 ## 11. 단계 완료 보고 형식
 
