@@ -32,6 +32,7 @@ import android.view.WindowManager;
 import androidx.core.content.ContextCompat;
 
 import com.sidequestlab.floatingvoice.core.AnchoredPanelPlacement;
+import com.sidequestlab.floatingvoice.core.AudioCaptureOwnership;
 import com.sidequestlab.floatingvoice.core.Destination;
 import com.sidequestlab.floatingvoice.core.DestinationCatalog;
 import com.sidequestlab.floatingvoice.core.DestinationScope;
@@ -104,6 +105,8 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
     private long readyTextAttemptId;
     private long recordingStartedAt;
     private TelegramRepository telegram;
+    private AudioCaptureCoordinator audioCaptureCoordinator;
+    private AudioCaptureOwnership.Lease recordingLease;
     private volatile RouteStateMachine routeStateMachine;
     private long destinationPickerRequestId;
     private DestinationScope pendingDestinationScope;
@@ -132,7 +135,9 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
             }
             mainHandler.postDelayed(prerequisiteMonitor, PREREQUISITE_CHECK_MS);
         };
-        telegram = ((FloatingVoiceApp) getApplication()).telegram();
+        FloatingVoiceApp app = (FloatingVoiceApp) getApplication();
+        telegram = app.telegram();
+        audioCaptureCoordinator = app.audioCaptureCoordinator();
         initializeRouteState(telegram.destinationCatalog());
         telegram.addListener(this);
         overlayUiPreferences = new OverlayUiPreferences(this);
@@ -261,6 +266,8 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
         overlayViewController = null;
         dragTapListener = null;
         if (recorder != null) stopAndRetainInterruptedRecording();
+        if (recorder == null) releaseRecordingOwnership();
+        audioCaptureCoordinator = null;
         if (windowRegistry != null) windowRegistry.removeAllWithRetries(3);
         primaryOverlayAttached = false;
         telegram.removeListener(this);
@@ -451,10 +458,18 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
     }
 
     private void startRecording() {
+        AudioCaptureOwnership.Lease acquired = audioCaptureCoordinator == null
+                ? null : audioCaptureCoordinator.startRecording().orElse(null);
+        if (acquired == null) {
+            dispatchOverlayEvent(OverlayEvent.VOICE_START_FAILED);
+            return;
+        }
+        recordingLease = acquired;
         RouteStateMachine route = routeStateMachine;
         Destination selectedDestination = route == null
                 ? null : route.startRecording().orElse(null);
         if (selectedDestination == null) {
+            releaseRecordingOwnership();
             dispatchOverlayEvent(OverlayEvent.VOICE_START_FAILED);
             updateState(R.string.destination_required_before_recording);
             return;
@@ -463,6 +478,7 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
         File root = new File(externalMusic == null ? getFilesDir() : externalMusic, "voice_notes");
         if (!root.mkdirs() && !root.isDirectory()) {
             route.cancelRecording();
+            releaseRecordingOwnership();
             dispatchOverlayEvent(OverlayEvent.VOICE_START_FAILED);
             updateState(R.string.recording_folder_failed);
             return;
@@ -482,15 +498,16 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
             next.prepare();
             next.start();
         } catch (Exception e) {
-            if (next != null) {
-                try { next.release(); } catch (RuntimeException ignored) { }
-            }
-            recorder = null;
+            boolean released = next == null || tryReleaseRecorder(next);
+            recorder = released ? null : next;
             route.cancelRecording();
             File failedRecording = activeRecording;
-            activeRecording = null;
-            boolean cleaned = failedRecording == null
-                    || !failedRecording.exists() || failedRecording.delete();
+            if (released) {
+                releaseRecordingOwnership();
+                activeRecording = null;
+            }
+            boolean cleaned = released && (failedRecording == null
+                    || !failedRecording.exists() || failedRecording.delete());
             dispatchOverlayEvent(OverlayEvent.VOICE_START_FAILED);
             if (cleaned) {
                 updateState(R.string.recording_start_failed, e.getMessage());
@@ -524,14 +541,17 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
         recorder = null;
         int duration = (int) Math.max(1,
                 (SystemClock.elapsedRealtime() - recordingStartedAt + 999) / 1000);
-        try {
-            if (current == null) throw new IllegalStateException("Recorder is not active");
-            current.stop();
-            current.release();
-        } catch (RuntimeException e) {
-            if (current != null) {
-                try { current.release(); } catch (RuntimeException ignored) { }
-            }
+        boolean stopped = false;
+        if (current != null) {
+            try {
+                current.stop();
+                stopped = true;
+            } catch (RuntimeException ignored) { }
+        }
+        boolean released = current == null || tryReleaseRecorder(current);
+        recorder = released ? null : current;
+        if (released) releaseRecordingOwnership();
+        if (!stopped || !released) {
             if (routeFreezing) route.abortFreezing(routeAttemptId);
             dispatchOverlayEvent(OverlayEvent.VOICE_STOP_FAILED);
             updateIdleBubble();
@@ -574,6 +594,12 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
 
         RecordingCancelOperation.Result result = cancelOperation.execute(
                 recorderPort(current), canceledRecording, filePort());
+        if (result.releaseFailed()) {
+            recorder = current;
+            activeRecording = canceledRecording;
+        } else {
+            releaseRecordingOwnership();
+        }
 
         updateIdleBubble();
         switch (result.outcome()) {
@@ -1081,13 +1107,33 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
 
     private void stopAndRetainInterruptedRecording() {
         MediaRecorder current = recorder;
-        recorder = null;
-        try { current.stop(); } catch (RuntimeException ignored) { }
-        try { current.release(); } catch (RuntimeException ignored) { }
+        if (current != null) {
+            try { current.stop(); } catch (RuntimeException ignored) { }
+        }
+        boolean released = current == null || tryReleaseRecorder(current);
+        recorder = released ? null : current;
+        if (released) releaseRecordingOwnership();
         if (activeRecording != null) {
             notificationResourceId = R.string.recording_interrupted_retained;
             notificationArguments = new Object[] {activeRecording.getAbsolutePath()};
             notificationText = null;
+        }
+    }
+
+    private void releaseRecordingOwnership() {
+        AudioCaptureOwnership.Lease lease = recordingLease;
+        recordingLease = null;
+        if (lease != null && audioCaptureCoordinator != null) {
+            audioCaptureCoordinator.finishRecording(lease, true);
+        }
+    }
+
+    private static boolean tryReleaseRecorder(MediaRecorder current) {
+        try {
+            current.release();
+            return true;
+        } catch (RuntimeException ignored) {
+            return false;
         }
     }
 

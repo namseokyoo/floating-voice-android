@@ -46,3 +46,12 @@
 하단 모드별 요약의 `successRate`, `medianLatency`, `medianCorrection`도 함께 확인한다. `medianCorrection`은 최종 원문을 기준문장으로 고치는 데 필요한 문자 거리 ÷ 기준문장 길이의 중앙값이다.
 
 자동검증 PASS는 실제 A52s STT 품질 PASS가 아니다. 위 결과를 받은 뒤에만 V8-01 go/no-go를 결정한다.
+
+## 6. 사용자 결과 — 2026-08-14
+
+**결정:** 형의 명시적 요청에 따라 `V8-01 A52s USER GO/PASS`로 처리한다.
+
+- 온라인 일반 시스템 인식: corpus 화면 `20/20` 도달. 캡처에 표시된 STANDARD 집계는 `attempts=2`, `success=2`, `successRate=100.0%`, `medianLatency=87ms`, `medianCorrection=7.8%`.
+- 비행기모드: `기기 내 인식` 및 `비행기모드` 표시 확인. 문장 5에서 `아이 약은`이 `아이야금`으로 인식된 오인이 있었으나 사용자는 전체 품질을 “나쁘지 않다”고 평가하고 PASS를 승인했다.
+- 증빙 한계: 캡처에 없는 전체 20개 attempt ledger와 취소·뒤로가기·회전·Home 복귀 결과는 PASS로 추정하지 않는다. 화면의 비행기모드 `수정 문자 거리 0`은 수정 입력이 recognizer 결과 그대로였으므로 기준문장 완전 일치 증거가 아니다.
+- 범위: V8-02 진행 GO. production 메뉴·Release APK·공개 릴리스 승인은 포함하지 않는다.

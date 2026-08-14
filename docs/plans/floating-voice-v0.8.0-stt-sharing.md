@@ -12,7 +12,7 @@
 
 **Non-goals:** 녹음된 OGG 사후 STT, bundled Whisper, cloud STT, MediaRecorder+SpeechRecognizer 동시 실행, Kakao 지정방 자동전송, 공유 대상 앱의 최종 수신 성공 추적, 복수 output 동시 실행.
 
-**현재 단계 상태 (2026-08-13 14:41 KST):** `V8-01 USER REPORT: GOOD ACCURACY / R2 MEASUREMENT APK`. production 메뉴와 release APK를 바꾸지 않은 별도 `.debug` 런처에서 사용자가 일반/on-device 모드 모두 꽤 정확한 인식을 보인다고 보고했다. 이는 정성 관찰이며 정량 go/no-go PASS는 아니다. R2는 오류·timeout·empty/create/start 실패행, 문자 수정 부담률, 모드별 시도/성공률/중앙 지연/중앙 수정 부담률을 인메모리 요약에 추가한다. 기존 API support probe, 실제 비행기모드 판독, cancel/destroy/stale callback 차단, 비영속·무전송 계약은 유지한다. R2 clean 자동검증과 A52s 정량 측정이 다음 게이트다.
+**현재 단계 상태 (2026-08-14 10:23 KST):** `V8-02 COMPLETE / V8-03 APPROVAL PENDING`. V8-02는 speech sub-state, generation-bound stale callback 차단, recorder/STT 전역 상호 배타 ownership, 리소스 해제 확인 전 fail-closed, 연속 interaction reset, Telegram/STT/local capability 독립 판정과 no-fallback 계약을 구현·검증했다. production 메뉴, 실제 `SpeechRecognizer` controller, review/share UI, Release APK, 공개 릴리스는 후속 게이트다.
 
 ---
 
@@ -156,6 +156,15 @@ C. OGG 출력
 
 **게이트:** 측정표와 go/no-go 결정 승인.
 
+**2026-08-14 A52s 사용자 결정:** `GO/PASS`.
+
+- R2 APK: `FloatingVoice-v8-01-stt-spike-r2-debug.apk`, SHA-256 `33a87ec0eadb4b69c23fe24fabd7ac02316f0b897e871f4bde12a9f1e0256002`.
+- 온라인 캡처: corpus 화면 `20/20`; 화면에 직접 표시된 STANDARD 요약은 `attempts=2`, `success=2`, `successRate=100.0%`, `medianLatency=87ms`, `medianCorrection=7.8%`.
+- 비행기모드 캡처: `기기 내 인식`, `비행기모드`, 문장 5에서 recognizer 결과 `아이야금 저녁 식사 후에 먹입니다`; 기준문장의 `아이 약은` 부분과 오인이 있었지만 형은 전체 인식 품질을 수용했다.
+- 화면의 `수정 문자 거리 0`/`수정 부담률 0.0%`는 사용자가 수정 입력을 바꾸지 않은 상태의 표시이므로 기준문장과 완전 일치했다는 증거로 사용하지 않는다.
+- 전체 20개 attempt ledger, crash/hang, 취소·회전·Home 복귀 항목은 제공된 캡처만으로 확인되지 않았으므로 별도 PASS 수치로 기록하지 않는다.
+- 결정 범위: 시스템 STT를 v0.8.0 제품 구현 후보로 채택하고 V8-02로 진행 가능. 제품 메뉴 반영, Release APK, tag/GitHub 공개는 미승인.
+
 ---
 
 ## 5. V8-02 — speech state·audio ownership TDD
@@ -207,6 +216,17 @@ TEARING_DOWN
 **완화:** speech sub-state와 audio ownership을 분리하되 상위 coordinator가 둘의 invariant를 검사한다.
 
 **게이트:** illegal/race/ownership tests 전부 통과, overlap effect 0.
+
+**완료 증빙 (2026-08-14 10:23 KST):**
+
+- `SpeechShareStateMachine`/`SpeechShareEvent`: partial은 preview만, final은 review만, explicit share만 chooser effect, first-terminal 및 stale-generation 차단, 완료 후 IDLE 복귀와 generation 단조 증가.
+- `AudioCaptureOwnership`/`AudioCaptureCoordinator`: recording/STT 동시 점유 거부, 실제 recorder/recognizer 해제 확인 전 lease 유지, stale·중복 release 거부, 연속 STT interaction 지원.
+- `FloatingVoiceService`: start/stop/cancel/service teardown의 `MediaRecorder.release()` 실패를 fail-closed로 처리해 점유권과 보존 파일을 유지.
+- V8-01 debug STT harness도 process-wide coordinator를 사용하며 `SpeechRecognizer.destroy()` 성공 뒤에만 STT lease를 해제.
+- `CaptureCapabilities`: Telegram/STT/local 독립 판정과 unavailable action의 no-fallback 계약을 pure test로 고정.
+- 최종 자동검증: clean 211 tasks, core 178 + app debug 74 tests/fail 0, app release variant 70 tests/fail 0, Debug/Release Lint 오류 0, localization 357 keys/hard failure 0, debug/release assembly PASS.
+- 패키징 검증: debug APK ZIP/ELF 16KB PASS, v2 서명 PASS. 이 APK는 내부 자동검증 산출물이며 사용자 배포·Release 승인이 아니다.
+- 독립 follow-up review: Blocker 0 / High 0 PASS.
 
 ---
 

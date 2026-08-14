@@ -10,6 +10,7 @@ public final class FloatingVoiceApp extends Application {
     private DestinationStore destinations;
     private DestinationCatalogPersistence.LoadResult destinationLoadResult;
     private TelegramRepository telegram;
+    private AudioCaptureCoordinator audioCaptureCoordinator;
     private boolean automaticStartAttempted;
 
     @Override public void onCreate() {
@@ -17,6 +18,7 @@ public final class FloatingVoiceApp extends Application {
         settings = new SecureSettingsStore(this);
         destinations = new DestinationStore(settings);
         destinationLoadResult = destinations.load();
+        audioCaptureCoordinator = new AudioCaptureCoordinator();
         telegram = new TelegramRepository(this, settings, destinations,
                 new PendingRecordingStore(this), new PendingTextSendStore(this),
                 new PendingDispatchStore(this));
@@ -39,4 +41,8 @@ public final class FloatingVoiceApp extends Application {
         return destinationLoadResult;
     }
     public TelegramRepository telegram() { return telegram; }
+
+    public synchronized AudioCaptureCoordinator audioCaptureCoordinator() {
+        return audioCaptureCoordinator;
+    }
 }

@@ -21,6 +21,8 @@ import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
 
+import com.sidequestlab.floatingvoice.core.SpeechShareEvent;
+
 import java.util.ArrayList;
 
 /** Debug-only visible A52s system-STT measurement harness. */
@@ -28,6 +30,8 @@ public final class SttCapabilityDebugActivity extends AppCompatActivity {
     private final SttMeasurementSession session = new SttMeasurementSession();
     private SpeechRecognizer recognizer;
     private long activeGeneration;
+    private AudioCaptureCoordinator audioCaptureCoordinator;
+    private long captureGeneration;
 
     private TextView supportView;
     private TextView phraseIndexView;
@@ -52,6 +56,7 @@ public final class SttCapabilityDebugActivity extends AppCompatActivity {
 
     @Override protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        audioCaptureCoordinator = ((FloatingVoiceApp) getApplication()).audioCaptureCoordinator();
         setContentView(R.layout.activity_stt_capability_debug);
         bindViews();
         bindActions();
@@ -160,16 +165,22 @@ public final class SttCapabilityDebugActivity extends AppCompatActivity {
     private void startRecognition() {
         destroyRecognizer();
         boolean requestOnDevice = onDeviceMode.isChecked();
+        if (requestOnDevice && Build.VERSION.SDK_INT < 31) {
+            stateView.setText(R.string.debug_stt_on_device_unavailable);
+            return;
+        }
         if (requestOnDevice && !onDeviceAvailable()) {
             stateView.setText(R.string.debug_stt_on_device_unavailable);
             return;
         }
+        if (audioCaptureCoordinator == null
+                || audioCaptureCoordinator.startSpeech().isEmpty()) {
+            stateView.setText(R.string.debug_stt_start_failed);
+            return;
+        }
+        captureGeneration = audioCaptureCoordinator.speechGeneration();
         try {
             if (requestOnDevice) {
-                if (Build.VERSION.SDK_INT < 31) {
-                    stateView.setText(R.string.debug_stt_on_device_unavailable);
-                    return;
-                }
                 recognizer = SttOnDeviceRecognizerApi31.create(this);
             } else {
                 recognizer = SpeechRecognizer.createSpeechRecognizer(this);
@@ -181,9 +192,12 @@ public final class SttCapabilityDebugActivity extends AppCompatActivity {
                     actualEnvironment(), 1002, "CREATE_FAILED");
             summaryView.setText(session.summaryText());
             stateView.setText(R.string.debug_stt_create_failed);
+            audioCaptureCoordinator.acceptSpeech(SpeechShareEvent.error(captureGeneration));
             destroyRecognizer();
             return;
         }
+        audioCaptureCoordinator.acceptSpeech(
+                SpeechShareEvent.supportAvailable(captureGeneration));
         activeGeneration = session.beginAttempt(SystemClock.elapsedRealtime(),
                 requestOnDevice ? SttMeasurementSession.RecognizerMode.ON_DEVICE
                         : SttMeasurementSession.RecognizerMode.STANDARD,
@@ -199,6 +213,7 @@ public final class SttCapabilityDebugActivity extends AppCompatActivity {
                     SystemClock.elapsedRealtime());
             summaryView.setText(session.summaryText());
             stateView.setText(R.string.debug_stt_start_failed);
+            audioCaptureCoordinator.acceptSpeech(SpeechShareEvent.error(captureGeneration));
             finishAttempt();
         }
     }
@@ -216,6 +231,8 @@ public final class SttCapabilityDebugActivity extends AppCompatActivity {
             @Override public void onEndOfSpeech() {
                 if (generation == activeGeneration) {
                     session.markSpeechEnded(generation, SystemClock.elapsedRealtime());
+                    audioCaptureCoordinator.acceptSpeech(
+                            SpeechShareEvent.processing(captureGeneration));
                     stateView.setText(R.string.debug_stt_processing);
                 }
             }
@@ -225,6 +242,7 @@ public final class SttCapabilityDebugActivity extends AppCompatActivity {
                         SystemClock.elapsedRealtime());
                 summaryView.setText(session.summaryText());
                 stateView.setText(getString(R.string.debug_stt_error, error, errorName(error)));
+                audioCaptureCoordinator.acceptSpeech(SpeechShareEvent.error(captureGeneration));
                 finishAttempt();
             }
             @Override public void onResults(Bundle results) {
@@ -239,12 +257,18 @@ public final class SttCapabilityDebugActivity extends AppCompatActivity {
                     session.recordBlankFinalFailure();
                     summaryView.setText(session.summaryText());
                 }
+                audioCaptureCoordinator.acceptSpeech(SpeechShareEvent.finalResult(
+                        captureGeneration, session.rawFinalText()));
                 renderMetrics();
                 finishAttempt();
             }
             @Override public void onPartialResults(Bundle partialResults) {
                 String partial = firstResult(partialResults);
-                if (session.acceptPartial(generation, partial)) partialView.setText(partial);
+                if (session.acceptPartial(generation, partial)) {
+                    partialView.setText(partial);
+                    audioCaptureCoordinator.acceptSpeech(
+                            SpeechShareEvent.partialResult(captureGeneration, partial));
+                }
             }
             @Override public void onEvent(int eventType, Bundle params) { }
         };
@@ -322,6 +346,10 @@ public final class SttCapabilityDebugActivity extends AppCompatActivity {
     private void cancelRecognition(int statusText) {
         session.cancelAttempt();
         stateView.setText(statusText);
+        if (captureGeneration > 0L) {
+            audioCaptureCoordinator.acceptSpeech(
+                    SpeechShareEvent.cancel(captureGeneration));
+        }
         destroyRecognizer();
         startButton.setEnabled(true);
         cancelButton.setEnabled(false);
@@ -335,10 +363,23 @@ public final class SttCapabilityDebugActivity extends AppCompatActivity {
 
     private void destroyRecognizer() {
         activeGeneration++;
+        if (captureGeneration > 0L) {
+            audioCaptureCoordinator.acceptSpeech(
+                    SpeechShareEvent.cancel(captureGeneration));
+        }
+        boolean destroyed = recognizer == null;
         if (recognizer != null) {
             try { recognizer.cancel(); } catch (RuntimeException ignored) { }
-            recognizer.destroy();
-            recognizer = null;
+            try {
+                recognizer.destroy();
+                recognizer = null;
+                destroyed = true;
+            } catch (RuntimeException ignored) { }
+        }
+        if (destroyed && captureGeneration > 0L) {
+            audioCaptureCoordinator.finishSpeechCapture(captureGeneration);
+            audioCaptureCoordinator.completeSpeechInteraction();
+            captureGeneration = 0L;
         }
     }
 
