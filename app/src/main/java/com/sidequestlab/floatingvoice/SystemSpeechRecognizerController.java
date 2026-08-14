@@ -22,7 +22,8 @@ import java.util.Optional;
 
 /**
  * Main-thread owner of one explicit user-stopped speech-recognition session.
- * It chains fresh, short platform recognizers while retaining one audio lease and generation.
+ * API 33+ uses one segmented recognizer session; older APIs chain short recognizers.
+ * Both routes retain one audio lease and generation until explicit user termination.
  * It never triggers a model download or shares transcript text automatically.
  */
 public final class SystemSpeechRecognizerController {
@@ -87,10 +88,16 @@ public final class SystemSpeechRecognizerController {
             String languageTag,
             boolean partialResults,
             boolean preferOffline,
-            String callingPackage) {
+            String callingPackage,
+            boolean segmentedSession,
+            long segmentCompleteSilenceMillis) {
         public RecognitionRequest {
             Objects.requireNonNull(languageTag, "languageTag");
             Objects.requireNonNull(callingPackage, "callingPackage");
+            if (segmentedSession != (segmentCompleteSilenceMillis > 0L)) {
+                throw new IllegalArgumentException(
+                        "segmented session and complete-silence duration must agree");
+            }
         }
     }
 
@@ -114,6 +121,8 @@ public final class SystemSpeechRecognizerController {
         void onProcessing();
         void onFinalResult(String text);
         void onError(PlatformError error);
+        default void onSegmentResult(String text) { }
+        default void onEndOfSegmentedSession() { }
     }
 
     public interface SupportCallback {
@@ -143,6 +152,7 @@ public final class SystemSpeechRecognizerController {
     }
 
     private static final String KOREAN_LANGUAGE = "ko-KR";
+    private static final long SEGMENT_COMPLETE_SILENCE_MILLIS = 1_200L;
     private static final long CHAIN_RESTART_DELAY_MILLIS = 350L;
     private static final long CHAIN_BUSY_RESTART_DELAY_MILLIS = 600L;
     private static final int MAX_CONSECUTIVE_CHAIN_BUSY_RETRIES = 3;
@@ -318,7 +328,10 @@ public final class SystemSpeechRecognizerController {
             SpeechRecognitionSupport.FallbackReason fallback,
             boolean onDevice) {
         Session session = new Session(generation, route, fallback,
-                new RecognitionRequest(KOREAN_LANGUAGE, true, true, platform.callingPackage()));
+                new RecognitionRequest(
+                        KOREAN_LANGUAGE, true, true, platform.callingPackage(),
+                        platform.apiLevel() >= 33,
+                        platform.apiLevel() >= 33 ? SEGMENT_COMPLETE_SILENCE_MILLIS : 0L));
         session.cycle = createCycle(session, onDevice);
         return session;
     }
@@ -341,6 +354,14 @@ public final class SystemSpeechRecognizerController {
 
             @Override public void onError(PlatformError error) {
                 handleError(session, cycle, error);
+            }
+
+            @Override public void onSegmentResult(String text) {
+                handleSegment(session, cycle, text);
+            }
+
+            @Override public void onEndOfSegmentedSession() {
+                handleSegmentedSessionEnd(session, cycle);
             }
         };
         cycle.recognizer = onDevice
@@ -512,6 +533,11 @@ public final class SystemSpeechRecognizerController {
 
         emitAccumulatedPreview(session);
         if (!isActive(session)) return;
+        if (session.request.segmentedSession()) {
+            terminate(session, SpeechShareEvent.error(session.generation), OutcomeType.ERROR,
+                    ErrorKind.CLIENT, null, false);
+            return;
+        }
         if (cycle.inStart) {
             terminate(session, SpeechShareEvent.error(session.generation), OutcomeType.ERROR,
                     ErrorKind.START_FAILED, null, false);
@@ -533,6 +559,11 @@ public final class SystemSpeechRecognizerController {
             fallbackToStandard(
                     session, cycle,
                     SpeechRecognitionSupport.FallbackReason.ON_DEVICE_LANGUAGE_ERROR);
+            return;
+        }
+        if (session.request.segmentedSession()) {
+            terminate(session, SpeechShareEvent.error(session.generation), OutcomeType.ERROR,
+                    mapError(error), null, false);
             return;
         }
         if (error == PlatformError.NO_MATCH || error == PlatformError.TIMEOUT) {
@@ -560,13 +591,51 @@ public final class SystemSpeechRecognizerController {
                 mapError(error), null, false);
     }
 
+    private synchronized void handleSegment(Session session, Cycle cycle, String text) {
+        platform.assertMainThread();
+        if (!isCurrent(session, cycle) || !session.request.segmentedSession()) return;
+        String normalized = normalize(text);
+        if (normalized == null) return;
+        session.consecutiveBusyRetries = 0;
+        session.accumulated = joinSegments(session.accumulated, normalized);
+        cycle.latestPartial = null;
+
+        if (!session.stopRequested) {
+            SpeechShareStateMachine.Transition transition = coordinator.acceptSpeech(
+                    SpeechShareEvent.listeningCycleStarted(session.generation));
+            if (transition.nextState() == SpeechShareStateMachine.State.STT_LISTENING) {
+                emit(OutcomeType.LISTENING, session.generation, null, null, null);
+            }
+        }
+        emitAccumulatedPreview(session);
+    }
+
+    private synchronized void handleSegmentedSessionEnd(Session session, Cycle cycle) {
+        platform.assertMainThread();
+        if (!isCurrent(session, cycle) || !session.request.segmentedSession()) return;
+        cycle.terminal = true;
+        if (session.stopRequested) {
+            finishStoppedSession(session, cycle, ErrorKind.NO_MATCH);
+            return;
+        }
+        emitVisiblePreview(session,
+                joinSegments(session.accumulated, cycle.latestPartial));
+        if (!isActive(session)) return;
+        terminate(session, SpeechShareEvent.error(session.generation), OutcomeType.ERROR,
+                ErrorKind.CLIENT, null, false);
+    }
+
     private void emitAccumulatedPreview(Session session) {
-        if (session.accumulated == null) return;
+        emitVisiblePreview(session, session.accumulated);
+    }
+
+    private void emitVisiblePreview(Session session, String text) {
+        if (text == null) return;
         SpeechShareStateMachine.Transition transition = coordinator.acceptSpeech(
-                SpeechShareEvent.partialResult(session.generation, session.accumulated));
+                SpeechShareEvent.partialResult(session.generation, text));
         if (!transition.effects().isEmpty()) {
             emit(OutcomeType.PARTIAL_RESULT, session.generation,
-                    session.accumulated, null, null);
+                    text, null, null);
         }
     }
 
@@ -859,6 +928,12 @@ public final class SystemSpeechRecognizerController {
                 @Override public void onPartialResults(Bundle partialResults) {
                     callback.onPartialResult(firstResult(partialResults));
                 }
+                @Override public void onSegmentResults(Bundle segmentResults) {
+                    callback.onSegmentResult(firstResult(segmentResults));
+                }
+                @Override public void onEndOfSegmentedSession() {
+                    callback.onEndOfSegmentedSession();
+                }
                 @Override public void onEvent(int eventType, Bundle params) { }
             });
             return wrapped;
@@ -872,13 +947,22 @@ public final class SystemSpeechRecognizerController {
         }
 
         private static Intent toIntent(RecognitionRequest request) {
-            return new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
+            Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
                     .putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL,
                             RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
                     .putExtra(RecognizerIntent.EXTRA_LANGUAGE, request.languageTag())
                     .putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, request.partialResults())
                     .putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, request.preferOffline())
                     .putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, request.callingPackage());
+            if (Build.VERSION.SDK_INT >= 33 && request.segmentedSession()) {
+                intent.putExtra(
+                        RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS,
+                        request.segmentCompleteSilenceMillis());
+                intent.putExtra(
+                        RecognizerIntent.EXTRA_SEGMENTED_SESSION,
+                        RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS);
+            }
+            return intent;
         }
 
         private static String firstResult(Bundle bundle) {

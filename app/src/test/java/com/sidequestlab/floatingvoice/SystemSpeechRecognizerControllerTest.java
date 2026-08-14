@@ -57,6 +57,9 @@ public class SystemSpeechRecognizerControllerTest {
             assertTrue(f.platform.recognizer.lastRequest.partialResults());
             assertTrue(f.platform.recognizer.lastRequest.preferOffline());
             assertEquals("com.test.floatingvoice", f.platform.recognizer.lastRequest.callingPackage());
+            assertFalse(f.platform.recognizer.lastRequest.segmentedSession());
+            assertEquals(0L,
+                    f.platform.recognizer.lastRequest.segmentCompleteSilenceMillis());
         }
     }
 
@@ -69,6 +72,7 @@ public class SystemSpeechRecognizerControllerTest {
             assertEquals(0, onDevice.platform.standardCreates);
             assertEquals(SpeechRecognitionSupport.Route.ON_DEVICE,
                     onDevice.listener.lastSupport().route());
+            assertFalse(onDevice.platform.recognizer.lastRequest.segmentedSession());
 
             Fixture fallback = new Fixture(api);
             fallback.platform.onDeviceAvailable = false;
@@ -80,6 +84,112 @@ public class SystemSpeechRecognizerControllerTest {
             assertEquals(SpeechRecognitionSupport.FallbackReason.ON_DEVICE_UNAVAILABLE,
                     fallback.listener.lastSupport().fallbackReason());
         }
+    }
+
+    @Test
+    public void api36SegmentedSessionAccumulatesWithoutRecognizerRestartUntilUserStop() {
+        Fixture f = new Fixture(36);
+        f.controller.start();
+
+        assertTrue(f.platform.recognizer.lastRequest.segmentedSession());
+        assertEquals(1_200L,
+                f.platform.recognizer.lastRequest.segmentCompleteSilenceMillis());
+        SystemSpeechRecognizerController.Callback callback = f.platform.callback;
+        callback.onPartialResult("두번째 문장 앞부분");
+        callback.onSegmentResult("두번째 문장 전체");
+        callback.onPartialResult("세번째 문장 앞부분");
+        callback.onSegmentResult("세번째 문장 전체");
+
+        assertEquals(1, f.platform.standardCreates + f.platform.onDeviceCreates);
+        assertEquals(1, f.platform.totalStarts());
+        assertEquals(0, f.platform.totalDestroys());
+        assertEquals(0, f.platform.postedRestarts.size());
+        assertEquals("두번째 문장 전체 세번째 문장 전체", f.listener.last().text());
+        assertEquals(AudioCaptureOwnership.Owner.STT, f.coordinator.owner());
+
+        f.controller.stopListening();
+        callback.onEndOfSegmentedSession();
+
+        assertEquals(1, f.platform.totalStops());
+        assertEquals(1, f.platform.totalDestroys());
+        assertEquals(SpeechShareStateMachine.State.STT_REVIEW,
+                f.coordinator.speechState());
+        assertEquals("두번째 문장 전체 세번째 문장 전체", f.listener.last().text());
+        assertEquals(SystemSpeechRecognizerController.OutcomeType.FINAL_RESULT,
+                f.listener.last().type());
+        assertEquals(AudioCaptureOwnership.Owner.NONE, f.coordinator.owner());
+    }
+
+    @Test
+    public void api36UnexpectedRegularFinalFailsClosedWithoutGapRestart() {
+        Fixture f = new Fixture(36);
+        f.controller.start();
+
+        f.platform.callback.onPartialResult("보이는 초안");
+        f.platform.callback.onFinalResult("첫 문장");
+
+        assertEquals(1, f.platform.standardCreates + f.platform.onDeviceCreates);
+        assertEquals(1, f.platform.totalStarts());
+        assertEquals(1, f.platform.totalDestroys());
+        assertEquals(0, f.platform.postedRestarts.size());
+        assertEquals(AudioCaptureOwnership.Owner.NONE, f.coordinator.owner());
+        assertEquals(SpeechShareStateMachine.State.STT_FAILED,
+                f.coordinator.speechState());
+        assertEquals(SystemSpeechRecognizerController.OutcomeType.ERROR,
+                f.listener.last().type());
+        assertEquals(SystemSpeechRecognizerController.ErrorKind.CLIENT,
+                f.listener.last().error());
+        assertEquals("첫 문장", f.listener.outcomes.stream()
+                .filter(outcome -> outcome.type()
+                        == SystemSpeechRecognizerController.OutcomeType.PARTIAL_RESULT)
+                .reduce((left, right) -> right).orElseThrow().text());
+    }
+
+    @Test
+    public void api36UnexpectedSegmentedEndFailsClosedButKeepsVisibleDraft() {
+        Fixture f = new Fixture(36);
+        f.controller.start();
+        SystemSpeechRecognizerController.Callback callback = f.platform.callback;
+        callback.onSegmentResult("보존할 문장");
+        callback.onPartialResult("둘째 문장 앞부분");
+
+        callback.onEndOfSegmentedSession();
+
+        assertEquals(1, f.platform.totalStarts());
+        assertEquals(1, f.platform.totalDestroys());
+        assertEquals(0, f.platform.postedRestarts.size());
+        assertEquals(AudioCaptureOwnership.Owner.NONE, f.coordinator.owner());
+        assertEquals(SpeechShareStateMachine.State.STT_FAILED,
+                f.coordinator.speechState());
+        assertEquals(SystemSpeechRecognizerController.ErrorKind.CLIENT,
+                f.listener.last().error());
+        assertEquals("보존할 문장 둘째 문장 앞부분", f.listener.outcomes.stream()
+                .filter(outcome -> outcome.type()
+                        == SystemSpeechRecognizerController.OutcomeType.PARTIAL_RESULT)
+                .reduce((left, right) -> right).orElseThrow().text());
+    }
+
+    @Test
+    public void api36StopIncludesPartialArrivingBeforeSegmentedEndExactlyOnce() {
+        Fixture f = new Fixture(36);
+        f.controller.start();
+        SystemSpeechRecognizerController.Callback callback = f.platform.callback;
+        callback.onSegmentResult("첫 문장");
+        callback.onPartialResult("중단 직전 부분");
+
+        f.controller.stopListening();
+        callback.onEndOfSegmentedSession();
+        callback.onEndOfSegmentedSession();
+
+        assertEquals(SpeechShareStateMachine.State.STT_REVIEW,
+                f.coordinator.speechState());
+        assertEquals("첫 문장 중단 직전 부분", f.listener.last().text());
+        assertEquals(1, f.listener.outcomes.stream()
+                .filter(outcome -> outcome.type()
+                        == SystemSpeechRecognizerController.OutcomeType.FINAL_RESULT)
+                .count());
+        assertEquals(1, f.platform.totalDestroys());
+        assertEquals(AudioCaptureOwnership.Owner.NONE, f.coordinator.owner());
     }
 
     @Test
