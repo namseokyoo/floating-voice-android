@@ -23,7 +23,8 @@ public final class SpeechReviewSession {
             String draft,
             boolean editable,
             boolean shareEnabled,
-            boolean retryEnabled) {
+            boolean retryEnabled,
+            SpeechRecognitionSupport support) {
         public UiState {
             Objects.requireNonNull(stage, "stage");
             draft = draft == null ? "" : draft;
@@ -36,6 +37,7 @@ public final class SpeechReviewSession {
     private Stage stage = Stage.CHECKING;
     private boolean editable;
     private boolean retryEnabled;
+    private SpeechRecognitionSupport support;
 
     public SpeechReviewSession(AudioCaptureCoordinator coordinator, long generation) {
         this.coordinator = Objects.requireNonNull(coordinator, "coordinator");
@@ -50,13 +52,14 @@ public final class SpeechReviewSession {
         stage = Stage.CHECKING;
         editable = false;
         retryEnabled = false;
+        support = null;
     }
 
     public synchronized void onOutcome(SystemSpeechRecognizerController.Outcome outcome) {
         Objects.requireNonNull(outcome, "outcome");
         if (outcome.generation() <= 0L || outcome.generation() != generation) return;
         switch (outcome.type()) {
-            case SUPPORT_CHANGED -> stage = Stage.CHECKING;
+            case SUPPORT_CHANGED -> support = outcome.support();
             case LISTENING -> stage = Stage.LISTENING;
             case PARTIAL_RESULT -> {
                 if (outcome.text() != null && !outcome.text().isBlank()) draft = outcome.text();
@@ -88,7 +91,8 @@ public final class SpeechReviewSession {
     }
 
     public synchronized UiState uiState() {
-        return new UiState(stage, draft, editable, editable && !draft.isBlank(), retryEnabled);
+        return new UiState(
+                stage, draft, editable, editable && !draft.isBlank(), retryEnabled, support);
     }
 
     /** The only public session operation that may invoke the Android share seam. */

@@ -296,29 +296,114 @@ public class SystemSpeechRecognizerControllerTest {
     }
 
     @Test
-    public void api33StandardSegmentedDownloadRequiredRequiresKeyboardWithoutAutomaticDownload() {
-        Fixture f = new Fixture(33);
+    public void api33StandardSegmentedSupportProbeNeverGatesRuntimeListening() {
+        for (SystemSpeechRecognizerController.PlatformSupport support : List.of(
+                SystemSpeechRecognizerController.PlatformSupport.READY,
+                SystemSpeechRecognizerController.PlatformSupport.DOWNLOAD_REQUIRED,
+                SystemSpeechRecognizerController.PlatformSupport.UNSUPPORTED,
+                SystemSpeechRecognizerController.PlatformSupport.ERROR)) {
+            Fixture f = new Fixture(36);
+            f.platform.deferSupport = true;
+
+            assertEquals(support.name(), SystemSpeechRecognizerController.StartResult.STARTED,
+                    f.controller.start());
+
+            assertEquals(support.name(), 1, f.platform.supportChecks);
+            assertEquals(support.name(), 1, f.platform.recognizer.starts);
+            assertEquals(support.name(), AudioCaptureOwnership.Owner.STT,
+                    f.coordinator.owner());
+            assertEquals(support.name(), SpeechShareStateMachine.State.STT_LISTENING,
+                    f.coordinator.speechState());
+
+            f.platform.supportCallback.onResult(support);
+
+            assertEquals(support.name(), 0, f.platform.modelDownloads);
+            assertEquals(support.name(), 0, f.platform.onDeviceCreates);
+            assertEquals(support.name(), 1, f.platform.standardCreates);
+            assertEquals(support.name(), 1, f.platform.recognizer.starts);
+            assertEquals(support.name(), SpeechRecognitionSupport.Availability.AVAILABLE,
+                    f.listener.lastSupport().availability());
+            assertEquals(support.name(), switch (support) {
+                case READY -> SpeechRecognitionSupport.ModelState.READY;
+                case DOWNLOAD_REQUIRED ->
+                        SpeechRecognitionSupport.ModelState.DOWNLOAD_REQUIRED;
+                case UNSUPPORTED -> SpeechRecognitionSupport.ModelState.UNSUPPORTED;
+                case ERROR -> SpeechRecognitionSupport.ModelState.ERROR;
+            }, f.listener.lastSupport().modelState());
+            assertFalse(support.name(), f.listener.types().contains(
+                    SystemSpeechRecognizerController.OutcomeType.KEYBOARD_REQUIRED));
+            assertEquals(support.name(), AudioCaptureOwnership.Owner.STT,
+                    f.coordinator.owner());
+        }
+    }
+
+    @Test
+    public void deferredOriginalSupportDiagnosticSurvivesPhysicalCycleReplacement() {
+        Fixture f = new Fixture(36);
         f.platform.deferSupport = true;
+        f.controller.start();
+        SystemSpeechRecognizerController.SupportCallback originalSupport =
+                f.platform.supportCallback;
+        SystemSpeechRecognizerController.Callback firstCycle = f.platform.callback;
 
-        assertEquals(SystemSpeechRecognizerController.StartResult.STARTED, f.controller.start());
-        assertEquals(1, f.platform.supportChecks);
-        assertEquals(0, f.platform.recognizer.starts);
-        assertEquals(0, f.platform.modelDownloads);
-        assertEquals(SpeechRecognitionSupport.ModelState.CHECKING,
+        firstCycle.onFinalResult("첫 문장");
+        f.platform.runNextPosted();
+        SystemSpeechRecognizerController.Callback replacementCycle = f.platform.callback;
+        originalSupport.onResult(SystemSpeechRecognizerController.PlatformSupport.UNSUPPORTED);
+
+        assertNotEquals(firstCycle, replacementCycle);
+        assertEquals(2, f.platform.totalStarts());
+        assertEquals(SpeechRecognitionSupport.ModelState.UNSUPPORTED,
                 f.listener.lastSupport().modelState());
+        assertEquals(SpeechShareStateMachine.State.STT_LISTENING,
+                f.coordinator.speechState());
+        assertEquals(AudioCaptureOwnership.Owner.STT, f.coordinator.owner());
 
-        f.platform.supportCallback.onResult(
-                SystemSpeechRecognizerController.PlatformSupport.DOWNLOAD_REQUIRED);
-
-        assertEquals(0, f.platform.modelDownloads);
-        assertEquals(0, f.platform.onDeviceCreates);
-        assertEquals(1, f.platform.standardCreates);
-        assertEquals(1, f.platform.supportChecks);
-        assertEquals(0, f.platform.recognizer.starts);
+        f.controller.stopListening();
+        replacementCycle.onFinalResult("둘째 문장");
+        assertEquals("첫 문장 둘째 문장", f.listener.last().text());
         assertEquals(AudioCaptureOwnership.Owner.NONE, f.coordinator.owner());
-        assertEquals(SystemSpeechRecognizerController.OutcomeType.KEYBOARD_REQUIRED,
-                f.listener.last().type());
-        assertEquals(SpeechShareStateMachine.State.STT_FAILED, f.coordinator.speechState());
+    }
+
+    @Test
+    public void api36SynchronousSupportDiagnosticsRunOnlyAfterRuntimeStart() {
+        for (SystemSpeechRecognizerController.PlatformSupport support : List.of(
+                SystemSpeechRecognizerController.PlatformSupport.READY,
+                SystemSpeechRecognizerController.PlatformSupport.DOWNLOAD_REQUIRED,
+                SystemSpeechRecognizerController.PlatformSupport.UNSUPPORTED,
+                SystemSpeechRecognizerController.PlatformSupport.ERROR)) {
+            Fixture f = new Fixture(36);
+            f.platform.immediateSupport = support;
+
+            assertEquals(support.name(), SystemSpeechRecognizerController.StartResult.STARTED,
+                    f.controller.start());
+
+            assertEquals(support.name(), 1, f.platform.startsWhenSupportChecked);
+            assertEquals(support.name(), 1, f.platform.totalStarts());
+            assertEquals(support.name(), SpeechShareStateMachine.State.STT_LISTENING,
+                    f.coordinator.speechState());
+            assertEquals(support.name(), SpeechRecognitionSupport.Availability.AVAILABLE,
+                    f.listener.lastSupport().availability());
+            assertFalse(support.name(), f.listener.types().contains(
+                    SystemSpeechRecognizerController.OutcomeType.KEYBOARD_REQUIRED));
+        }
+    }
+
+    @Test
+    public void api36ThrowingSupportProbeRemainsDiagnosticAfterRuntimeStart() {
+        Fixture f = new Fixture(36);
+        f.platform.throwOnSupportCheck = true;
+
+        assertEquals(SystemSpeechRecognizerController.StartResult.STARTED,
+                f.controller.start());
+
+        assertEquals(1, f.platform.startsWhenSupportChecked);
+        assertEquals(1, f.platform.totalStarts());
+        assertEquals(SpeechRecognitionSupport.ModelState.ERROR,
+                f.listener.lastSupport().modelState());
+        assertEquals(SpeechShareStateMachine.State.STT_LISTENING,
+                f.coordinator.speechState());
+        assertEquals(AudioCaptureOwnership.Owner.STT, f.coordinator.owner());
     }
 
     @Test
@@ -349,6 +434,32 @@ public class SystemSpeechRecognizerControllerTest {
         assertEquals(AudioCaptureOwnership.Owner.NONE, f.coordinator.owner());
         assertEquals(SystemSpeechRecognizerController.ErrorKind.START_FAILED,
                 f.listener.last().error());
+    }
+
+    @Test
+    public void terminalListenerFailureStillDestroysRecognizerAndReleasesLease() {
+        AudioCaptureCoordinator coordinator = new AudioCaptureCoordinator();
+        FakePlatform platform = new FakePlatform(36);
+        SystemSpeechRecognizerController controller = new SystemSpeechRecognizerController(
+                coordinator,
+                platform,
+                outcome -> {
+                    if (outcome.type() == SystemSpeechRecognizerController.OutcomeType.ERROR) {
+                        throw new IllegalStateException("observer failed");
+                    }
+                });
+        controller.start();
+
+        try {
+            platform.callback.onError(SystemSpeechRecognizerController.PlatformError.NETWORK);
+            throw new AssertionError("listener failure must propagate");
+        } catch (IllegalStateException expected) {
+            assertEquals("observer failed", expected.getMessage());
+        }
+
+        assertEquals(1, platform.totalDestroys());
+        assertEquals(AudioCaptureOwnership.Owner.NONE, coordinator.owner());
+        assertEquals(SpeechShareStateMachine.State.STT_FAILED, coordinator.speechState());
     }
 
     @Test
@@ -1103,6 +1214,7 @@ public class SystemSpeechRecognizerControllerTest {
         boolean onDeviceAvailable = true;
         boolean throwOnOnDeviceCreate;
         boolean throwOnStandardCreate;
+        boolean throwOnSupportCheck;
         boolean throwOnPostDelayed;
         boolean deferSupport;
         int standardCreates;
@@ -1110,6 +1222,9 @@ public class SystemSpeechRecognizerControllerTest {
         int onDeviceCreates;
         int supportChecks;
         int modelDownloads;
+        int startsWhenSupportChecked = -1;
+        SystemSpeechRecognizerController.PlatformSupport immediateSupport =
+                SystemSpeechRecognizerController.PlatformSupport.READY;
         int synchronousFinalCreate = -1;
         int synchronousErrorCreate = -1;
         SystemSpeechRecognizerController.PlatformError synchronousError;
@@ -1214,9 +1329,10 @@ public class SystemSpeechRecognizerControllerTest {
                 SystemSpeechRecognizerController.RecognitionRequest request,
                 SystemSpeechRecognizerController.SupportCallback callback) {
             supportChecks++;
+            startsWhenSupportChecked = totalStarts();
             supportCallback = callback;
-            if (!deferSupport) callback.onResult(
-                    SystemSpeechRecognizerController.PlatformSupport.READY);
+            if (throwOnSupportCheck) throw new IllegalStateException("support failed");
+            if (!deferSupport) callback.onResult(immediateSupport);
         }
 
         @Override public void triggerModelDownload(

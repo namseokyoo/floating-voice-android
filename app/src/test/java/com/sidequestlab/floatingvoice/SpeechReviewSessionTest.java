@@ -98,6 +98,29 @@ public class SpeechReviewSessionTest {
     }
 
     @Test
+    public void lateSupportDiagnosticsNeverRegressActiveListeningUiToChecking() {
+        Fixture f = new Fixture();
+        f.session.onOutcome(outcome(
+                SystemSpeechRecognizerController.OutcomeType.LISTENING,
+                f.generation, null, null));
+
+        SpeechRecognitionSupport diagnostic = SpeechRecognitionSupport.available(
+                SpeechRecognitionSupport.Route.STANDARD,
+                SpeechRecognitionSupport.ModelState.UNSUPPORTED,
+                SpeechRecognitionSupport.FallbackReason.NONE);
+        f.session.onOutcome(new SystemSpeechRecognizerController.Outcome(
+                SystemSpeechRecognizerController.OutcomeType.SUPPORT_CHANGED,
+                f.generation,
+                null,
+                null,
+                diagnostic));
+
+        assertEquals(SpeechReviewSession.Stage.LISTENING, f.session.uiState().stage());
+        assertFalse(f.session.uiState().editable());
+        assertEquals(diagnostic, f.session.uiState().support());
+    }
+
+    @Test
     public void successfulReviewCanRetryAsNewGenerationWithoutSharing() {
         Fixture f = new Fixture();
         f.finalResult("first final");

@@ -12,7 +12,7 @@
 
 **Non-goals:** 녹음된 OGG 사후 STT, bundled Whisper, cloud STT, MediaRecorder+SpeechRecognizer 동시 실행, Kakao 지정방 자동전송, 공유 대상 앱의 최종 수신 성공 추적, 복수 output 동시 실행.
 
-**현재 단계 상태 (2026-08-14 22:37 KST):** `V8-05 R2 CONTINUOUS STT + COMPACT REVIEW DEVICE REMEDIATION`. code 20은 A52s Android 16에서 첫 문장 뒤 인식이 끝나고 review actions가 긴 세로열로 표시돼 실기기 FAIL·폐기 처리했다. R2 code 21은 API 33+ standard segmented recognizer 우선, regular final/premature end/NO_MATCH/TIMEOUT compatibility recovery, visible partial 보존, Stop 재진입 즉시 review, BUSY 최대 3회 제한을 구현했다. review는 목적지+변경 1행, Telegram/Android 2열, 다시 말하기/닫기 2열이며 200% 글꼴에서만 액션을 세로 stack한다. output snapshot·verified destination·no-auto-fallback·memory-only draft 계약은 유지한다. 자동 gate와 최종 독립 review는 PASS지만 A52s의 실제 segmented 지원과 restart-gap clipping은 새 서명 APK로 다시 검증해야 하며 아직 실기기 PASS가 아니다. 폰/ADB 조작과 공개 릴리스는 승인 범위가 아니다.
+**현재 단계 상태 (2026-08-16 05:53 KST):** `V8-05 R3 STT SUPPORT-PREFLIGHT REMEDIATION`. code 21은 A52s에서 `checkRecognitionSupport()`의 non-ready 결과가 실제 `startListening()`을 막아 즉시 “음성 인식을 사용할 수 없습니다”로 종료된 실기기 FAIL로 폐기했다. R3 code 22는 API 33+ 표준 recognizer 생성 성공 후 듣기를 먼저 시작하고 READY/DOWNLOAD_REQUIRED/UNSUPPORTED/ERROR support 결과는 model download 없는 session 진단 정보로만 처리한다. 늦은 support 콜백은 active listening UI를 CHECKING으로 되돌리지 않고 physical cycle 교체 뒤에도 보존된다. terminal listener 예외가 나도 physical destroy와 audio ownership release를 보장한다. 기존 segmented compatibility recovery·compact review·output snapshot·verified destination·no-auto-fallback·memory-only draft 계약은 유지한다. targeted RED→GREEN과 final clean gate(core 195/debug 161/release 157 tests, 실패·오류·skip 0, localization 395/395, Lint Fatal/Error 0, 변경 Java warning/error 0, Debug/Release assembly)는 PASS다. 독립 follow-up review는 Blocker/High/Medium 0, Low 1로 PASS했고 Low exact interleaving coverage도 전용 테스트로 닫았다. commit/push·immutable commit fresh build·공식 서명 APK 생성은 대기 중이다. 폰/ADB 조작과 공개 릴리스는 승인 범위가 아니다.
 
 ---
 
@@ -253,7 +253,7 @@ TEARING_DOWN
 - API 31–32에서 runtime on-device availability 확인 후에만 on-device recognizer 생성
 - API 33+ 연속 dictation은 standard recognizer의 complete-silence segmented session을 우선하고 `EXTRA_PREFER_OFFLINE`을 강제하지 않음
 - unsupported/creation exception은 일반 system recognizer 또는 keyboard fallback으로 명시
-- API 33+ standard segmented request의 `checkRecognitionSupport(ko-KR)` 결과를 확인하고 model download를 자동 실행하지 않음
+- API 33+ standard segmented request의 `checkRecognitionSupport(ko-KR)`는 진단 정보로만 사용하고 recognizer 생성 성공 시 실제 `startListening()`을 먼저 시도하며 model download를 자동 실행하지 않음
 - `ko-KR`, partial results, calling package 등 최소 intent extras
 - `EXTRA_PREFER_OFFLINE`을 offline 보장으로 표현하지 않음
 - finish/cancel/error/teardown에서 exactly-once destroy
@@ -378,7 +378,7 @@ TEARING_DOWN
 
 **게이트:** route invariants tests 통과.
 
-**구현 현황 (2026-08-14 22:37 KST):** `OutputRoute`/`OutputSnapshot`/`OutputRouteStateMachine`과 snapshot 기반 `VerifiedTextDispatch`를 유지하면서 code 20 실기기 FAIL을 R2로 보완했다. API 33+ standard segmented 우선과 compatibility recovery로 Stop 전 여러 문장을 누적하며, blank callback은 BUSY 예산이나 visible partial을 지우지 않는다. review UI는 현재 Telegram 목적지와 `변경`을 같은 행에 두고 `Telegram 전송 | Android 공유`, `다시 말하기 | 닫기` 두 action rows로 구성한다. normal font는 compact 2열, fontScale 1.5+는 무클리핑 stack이며 touch target 48/56dp와 TalkBack full label을 유지한다. Telegram 미설정 local-share 진입, frozen output/destination snapshot, delivered 전 draft 유지, rotation/handoff feedback, stale callback 차단, no-auto-fallback 계약은 그대로다. code 21/name `0.8.0-v8-05-r2`; 최종 clean gate는 core 195/debug 156/release 152 tests(실패·오류·skip 0), localization 395/395, changed-file Lint warning/error 0, Debug/Release assembly PASS다. 최종 독립 follow-up review는 Blocker/High/Medium/Low 0으로 PASS했다. A52s 재검증은 pending이다.
+**구현 현황 (2026-08-16 05:53 KST):** code 21의 support-preflight absolute gate를 제거하는 R3를 구현했다. controller public seam에서 API 36 synchronous/deferred READY/DOWNLOAD_REQUIRED/UNSUPPORTED/ERROR와 throwing probe 모두 runtime start가 probe보다 먼저 1회 실행되는지 검증한다. review session은 늦은 support 진단을 보존하면서 LISTENING UI를 유지하고, 최초 support 콜백이 physical cycle 교체 뒤 도착하는 exact interleaving도 회귀 테스트로 고정했다. terminal listener 예외 뒤 destroy/lease release도 검증한다. code 22/name `0.8.0-v8-05-r3`; final clean gate는 core 195/debug 161/release 157 tests(실패·오류·skip 0), localization 395/395, Lint Fatal/Error 0, 변경 Java warning/error 0, Debug/Release assembly PASS다. 독립 follow-up review는 Blocker/High/Medium 0으로 PASS했고 지적된 Low coverage도 닫았다. A52s 재검증은 pending이다.
 
 ---
 
