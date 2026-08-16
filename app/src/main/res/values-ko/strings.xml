@@ -427,4 +427,25 @@
     <string name="overlay_speech_share_action_title">말해서 텍스트 공유</string>
     <string name="overlay_speech_share_action_supporting">말하고 수정한 뒤 공유창 열기</string>
     <string name="content_description_open_speech_share">음성으로 작성한 텍스트 확인 및 명시적 공유 화면 열기</string>
+    <string name="archive_folder_title">로컬 OGG 보관 폴더</string>
+    <string name="archive_folder_not_selected">선택한 폴더가 없습니다. 로컬 녹음에는 SAF 폴더가 필요합니다.</string>
+    <string name="archive_folder_ready">사용 가능 · %1$s</string>
+    <string name="archive_folder_permission_lost">권한을 잃었습니다 · %1$s · 폴더를 다시 선택해 주세요</string>
+    <string name="archive_folder_provider_unavailable">폴더 제공자를 사용할 수 없습니다 · %1$s · 다시 연결하고 선택해 주세요</string>
+    <string name="archive_folder_choose">보관 폴더 선택</string>
+    <string name="archive_folder_reselection_required">사용 가능한 로컬 보관 폴더를 먼저 선택해 주세요. Telegram으로 대체 전송하지 않았습니다.</string>
+    <string name="archive_folder_save_failed">선택한 폴더를 영구 저장하지 못했습니다. 이전 선택을 유지했습니다.</string>
+    <string name="overlay_local_archive_action_title">로컬 폴더에 녹음</string>
+    <string name="overlay_local_archive_action_supporting">SAF로 OGG 하나 저장</string>
+    <string name="content_description_local_archive_recording">로컬 보관 폴더에만 저장할 녹음 시작</string>
+    <string name="local_recording_in_progress">로컬 보관용 녹음 중 — 다시 누르면 저장합니다</string>
+    <string name="recording_start_failed_retained_private">녹음을 시작하지 못했습니다(%1$s). 임시 파일은 앱 내부에 보존했습니다.</string>
+    <string name="recording_stop_failed_retained_private">녹음을 정상 종료하지 못했습니다. 임시 파일은 앱 내부에 보존했습니다.</string>
+    <string name="recording_interrupted_retained_private">로컬 녹음 중 플로팅 버튼이 종료되었습니다. 임시 파일은 앱 내부에 보존했습니다.</string>
+    <string name="archive_verified_saved">저장·검증 완료 · %1$s</string>
+    <string name="archive_saving">로컬 OGG를 저장하고 검증하는 중…</string>
+    <string name="archive_verified_source_retained">저장·검증 완료 · %1$s. 임시 원본 정리에 실패해 앱 내부에 보존했습니다.</string>
+    <string name="archive_copied_unverified">복사했지만 제공자가 다시 읽기를 지원하지 않습니다 · %1$s. 원본과 대상을 모두 보존했습니다.</string>
+    <string name="archive_failed_source_retained">로컬 보관에 실패했습니다. 원본은 앱 내부에 보존했으며 Telegram으로 대체 전송하지 않았습니다.</string>
+    <string name="archive_failed_partial_retained">로컬 보관에 실패했습니다. 원본과 일부 대상이 남았으며 Telegram으로 대체 전송하지 않았습니다.</string>
 </resources>

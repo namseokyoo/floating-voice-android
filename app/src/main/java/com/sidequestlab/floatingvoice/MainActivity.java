@@ -27,6 +27,8 @@ import android.widget.Spinner;
 import android.widget.TextView;
 
 import androidx.activity.OnBackPressedCallback;
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.app.AppCompatDelegate;
@@ -148,9 +150,12 @@ public final class MainActivity extends AppCompatActivity implements TelegramRep
     private MaterialButton changeAuthPhoneButton;
     private LinearLayout destinationsListContainer;
     private TextView destinationsListEmpty;
+    private TextView archiveFolderStatus;
     private TelegramRepository telegram;
     private SecureSettingsStore settingsStore;
     private OverlayUiPreferences overlayUiPreferences;
+    private ArchiveSettingsStore archiveSettingsStore;
+    private ActivityResultLauncher<Intent> archiveFolderLauncher;
     private BroadcastReceiver serviceStateReceiver;
     private AppConfig savedConfig;
     private DashboardReadiness.State dashboardState = DashboardReadiness.State.CONNECT_TELEGRAM;
@@ -175,6 +180,18 @@ public final class MainActivity extends AppCompatActivity implements TelegramRep
         super.onCreate(savedInstanceState);
         WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
         setContentView(R.layout.activity_main);
+        archiveSettingsStore = new ArchiveSettingsStore(this);
+        archiveFolderLauncher = registerForActivityResult(
+                new ActivityResultContracts.StartActivityForResult(), result -> {
+                    if (result.getResultCode() != RESULT_OK || result.getData() == null
+                            || result.getData().getData() == null) {
+                        archiveSettingsStore.onPickerCancelled();
+                        refreshArchiveFolderStatus();
+                        return;
+                    }
+                    persistArchiveFolder(
+                            result.getData().getData(), result.getData().getFlags());
+                });
         pendingTargetEditor = savedInstanceState != null
                 && savedInstanceState.getBoolean(STATE_PENDING_TARGET_EDITOR, false);
         if (savedInstanceState != null) {
@@ -308,6 +325,7 @@ public final class MainActivity extends AppCompatActivity implements TelegramRep
         changeAuthPhoneButton = findViewById(R.id.change_auth_phone);
         destinationsListContainer = findViewById(R.id.destinations_list_container);
         destinationsListEmpty = findViewById(R.id.destinations_list_empty);
+        archiveFolderStatus = findViewById(R.id.archive_folder_status);
         apiId.setInputType(InputType.TYPE_CLASS_NUMBER);
     }
 
@@ -359,11 +377,18 @@ public final class MainActivity extends AppCompatActivity implements TelegramRep
         permissionStatus.setOnClickListener(v -> requestRequiredPermissions());
         permissionMicrophoneStatus.setOnClickListener(v -> requestRequiredPermissions());
         permissionNotificationStatus.setOnClickListener(v -> requestRequiredPermissions());
+        findViewById(R.id.archive_folder_choose).setOnClickListener(v ->
+                archiveFolderLauncher.launch(new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE)
+                        .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION
+                                | Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                                | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION
+                                | Intent.FLAG_GRANT_PREFIX_URI_PERMISSION)));
     }
 
     @Override protected void onResume() {
         super.onResume();
         refreshPermissionStatus();
+        refreshArchiveFolderStatus();
         refreshUi();
     }
 
@@ -392,6 +417,64 @@ public final class MainActivity extends AppCompatActivity implements TelegramRep
     @Override protected void onDestroy() {
         if (telegram != null) telegram.removeListener(this);
         super.onDestroy();
+    }
+
+    private void persistArchiveFolder(Uri uri, int returnedFlags) {
+        ArchiveSettingsStore.Selection previous = archiveSettingsStore.selection();
+        int flags = returnedFlags & (Intent.FLAG_GRANT_READ_URI_PERMISSION
+                | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+        int requiredFlags = Intent.FLAG_GRANT_READ_URI_PERMISSION
+                | Intent.FLAG_GRANT_WRITE_URI_PERMISSION;
+        if (flags != requiredFlags) {
+            presentLocalStatus(R.string.archive_folder_save_failed, true, false);
+            refreshArchiveFolderStatus();
+            return;
+        }
+        try {
+            getContentResolver().takePersistableUriPermission(uri, flags);
+            if (!archiveSettingsStore.saveSelection(uri.toString(), archiveFolderLabel(uri))) {
+                if (previous.treeUri() == null || !uri.toString().equals(previous.treeUri())) {
+                    getContentResolver().releasePersistableUriPermission(uri, flags);
+                }
+                presentLocalStatus(R.string.archive_folder_save_failed, true, false);
+            } else if (previous.treeUri() != null
+                    && !uri.toString().equals(previous.treeUri())) {
+                try {
+                    getContentResolver().releasePersistableUriPermission(
+                            Uri.parse(previous.treeUri()), flags);
+                } catch (SecurityException ignored) { }
+            }
+        } catch (SecurityException failure) {
+            presentLocalStatus(R.string.archive_folder_save_failed, true, false);
+        }
+        refreshArchiveFolderStatus();
+    }
+
+    private String archiveFolderLabel(Uri treeUri) {
+        Uri documentUri = android.provider.DocumentsContract.buildDocumentUriUsingTree(
+                treeUri, android.provider.DocumentsContract.getTreeDocumentId(treeUri));
+        try (android.database.Cursor cursor = getContentResolver().query(documentUri,
+                new String[] {android.provider.DocumentsContract.Document.COLUMN_DISPLAY_NAME},
+                null, null, null)) {
+            if (cursor != null && cursor.moveToFirst() && !cursor.isNull(0)) {
+                return cursor.getString(0);
+            }
+        } catch (RuntimeException ignored) { }
+        return treeUri.getLastPathSegment() == null
+                ? treeUri.toString() : treeUri.getLastPathSegment();
+    }
+
+    private void refreshArchiveFolderStatus() {
+        if (archiveFolderStatus == null || archiveSettingsStore == null) return;
+        ArchiveSettingsStore.Selection selection = archiveSettingsStore.selection();
+        int text = switch (selection.status()) {
+            case NOT_SELECTED -> R.string.archive_folder_not_selected;
+            case READY -> R.string.archive_folder_ready;
+            case PERMISSION_LOST -> R.string.archive_folder_permission_lost;
+            case PROVIDER_UNAVAILABLE -> R.string.archive_folder_provider_unavailable;
+        };
+        archiveFolderStatus.setText(selection.status() == ArchiveSettingsStore.Status.NOT_SELECTED
+                ? getString(text) : getString(text, selection.label()));
     }
 
     private void setupLanguageSelector() {

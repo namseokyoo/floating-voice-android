@@ -16,6 +16,7 @@ final class FloatingActionMenuController {
     interface Listener {
         void onComposeText();
         void onSpeechShare();
+        void onLocalArchiveRecording();
         void onChooseDestination();
         void onDismissRequested();
     }
@@ -54,6 +55,8 @@ final class FloatingActionMenuController {
         textAction.setOnClickListener(view -> listener.onComposeText());
         View speechShareAction = next.findViewById(R.id.overlay_speech_share_action);
         speechShareAction.setOnClickListener(view -> listener.onSpeechShare());
+        View localArchiveAction = next.findViewById(R.id.overlay_local_archive_action);
+        localArchiveAction.setOnClickListener(view -> listener.onLocalArchiveRecording());
         View destinationAction = next.findViewById(R.id.overlay_destination_action);
         destinationAction.setOnClickListener(view -> listener.onChooseDestination());
         if (destinationSummary != null && !destinationSummary.isBlank()) {
@@ -101,6 +104,7 @@ final class FloatingActionMenuController {
         current.animate().cancel();
         current.findViewById(R.id.overlay_text_action).setOnClickListener(null);
         current.findViewById(R.id.overlay_speech_share_action).setOnClickListener(null);
+        current.findViewById(R.id.overlay_local_archive_action).setOnClickListener(null);
         current.findViewById(R.id.overlay_destination_action).setOnClickListener(null);
         current.setOnTouchListener(null);
         interactive = false;
@@ -140,6 +144,12 @@ final class FloatingActionMenuController {
                 .setText(text(R.string.overlay_speech_share_action_supporting));
         current.findViewById(R.id.overlay_speech_share_action)
                 .setContentDescription(text(R.string.content_description_open_speech_share));
+        ((TextView) current.findViewById(R.id.overlay_local_archive_action_title))
+                .setText(text(R.string.overlay_local_archive_action_title));
+        ((TextView) current.findViewById(R.id.overlay_local_archive_action_supporting))
+                .setText(text(R.string.overlay_local_archive_action_supporting));
+        current.findViewById(R.id.overlay_local_archive_action)
+                .setContentDescription(text(R.string.content_description_local_archive_recording));
         ((TextView) current.findViewById(R.id.overlay_destination_action_title))
                 .setText(text(R.string.overlay_destination_action_title));
         ((TextView) current.findViewById(R.id.overlay_destination_action_supporting))
@@ -180,6 +190,8 @@ final class FloatingActionMenuController {
         root.findViewById(R.id.overlay_text_action_supporting)
                 .setVisibility(largeFont ? View.GONE : View.VISIBLE);
         root.findViewById(R.id.overlay_speech_share_action_supporting)
+                .setVisibility(largeFont ? View.GONE : View.VISIBLE);
+        root.findViewById(R.id.overlay_local_archive_action_supporting)
                 .setVisibility(largeFont ? View.GONE : View.VISIBLE);
         root.findViewById(R.id.overlay_destination_action_supporting)
                 .setVisibility(largeFont ? View.GONE : View.VISIBLE);

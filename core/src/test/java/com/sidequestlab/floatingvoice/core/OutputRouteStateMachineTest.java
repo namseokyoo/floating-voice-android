@@ -92,6 +92,19 @@ class OutputRouteStateMachineTest {
     }
 
     @Test
+    void localArchiveFreezesWithoutTelegramAndNeverFallsBack() {
+        OutputRouteStateMachine machine = new OutputRouteStateMachine(
+                OutputRoute.ContentKind.AUDIO, 0L, DestinationCatalog.empty(), null);
+
+        assertTrue(machine.selectRoute(OutputRoute.LOCAL_AUDIO_ARCHIVE));
+        OutputSnapshot snapshot = machine.freeze("/tmp/voice.ogg").orElseThrow();
+
+        assertEquals(OutputRoute.LOCAL_AUDIO_ARCHIVE, snapshot.route());
+        assertTrue(snapshot.telegramTarget().isEmpty());
+        assertTrue(!machine.selectRoute(OutputRoute.TELEGRAM_VOICE));
+    }
+
+    @Test
     void retryUsesTheExactFrozenSnapshotAndCompletionClearsPayloadReference() {
         OutputRouteStateMachine machine = new OutputRouteStateMachine(
                 OutputRoute.ContentKind.TEXT, 7L,

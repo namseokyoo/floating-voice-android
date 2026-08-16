@@ -428,6 +428,8 @@ TEARING_DOWN
 
 **게이트:** A52s의 실제 선택 폴더에서 10개 OGG save/reopen/play, 실패 injection에서 source loss 0.
 
+**구현 현황 (2026-08-16 16:25 KST):** code 23/name `0.8.0-v8-06-saf-archive`. SAF 폴더 선택(`ACTION_OPEN_DOCUMENT_TREE`, picker가 돌려준 grant flag 기반 `takePersistableUriPermission`)과 권한 상실 시 재선택 요구(no private fallback), picker cancel 무변경, 명시적 로컬 OGG 녹음 route(텔레그램 없이 가능, mic/notification/overlay + READY 폴더만 요구), loss-averse copy/read-back SHA-256 transaction(reopen 실패 시 copied-unverified·source 보존, verify 성공 후 source 삭제), `VOICE_ARCHIVING` 상태로 archive 완료까지 신규 녹음 차단, executor teardown 시 source 보존, bilingual strings/localization 416/416 PASS. final clean gate: `clean test lintDebug lintRelease assembleDebug assembleRelease` BUILD SUCCESSFUL, core 198/debug 178/release 174 tests(실패·오류·skip 0), Lint Fatal/Error 0, localization PASS, `git diff --check` PASS. 독립 Standards review PASS(Blocker/High/Medium 0); Spec-axis subagent 타임아웃으로 내가 동일 source를 직접 재검증해 spec semantics 전체 통과 확인. Low: `SEND_VOICE` effect 이름이 로컬 archive 트리거에 재사용(명명 정리 여지), provider가 문서명 자동 수정 시 성공 토스트 이름이 실제 문서명과 다를 수 있는 여지(중복 이름 사전 회피로 제한적). A52s 실제 폴더 10-file save/reopen/play + 실패 injection source loss 0 gate는 사용자 기기 검증 전까지 pending.
+
 ---
 
 ## 10. V8-07 — audio Sharesheet와 FileProvider

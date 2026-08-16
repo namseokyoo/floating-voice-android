@@ -426,4 +426,25 @@
     <string name="overlay_speech_share_action_title">Share text by speaking</string>
     <string name="overlay_speech_share_action_supporting">Dictate, edit, then open Sharesheet</string>
     <string name="content_description_open_speech_share">Open speech review for explicit text sharing</string>
+    <string name="archive_folder_title">Local OGG archive folder</string>
+    <string name="archive_folder_not_selected">No folder selected. Local recording requires a SAF folder.</string>
+    <string name="archive_folder_ready">Ready · %1$s</string>
+    <string name="archive_folder_permission_lost">Permission lost · %1$s · select the folder again</string>
+    <string name="archive_folder_provider_unavailable">Folder provider unavailable · %1$s · reconnect and reselect</string>
+    <string name="archive_folder_choose">Choose archive folder</string>
+    <string name="archive_folder_reselection_required">Select an available local archive folder first. No Telegram fallback was used.</string>
+    <string name="archive_folder_save_failed">Could not persist the selected folder. The previous selection was kept.</string>
+    <string name="overlay_local_archive_action_title">Record to local folder</string>
+    <string name="overlay_local_archive_action_supporting">Save one OGG through SAF</string>
+    <string name="content_description_local_archive_recording">Start a recording saved only to the local archive folder</string>
+    <string name="local_recording_in_progress">Recording for local archive — tap again to save</string>
+    <string name="recording_start_failed_retained_private">Could not start recording (%1$s). The temporary file was retained privately.</string>
+    <string name="recording_stop_failed_retained_private">Could not stop recording normally. The temporary file was retained privately.</string>
+    <string name="recording_interrupted_retained_private">The floating button stopped while locally recording. The temporary file was retained privately.</string>
+    <string name="archive_verified_saved">Saved and verified · %1$s</string>
+    <string name="archive_saving">Saving and verifying the local OGG…</string>
+    <string name="archive_verified_source_retained">Saved and verified · %1$s. Temporary source cleanup failed and was retained privately.</string>
+    <string name="archive_copied_unverified">Copied but provider read-back is unsupported · %1$s. Source and target were retained.</string>
+    <string name="archive_failed_source_retained">Local archive failed. The source was retained privately; no Telegram fallback was used.</string>
+    <string name="archive_failed_partial_retained">Local archive failed. Source and a partial target were retained; no Telegram fallback was used.</string>
 </resources>

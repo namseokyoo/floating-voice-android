@@ -628,6 +628,28 @@
                     android:textColor="?attr/colorOnSurfaceVariant" />
 
                 <TextView
+                    style="@style/FloatingVoice.FieldLabel"
+                    android:text="@string/archive_folder_title" />
+
+                <TextView
+                    android:id="@+id/archive_folder_status"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:accessibilityLiveRegion="polite"
+                    android:text="@string/archive_folder_not_selected"
+                    android:textAppearance="?attr/textAppearanceBodyMedium"
+                    android:textColor="?attr/colorOnSurfaceVariant" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/archive_folder_choose"
+                    style="@style/FloatingVoice.QuietOutlinedButton"
+                    android:layout_marginTop="10dp"
+                    android:layout_marginBottom="16dp"
+                    android:text="@string/archive_folder_choose" />
+
+                <View style="@style/FloatingVoice.QuietDivider" />
+
+                <TextView
                     android:id="@+id/language_selector_label"
                     style="@style/FloatingVoice.FieldLabel"
                     android:labelFor="@id/language_selector"

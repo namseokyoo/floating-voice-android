@@ -13,6 +13,7 @@ public final class OverlayStateMachine {
         VOICE_CANCELING,
         VOICE_QUEUEING,
         VOICE_PENDING,
+        VOICE_ARCHIVING,
         TEXT_COMPOSING,
         SPEECH_REVIEW_OPENING,
         SPEECH_REVIEW_OPEN,
@@ -25,6 +26,7 @@ public final class OverlayStateMachine {
 
     public enum Effect {
         START_VOICE,
+        START_LOCAL_VOICE,
         STOP_VOICE,
         CANCEL_VOICE,
         SEND_VOICE,
@@ -99,6 +101,10 @@ public final class OverlayStateMachine {
                 } else if (event == OverlayEvent.OPEN_SPEECH_REVIEW) {
                     state = State.SPEECH_REVIEW_OPENING;
                     effects = List.of(Effect.HIDE_MENU, Effect.OPEN_SPEECH_REVIEW);
+                } else if (event == OverlayEvent.START_LOCAL_RECORDING) {
+                    attemptId++;
+                    state = State.VOICE_STARTING;
+                    effects = List.of(Effect.HIDE_MENU, Effect.START_LOCAL_VOICE);
                 }
             }
             case VOICE_STARTING -> {
@@ -120,6 +126,9 @@ public final class OverlayStateMachine {
             case VOICE_STOPPING -> {
                 if (event == OverlayEvent.VOICE_STOP_SUCCEEDED) {
                     state = State.VOICE_QUEUEING;
+                    effects = List.of(Effect.SEND_VOICE);
+                } else if (event == OverlayEvent.LOCAL_VOICE_STOP_SUCCEEDED) {
+                    state = State.VOICE_ARCHIVING;
                     effects = List.of(Effect.SEND_VOICE);
                 } else if (event == OverlayEvent.VOICE_STOP_FAILED) {
                     state = State.IDLE;
@@ -143,6 +152,11 @@ public final class OverlayStateMachine {
                     attemptId++;
                     state = State.VOICE_STARTING;
                     effects = List.of(Effect.START_VOICE);
+                }
+            }
+            case VOICE_ARCHIVING -> {
+                if (event == OverlayEvent.VOICE_COMPLETED) {
+                    state = State.IDLE;
                 }
             }
             case VOICE_CANCELING -> {

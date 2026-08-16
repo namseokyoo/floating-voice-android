@@ -58,6 +58,21 @@ class OverlayStateMachineTest {
     }
 
     @Test
+    void explicitLocalArchiveActionStartsExactlyOneLocalRecording() {
+        OverlayStateMachine machine = new OverlayStateMachine();
+        machine.accept(OverlayEvent.LONG_PRESS);
+
+        OverlayStateMachine.Transition transition =
+                machine.accept(OverlayEvent.START_LOCAL_RECORDING);
+
+        assertEquals(OverlayStateMachine.State.VOICE_STARTING, transition.nextState());
+        assertEquals(List.of(
+                OverlayStateMachine.Effect.HIDE_MENU,
+                OverlayStateMachine.Effect.START_LOCAL_VOICE), transition.effects());
+        assertEquals(List.of(), machine.accept(OverlayEvent.START_LOCAL_RECORDING).effects());
+    }
+
+    @Test
     void gestureCancelClosesAnOpenMenu() {
         OverlayStateMachine machine = new OverlayStateMachine();
         machine.accept(OverlayEvent.LONG_PRESS);
@@ -190,6 +205,26 @@ class OverlayStateMachineTest {
 
         assertEquals(OverlayStateMachine.State.IDLE, rejected.nextState());
         assertEquals(List.of(), rejected.effects());
+    }
+
+    @Test
+    void completedLocalArchiveReturnsIdleWithoutAbusingQueuedOrRejected() {
+        OverlayStateMachine machine = recordingMachine();
+        machine.accept(OverlayEvent.TAP);
+        OverlayStateMachine.Transition stopped =
+                machine.accept(OverlayEvent.LOCAL_VOICE_STOP_SUCCEEDED);
+        assertEquals(OverlayStateMachine.State.VOICE_ARCHIVING, stopped.nextState());
+        assertEquals(List.of(OverlayStateMachine.Effect.SEND_VOICE), stopped.effects());
+
+        OverlayStateMachine.Transition blockedTap = machine.accept(OverlayEvent.TAP);
+        assertEquals(OverlayStateMachine.State.VOICE_ARCHIVING, blockedTap.nextState());
+        assertEquals(List.of(), blockedTap.effects());
+
+        OverlayStateMachine.Transition completed =
+                machine.accept(OverlayEvent.VOICE_COMPLETED, machine.attemptId());
+
+        assertEquals(OverlayStateMachine.State.IDLE, completed.nextState());
+        assertEquals(List.of(), completed.effects());
     }
 
     @Test
@@ -495,19 +530,22 @@ class OverlayStateMachineTest {
         legal.put(OverlayStateMachine.State.IDLE, EnumSet.of(OverlayEvent.TAP, OverlayEvent.LONG_PRESS));
         legal.put(OverlayStateMachine.State.MENU_OPEN, EnumSet.of(
                 OverlayEvent.TAP, OverlayEvent.GESTURE_CANCELED, OverlayEvent.COMPOSE_TEXT,
-                OverlayEvent.OPEN_SPEECH_REVIEW));
+                OverlayEvent.OPEN_SPEECH_REVIEW, OverlayEvent.START_LOCAL_RECORDING));
         legal.put(OverlayStateMachine.State.VOICE_STARTING, EnumSet.of(
                 OverlayEvent.VOICE_START_SUCCEEDED, OverlayEvent.VOICE_START_FAILED));
         legal.put(OverlayStateMachine.State.RECORDING, EnumSet.of(
                 OverlayEvent.TAP, OverlayEvent.CANCEL_VOICE_REQUESTED));
         legal.put(OverlayStateMachine.State.VOICE_STOPPING, EnumSet.of(
-                OverlayEvent.VOICE_STOP_SUCCEEDED, OverlayEvent.VOICE_STOP_FAILED));
+                OverlayEvent.VOICE_STOP_SUCCEEDED, OverlayEvent.LOCAL_VOICE_STOP_SUCCEEDED,
+                OverlayEvent.VOICE_STOP_FAILED));
         legal.put(OverlayStateMachine.State.VOICE_CANCELING, EnumSet.of(
                 OverlayEvent.VOICE_CANCEL_SUCCEEDED, OverlayEvent.VOICE_CANCEL_FAILED));
         legal.put(OverlayStateMachine.State.VOICE_QUEUEING, EnumSet.of(
                 OverlayEvent.VOICE_QUEUED, OverlayEvent.VOICE_REJECTED, OverlayEvent.TAP));
         legal.put(OverlayStateMachine.State.VOICE_PENDING, EnumSet.of(
                 OverlayEvent.VOICE_REJECTED, OverlayEvent.TAP));
+        legal.put(OverlayStateMachine.State.VOICE_ARCHIVING,
+                EnumSet.of(OverlayEvent.VOICE_COMPLETED));
         legal.put(OverlayStateMachine.State.TEXT_COMPOSING, EnumSet.of(
                 OverlayEvent.SUBMIT_TEXT, OverlayEvent.CLOSE_COMPOSER));
         legal.put(OverlayStateMachine.State.SPEECH_REVIEW_OPENING, EnumSet.of(
@@ -559,6 +597,11 @@ class OverlayStateMachineTest {
                 machine.accept(OverlayEvent.TAP);
                 machine.accept(OverlayEvent.VOICE_STOP_SUCCEEDED);
                 machine.accept(OverlayEvent.VOICE_QUEUED);
+            }
+            case VOICE_ARCHIVING -> {
+                machine = recordingMachine();
+                machine.accept(OverlayEvent.TAP);
+                machine.accept(OverlayEvent.LOCAL_VOICE_STOP_SUCCEEDED);
             }
             case TEXT_COMPOSING -> {
                 machine.accept(OverlayEvent.LONG_PRESS);
