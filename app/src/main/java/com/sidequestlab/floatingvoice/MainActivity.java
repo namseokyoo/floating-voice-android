@@ -58,6 +58,8 @@ import java.util.Locale;
 
 public final class MainActivity extends AppCompatActivity implements TelegramRepository.Listener {
     private static final int PERMISSION_REQUEST = 100;
+    public static final String EXTRA_OPEN_ARCHIVE_PICKER =
+            "com.sidequestlab.floatingvoice.OPEN_ARCHIVE_PICKER";
     private static final String PERMISSION_PREFS = "permission_request_history";
     private static final String STATE_PENDING_TARGET_EDITOR = "pending_target_editor";
     private static final String STATE_PAGE = "page";
@@ -211,6 +213,10 @@ public final class MainActivity extends AppCompatActivity implements TelegramRep
         }
         applySystemBarInsets();
         bindViews();
+        if (getIntent().getBooleanExtra(EXTRA_OPEN_ARCHIVE_PICKER, false)) {
+            getIntent().removeExtra(EXTRA_OPEN_ARCHIVE_PICKER);
+            archiveFolderStatus.post(this::launchArchiveFolderPicker);
+        }
         overlayUiPreferences = new OverlayUiPreferences(this);
         setupLanguageSelector();
         setupOverlaySizeSelector();
@@ -378,11 +384,24 @@ public final class MainActivity extends AppCompatActivity implements TelegramRep
         permissionMicrophoneStatus.setOnClickListener(v -> requestRequiredPermissions());
         permissionNotificationStatus.setOnClickListener(v -> requestRequiredPermissions());
         findViewById(R.id.archive_folder_choose).setOnClickListener(v ->
-                archiveFolderLauncher.launch(new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE)
-                        .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION
-                                | Intent.FLAG_GRANT_WRITE_URI_PERMISSION
-                                | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION
-                                | Intent.FLAG_GRANT_PREFIX_URI_PERMISSION)));
+                launchArchiveFolderPicker());
+    }
+
+    @Override protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        if (intent.getBooleanExtra(EXTRA_OPEN_ARCHIVE_PICKER, false)) {
+            intent.removeExtra(EXTRA_OPEN_ARCHIVE_PICKER);
+            archiveFolderStatus.post(this::launchArchiveFolderPicker);
+        }
+    }
+
+    private void launchArchiveFolderPicker() {
+        archiveFolderLauncher.launch(new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE)
+                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION
+                        | Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                        | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION
+                        | Intent.FLAG_GRANT_PREFIX_URI_PERMISSION));
     }
 
     @Override protected void onResume() {

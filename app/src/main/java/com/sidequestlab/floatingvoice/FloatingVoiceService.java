@@ -474,6 +474,7 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
                         != ArchiveSettingsStore.Status.READY) {
                     dispatchOverlayEvent(OverlayEvent.GESTURE_CANCELED);
                     updateState(R.string.archive_folder_reselection_required);
+                    openArchiveFolderPicker();
                     return;
                 }
                 dispatchOverlayEvent(OverlayEvent.START_LOCAL_RECORDING);
@@ -897,6 +898,14 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
 
     private void hideActionMenu() {
         if (actionMenuController != null) actionMenuController.dismiss();
+    }
+
+    private void openArchiveFolderPicker() {
+        Intent picker = new Intent(this, MainActivity.class)
+                .putExtra(MainActivity.EXTRA_OPEN_ARCHIVE_PICKER, true)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK
+                        | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        try { startActivity(picker); } catch (RuntimeException ignored) { }
     }
 
     private void openTextComposer() {
