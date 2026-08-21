@@ -4,7 +4,8 @@ package com.sidequestlab.floatingvoice;
 final class OverlayCapabilityPolicy {
     record Snapshot(boolean serviceAvailable,
                     boolean telegramOutputAvailable,
-                    boolean systemTextShareAvailable) { }
+                    boolean systemTextShareAvailable,
+                    boolean systemAudioShareAvailable) { }
 
     private OverlayCapabilityPolicy() { }
 
@@ -24,6 +25,7 @@ final class OverlayCapabilityPolicy {
         boolean telegramOutputAvailable = serviceAvailable
                 && telegramAuthenticated
                 && telegramRouteReady;
-        return new Snapshot(serviceAvailable, telegramOutputAvailable, serviceAvailable);
+        return new Snapshot(serviceAvailable, telegramOutputAvailable,
+                serviceAvailable, serviceAvailable);
     }
 }

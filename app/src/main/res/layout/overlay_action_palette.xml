@@ -10,10 +10,16 @@
     app:shapeAppearance="@style/ShapeAppearance.FloatingVoice.Dock"
     app:strokeWidth="0dp">
 
-    <LinearLayout
+    <ScrollView
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:orientation="vertical">
+        android:fillViewport="true"
+        android:overScrollMode="ifContentScrolls">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
 
         <LinearLayout
             android:id="@+id/overlay_text_action"
@@ -25,7 +31,7 @@
             android:contentDescription="@string/content_description_open_text_composer"
             android:focusable="true"
             android:gravity="center_vertical"
-            android:minHeight="64dp"
+            android:minHeight="48dp"
             android:orientation="horizontal"
             android:paddingHorizontal="16dp"
             android:paddingVertical="6dp">
@@ -83,7 +89,7 @@
             android:contentDescription="@string/content_description_open_speech_share"
             android:focusable="true"
             android:gravity="center_vertical"
-            android:minHeight="64dp"
+            android:minHeight="48dp"
             android:orientation="horizontal"
             android:paddingHorizontal="16dp"
             android:paddingVertical="6dp">
@@ -132,6 +138,62 @@
             android:background="@color/fv_outline" />
 
         <LinearLayout
+            android:id="@+id/overlay_audio_share_action"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:background="?attr/selectableItemBackground"
+            android:clickable="true"
+            android:contentDescription="@string/content_description_audio_share_recording"
+            android:focusable="true"
+            android:gravity="center_vertical"
+            android:minHeight="48dp"
+            android:orientation="horizontal"
+            android:paddingHorizontal="16dp"
+            android:paddingVertical="6dp">
+
+            <ImageView
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:contentDescription="@null"
+                android:importantForAccessibility="no"
+                android:src="@drawable/ic_overlay_send"
+                app:tint="@color/fv_on_surface" />
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="12dp"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/overlay_audio_share_action_title"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:ellipsize="end"
+                    android:maxLines="2"
+                    android:text="@string/overlay_audio_share_action_title"
+                    android:textColor="@color/fv_on_surface"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/overlay_audio_share_action_supporting"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/overlay_audio_share_action_supporting"
+                    android:textColor="@color/fv_on_surface_variant"
+                    android:textSize="11sp" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="@color/fv_outline" />
+
+        <LinearLayout
             android:id="@+id/overlay_local_archive_action"
             android:layout_width="match_parent"
             android:layout_height="0dp"
@@ -141,7 +203,7 @@
             android:contentDescription="@string/content_description_local_archive_recording"
             android:focusable="true"
             android:gravity="center_vertical"
-            android:minHeight="64dp"
+            android:minHeight="48dp"
             android:orientation="horizontal"
             android:paddingHorizontal="16dp"
             android:paddingVertical="6dp">
@@ -165,6 +227,8 @@
                     android:id="@+id/overlay_local_archive_action_title"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
+                    android:ellipsize="end"
+                    android:maxLines="2"
                     android:text="@string/overlay_local_archive_action_title"
                     android:textColor="@color/fv_on_surface"
                     android:textSize="14sp"
@@ -195,7 +259,7 @@
             android:contentDescription="@string/content_description_open_destination_picker"
             android:focusable="true"
             android:gravity="center_vertical"
-            android:minHeight="64dp"
+            android:minHeight="48dp"
             android:orientation="horizontal"
             android:paddingHorizontal="16dp"
             android:paddingVertical="6dp">
@@ -237,5 +301,6 @@
                     android:ellipsize="end" />
             </LinearLayout>
         </LinearLayout>
-    </LinearLayout>
+        </LinearLayout>
+    </ScrollView>
 </com.google.android.material.card.MaterialCardView>

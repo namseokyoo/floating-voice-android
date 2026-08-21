@@ -447,4 +447,25 @@
     <string name="archive_copied_unverified">Copied but provider read-back is unsupported · %1$s. Source and target were retained.</string>
     <string name="archive_failed_source_retained">Local archive failed. The source was retained privately; no Telegram fallback was used.</string>
     <string name="archive_failed_partial_retained">Local archive failed. Source and a partial target were retained; no Telegram fallback was used.</string>
+    <string name="overlay_audio_share_action_title">Record for Android Share</string>
+    <string name="overlay_audio_share_action_supporting">Record one OGG, then open Sharesheet</string>
+    <string name="content_description_audio_share_recording">Start an OGG recording for explicit Android sharing</string>
+    <string name="audio_share_recording_in_progress">Recording for Android Share — tap again to open Sharesheet</string>
+    <string name="audio_share_chooser_title">Share recorded OGG</string>
+    <string name="audio_share_opened_retained">Sharesheet opened — choose an app and confirm there. %1$s stays in the app until you delete it.</string>
+    <string name="audio_share_no_handler_retained">No app can receive OGG audio. %1$s remains in the app.</string>
+    <string name="audio_share_failed_retained">Could not open the Sharesheet. %1$s remains in the app; no Telegram fallback was used.</string>
+    <string name="audio_share_promotion_failed_retained">Could not finalize the Share recording. The interrupted source remains in the app; no Sharesheet or Telegram fallback was opened.</string>
+    <string name="retained_audio_share_title">Retained Android Share recordings</string>
+    <string name="retained_audio_share_empty">No retained Share recordings.</string>
+    <string name="retained_audio_share_item">%1$s · %2$d KB · %3$s</string>
+    <string name="retained_audio_share_status_active">recording</string>
+    <string name="retained_audio_share_status_completed">ready to delete</string>
+    <string name="retained_audio_share_status_incomplete">interrupted/incomplete</string>
+    <string name="retained_audio_share_delete">Delete</string>
+    <string name="retained_audio_share_delete_named">Delete %1$s</string>
+    <string name="retained_audio_share_delete_confirm_title">Delete retained recording?</string>
+    <string name="retained_audio_share_delete_confirm_message">Delete %1$s permanently? This is the app’s retained copy. A receiving app that has not finished reading it may lose access.</string>
+    <string name="retained_audio_share_deleted">Deleted %1$s.</string>
+    <string name="retained_audio_share_delete_failed">Could not delete %1$s.</string>
 </resources>

@@ -13,15 +13,28 @@ public final class RecordingRoutePolicyTest {
         assertFalse(RecordingRoutePolicy.stopForTelegramRouteLoss(
                 OutputRoute.LOCAL_AUDIO_ARCHIVE, true));
         assertFalse(RecordingRoutePolicy.stopForTelegramRouteLoss(
+                OutputRoute.SYSTEM_AUDIO_SHARE, true));
+        assertFalse(RecordingRoutePolicy.stopForTelegramRouteLoss(
                 OutputRoute.TELEGRAM_VOICE, false));
     }
 
     @Test public void teardownRetainsInterruptedAndReadyLocalSources() {
-        assertTrue(RecordingRoutePolicy.retainLocalSourceOnTeardown(
+        assertTrue(RecordingRoutePolicy.retainPrivateSourceOnTeardown(
                 OutputRoute.LOCAL_AUDIO_ARCHIVE, true, false));
-        assertTrue(RecordingRoutePolicy.retainLocalSourceOnTeardown(
+        assertTrue(RecordingRoutePolicy.retainPrivateSourceOnTeardown(
                 OutputRoute.LOCAL_AUDIO_ARCHIVE, false, true));
-        assertFalse(RecordingRoutePolicy.retainLocalSourceOnTeardown(
+        assertTrue(RecordingRoutePolicy.retainPrivateSourceOnTeardown(
+                OutputRoute.SYSTEM_AUDIO_SHARE, true, false));
+        assertFalse(RecordingRoutePolicy.retainPrivateSourceOnTeardown(
                 OutputRoute.LOCAL_AUDIO_ARCHIVE, false, false));
+    }
+
+    @Test public void shareStoreOwnershipReleasesOnlyAfterRecorderRelease() {
+        assertFalse(RecordingRoutePolicy.releaseShareStoreOwnership(
+                OutputRoute.SYSTEM_AUDIO_SHARE, false));
+        assertTrue(RecordingRoutePolicy.releaseShareStoreOwnership(
+                OutputRoute.SYSTEM_AUDIO_SHARE, true));
+        assertFalse(RecordingRoutePolicy.releaseShareStoreOwnership(
+                OutputRoute.LOCAL_AUDIO_ARCHIVE, true));
     }
 }

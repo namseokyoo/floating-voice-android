@@ -105,6 +105,19 @@ class OutputRouteStateMachineTest {
     }
 
     @Test
+    void systemAudioShareFreezesWithoutTelegramDestinationAndNeverFallsBack() {
+        OutputRouteStateMachine machine = new OutputRouteStateMachine(
+                OutputRoute.ContentKind.AUDIO, 0L, DestinationCatalog.empty(), null);
+
+        assertTrue(machine.selectRoute(OutputRoute.SYSTEM_AUDIO_SHARE));
+        OutputSnapshot snapshot = machine.freeze("private/shared-voice.ogg").orElseThrow();
+
+        assertEquals(OutputRoute.SYSTEM_AUDIO_SHARE, snapshot.route());
+        assertTrue(snapshot.telegramTarget().isEmpty());
+        assertTrue(!machine.selectRoute(OutputRoute.TELEGRAM_VOICE));
+    }
+
+    @Test
     void retryUsesTheExactFrozenSnapshotAndCompletionClearsPayloadReference() {
         OutputRouteStateMachine machine = new OutputRouteStateMachine(
                 OutputRoute.ContentKind.TEXT, 7L,

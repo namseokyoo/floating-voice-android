@@ -12,7 +12,7 @@
 
 **Non-goals:** 녹음된 OGG 사후 STT, bundled Whisper, cloud STT, MediaRecorder+SpeechRecognizer 동시 실행, Kakao 지정방 자동전송, 공유 대상 앱의 최종 수신 성공 추적, 복수 output 동시 실행.
 
-**현재 단계 상태 (2026-08-16 05:56 KST):** `V8-05 R3 STT SUPPORT-PREFLIGHT REMEDIATION`. code 21은 A52s에서 `checkRecognitionSupport()`의 non-ready 결과가 실제 `startListening()`을 막아 즉시 “음성 인식을 사용할 수 없습니다”로 종료된 실기기 FAIL로 폐기했다. R3 code 22는 API 33+ 표준 recognizer 생성 성공 후 듣기를 먼저 시작하고 READY/DOWNLOAD_REQUIRED/UNSUPPORTED/ERROR support 결과는 model download 없는 session 진단 정보로만 처리한다. 늦은 support 콜백은 active listening UI를 CHECKING으로 되돌리지 않고 physical cycle 교체 뒤에도 보존된다. terminal listener 예외가 나도 physical destroy와 audio ownership release를 보장한다. 기존 segmented compatibility recovery·compact review·output snapshot·verified destination·no-auto-fallback·memory-only draft 계약은 유지한다. targeted RED→GREEN과 final clean gate(core 195/debug 161/release 157 tests, 실패·오류·skip 0, localization 395/395, Lint Fatal/Error 0, 변경 Java warning/error 0, Debug/Release assembly)는 PASS다. 독립 follow-up review는 Blocker/High/Medium 0, Low 1로 PASS했고 Low exact interleaving coverage도 전용 테스트로 닫았다. app source commit `0c13c46fa68812999052edf2c1ea5acf685e9df6` immutable fresh build의 공식 서명 APK(SHA-256 `e67bfcbb7796903fdfdc4eaec47e02483da156a2c36888fc088c4ad81d3b67ed`)는 v2/v3·metadata·launcher·ABI·ZIP/ELF 16KB·credential scan까지 PASS했다. A52s 실기기 판정은 pending이며 폰/ADB 조작과 공개 릴리스는 승인 범위가 아니다.
+**현재 단계 상태 (2026-08-21 21:44 KST):** `V8-07 AUDIO SHARESHEET + FILEPROVIDER`. V8-06 R2 code 24는 형의 A52s 10-file save/reopen/play 사용자 직접 검증을 PASS했다. V8-07 code 25/name `0.8.0-v8-07-audio-sharesheet`는 app-internal `pending/.part → retained/.ogg` 승격, active-file 삭제 차단, scoped FileProvider `content://`, `ACTION_SEND audio/ogg` + read grant/ClipData, no-recipient 진단, chooser-open/failed 전용 상태, no Telegram fallback, restart-safe retained/incomplete 목록·파일별 확인 삭제, constrained-height scrollable palette를 구현했다. final clean gate는 core 201/debug 186/release 182 tests(실패·오류·skip 0), localization 437/437, Lint Fatal/Error 0, Debug/Release assembly, ZIP/ELF 16KB를 PASS했고 독립 follow-up review는 Blocker/High/Medium 0으로 PASS했다. 공식 서명 후보 생성과 A52s cross-UID URI readability/chooser 수신 검증은 pending이며 폰/ADB 조작과 공개 릴리스는 승인 범위가 아니다.
 
 ---
 
@@ -430,7 +430,7 @@ TEARING_DOWN
 
 **구현 현황 (2026-08-16 16:25 KST, R1):** code 23/name `0.8.0-v8-06-saf-archive`. SAF 폴더 선택(`ACTION_OPEN_DOCUMENT_TREE`, picker가 돌려준 grant flag 기반 `takePersistableUriPermission`)과 권한 상실 시 재선택 요구(no private fallback), picker cancel 무변경, 명시적 로컬 OGG 녹음 route(텔레그램 없이 가능, mic/notification/overlay + READY 폴더만 요구), loss-averse copy/read-back SHA-256 transaction(reopen 실패 시 copied-unverified·source 보존, verify 성공 후 source 삭제), `VOICE_ARCHIVING` 상태로 archive 완료까지 신규 녹음 차단, executor teardown 시 source 보존, bilingual strings/localization 416/416 PASS. final clean gate: `clean test lintDebug lintRelease assembleDebug assembleRelease` BUILD SUCCESSFUL, core 198/debug 178/release 174 tests(실패·오류·skip 0), Lint Fatal/Error 0, localization PASS, `git diff --check` PASS. 독립 Standards review PASS(Blocker/High/Medium 0); Spec-axis는 main session이 동일 source 직접 재검증. commit `a7f7988` push 완료. A52s 실기기에서 폴더 미선택 상태의 “로컬 폴더에 녹음”이 오버레이에서 무반응인 UX 결함을 발견해 **revoked**.
 
-**구현 현황 (2026-08-16 16:55 KST, R2):** code 24/name `0.8.0-v8-06-r2-saf-archive-picker`. 폴더 미선택/권한 상실 상태에서 탭하면 `openArchiveFolderPicker()`가 MainActivity를 열고 `EXTRA_OPEN_ARCHIVE_PICKER`로 SAF picker를 자동 실행(onCreate·onNewIntent 모두 처리). A52s 10-file gate는 code 24로 재검증 필요.
+**구현 현황 (2026-08-16 16:55 KST, R2):** code 24/name `0.8.0-v8-06-r2-saf-archive-picker`. 폴더 미선택/권한 상실 상태에서 탭하면 `openArchiveFolderPicker()`가 MainActivity를 열고 `EXTRA_OPEN_ARCHIVE_PICKER`로 SAF picker를 자동 실행(onCreate·onNewIntent 모두 처리). 2026-08-21 형의 A52s 사용자 직접 검증에서 실제 선택 폴더 10개 OGG save/reopen/play 게이트를 PASS했으며, V8-07 진입 승인을 받았다.
 
 ---
 
@@ -476,6 +476,8 @@ completed OGG
 **완화:** UI/report에서 `공유창을 열었습니다`만 사용. 전송 완료/카카오 특정방 전달을 주장하지 않는다.
 
 **게이트:** scoped URI·readability·retention·manual delete·wording 모두 검증.
+
+**구현 현황 (2026-08-21 21:44 KST):** source/자동검증/독립 review PASS. FileProvider는 `files/audio_share/retained/`만 노출하고, 녹음 중 `.part`는 active ownership으로 삭제를 차단한 뒤 정상 stop/release 성공 시에만 `.ogg`로 승격한다. 공유창이 열려도 전송 완료로 간주하지 않으며 source는 직접 확인 삭제 전까지 보존한다. code 25 공식 서명 APK와 A52s 실제 수신 앱 readability/chooser gate는 pending.
 
 ---
 

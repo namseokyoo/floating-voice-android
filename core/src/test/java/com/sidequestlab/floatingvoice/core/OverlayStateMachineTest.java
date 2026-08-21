@@ -73,6 +73,32 @@ class OverlayStateMachineTest {
     }
 
     @Test
+    void explicitSystemAudioShareStartsStandaloneRecordingThenBlocksUntilChooserResult() {
+        OverlayStateMachine machine = new OverlayStateMachine();
+        machine.accept(OverlayEvent.LONG_PRESS);
+
+        OverlayStateMachine.Transition start =
+                machine.accept(OverlayEvent.START_SYSTEM_AUDIO_SHARE_RECORDING);
+        assertEquals(OverlayStateMachine.State.VOICE_STARTING, start.nextState());
+        assertEquals(List.of(
+                OverlayStateMachine.Effect.HIDE_MENU,
+                OverlayStateMachine.Effect.START_SYSTEM_AUDIO_VOICE), start.effects());
+
+        machine.accept(OverlayEvent.VOICE_START_SUCCEEDED);
+        machine.accept(OverlayEvent.TAP);
+        OverlayStateMachine.Transition stopped =
+                machine.accept(OverlayEvent.SYSTEM_AUDIO_SHARE_STOP_SUCCEEDED);
+        assertEquals(OverlayStateMachine.State.VOICE_SHARING, stopped.nextState());
+        assertEquals(List.of(OverlayStateMachine.Effect.OPEN_AUDIO_SHARE_CHOOSER),
+                stopped.effects());
+        assertEquals(List.of(), machine.accept(OverlayEvent.TAP).effects());
+
+        OverlayStateMachine.Transition completed =
+                machine.accept(OverlayEvent.AUDIO_SHARE_CHOOSER_OPENED, machine.attemptId());
+        assertEquals(OverlayStateMachine.State.IDLE, completed.nextState());
+    }
+
+    @Test
     void gestureCancelClosesAnOpenMenu() {
         OverlayStateMachine machine = new OverlayStateMachine();
         machine.accept(OverlayEvent.LONG_PRESS);
@@ -530,14 +556,15 @@ class OverlayStateMachineTest {
         legal.put(OverlayStateMachine.State.IDLE, EnumSet.of(OverlayEvent.TAP, OverlayEvent.LONG_PRESS));
         legal.put(OverlayStateMachine.State.MENU_OPEN, EnumSet.of(
                 OverlayEvent.TAP, OverlayEvent.GESTURE_CANCELED, OverlayEvent.COMPOSE_TEXT,
-                OverlayEvent.OPEN_SPEECH_REVIEW, OverlayEvent.START_LOCAL_RECORDING));
+                OverlayEvent.OPEN_SPEECH_REVIEW, OverlayEvent.START_LOCAL_RECORDING,
+                OverlayEvent.START_SYSTEM_AUDIO_SHARE_RECORDING));
         legal.put(OverlayStateMachine.State.VOICE_STARTING, EnumSet.of(
                 OverlayEvent.VOICE_START_SUCCEEDED, OverlayEvent.VOICE_START_FAILED));
         legal.put(OverlayStateMachine.State.RECORDING, EnumSet.of(
                 OverlayEvent.TAP, OverlayEvent.CANCEL_VOICE_REQUESTED));
         legal.put(OverlayStateMachine.State.VOICE_STOPPING, EnumSet.of(
                 OverlayEvent.VOICE_STOP_SUCCEEDED, OverlayEvent.LOCAL_VOICE_STOP_SUCCEEDED,
-                OverlayEvent.VOICE_STOP_FAILED));
+                OverlayEvent.SYSTEM_AUDIO_SHARE_STOP_SUCCEEDED, OverlayEvent.VOICE_STOP_FAILED));
         legal.put(OverlayStateMachine.State.VOICE_CANCELING, EnumSet.of(
                 OverlayEvent.VOICE_CANCEL_SUCCEEDED, OverlayEvent.VOICE_CANCEL_FAILED));
         legal.put(OverlayStateMachine.State.VOICE_QUEUEING, EnumSet.of(
@@ -546,6 +573,9 @@ class OverlayStateMachineTest {
                 OverlayEvent.VOICE_REJECTED, OverlayEvent.TAP));
         legal.put(OverlayStateMachine.State.VOICE_ARCHIVING,
                 EnumSet.of(OverlayEvent.VOICE_COMPLETED));
+        legal.put(OverlayStateMachine.State.VOICE_SHARING,
+                EnumSet.of(OverlayEvent.AUDIO_SHARE_CHOOSER_OPENED,
+                        OverlayEvent.AUDIO_SHARE_FAILED));
         legal.put(OverlayStateMachine.State.TEXT_COMPOSING, EnumSet.of(
                 OverlayEvent.SUBMIT_TEXT, OverlayEvent.CLOSE_COMPOSER));
         legal.put(OverlayStateMachine.State.SPEECH_REVIEW_OPENING, EnumSet.of(
@@ -602,6 +632,11 @@ class OverlayStateMachineTest {
                 machine = recordingMachine();
                 machine.accept(OverlayEvent.TAP);
                 machine.accept(OverlayEvent.LOCAL_VOICE_STOP_SUCCEEDED);
+            }
+            case VOICE_SHARING -> {
+                machine = recordingMachine();
+                machine.accept(OverlayEvent.TAP);
+                machine.accept(OverlayEvent.SYSTEM_AUDIO_SHARE_STOP_SUCCEEDED);
             }
             case TEXT_COMPOSING -> {
                 machine.accept(OverlayEvent.LONG_PRESS);

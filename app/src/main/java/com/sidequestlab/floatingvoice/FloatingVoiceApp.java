@@ -5,6 +5,8 @@ import android.content.res.Configuration;
 
 import com.sidequestlab.floatingvoice.core.DestinationCatalogPersistence;
 
+import java.io.File;
+
 public final class FloatingVoiceApp extends Application {
     private SecureSettingsStore settings;
     private DestinationStore destinations;
@@ -12,6 +14,7 @@ public final class FloatingVoiceApp extends Application {
     private TelegramRepository telegram;
     private AudioCaptureCoordinator audioCaptureCoordinator;
     private SpeechTelegramHandoffRegistry speechTelegramHandoffs;
+    private RetainedAudioShareStore retainedAudioShares;
     private boolean automaticStartAttempted;
 
     @Override public void onCreate() {
@@ -21,6 +24,8 @@ public final class FloatingVoiceApp extends Application {
         destinationLoadResult = destinations.load();
         audioCaptureCoordinator = new AudioCaptureCoordinator();
         speechTelegramHandoffs = new SpeechTelegramHandoffRegistry();
+        retainedAudioShares = new RetainedAudioShareStore(
+                new File(getFilesDir(), "audio_share"));
         telegram = new TelegramRepository(this, settings, destinations,
                 new PendingRecordingStore(this), new PendingTextSendStore(this),
                 new PendingDispatchStore(this));
@@ -46,6 +51,8 @@ public final class FloatingVoiceApp extends Application {
     SpeechTelegramHandoffRegistry speechTelegramHandoffs() {
         return speechTelegramHandoffs;
     }
+
+    RetainedAudioShareStore retainedAudioShares() { return retainedAudioShares; }
 
     public synchronized AudioCaptureCoordinator audioCaptureCoordinator() {
         return audioCaptureCoordinator;

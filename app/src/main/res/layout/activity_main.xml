@@ -650,6 +650,27 @@
                 <View style="@style/FloatingVoice.QuietDivider" />
 
                 <TextView
+                    style="@style/FloatingVoice.FieldLabel"
+                    android:text="@string/retained_audio_share_title" />
+
+                <TextView
+                    android:id="@+id/retained_audio_share_empty"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/retained_audio_share_empty"
+                    android:textAppearance="?attr/textAppearanceBodyMedium"
+                    android:textColor="?attr/colorOnSurfaceVariant" />
+
+                <LinearLayout
+                    android:id="@+id/retained_audio_share_list"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="16dp"
+                    android:orientation="vertical" />
+
+                <View style="@style/FloatingVoice.QuietDivider" />
+
+                <TextView
                     android:id="@+id/language_selector_label"
                     style="@style/FloatingVoice.FieldLabel"
                     android:labelFor="@id/language_selector"

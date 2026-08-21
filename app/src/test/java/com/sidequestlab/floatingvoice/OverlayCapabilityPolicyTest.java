@@ -20,6 +20,7 @@ public class OverlayCapabilityPolicyTest {
 
         assertTrue(capabilities.serviceAvailable());
         assertTrue(capabilities.systemTextShareAvailable());
+        assertTrue(capabilities.systemAudioShareAvailable());
         assertFalse(capabilities.telegramOutputAvailable());
     }
 
@@ -30,6 +31,7 @@ public class OverlayCapabilityPolicyTest {
 
         assertFalse(capabilities.serviceAvailable());
         assertFalse(capabilities.systemTextShareAvailable());
+        assertFalse(capabilities.systemAudioShareAvailable());
         assertFalse(capabilities.telegramOutputAvailable());
     }
 

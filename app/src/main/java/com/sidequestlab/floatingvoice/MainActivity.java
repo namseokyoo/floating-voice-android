@@ -14,9 +14,11 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+
 import android.provider.Settings;
 import android.text.InputType;
 import android.view.LayoutInflater;
+import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.AdapterView;
@@ -53,6 +55,7 @@ import com.sidequestlab.floatingvoice.core.TargetChangePolicy;
 import com.sidequestlab.floatingvoice.core.TargetEditCompletionPolicy;
 
 import java.util.ArrayList;
+
 import java.util.List;
 import java.util.Locale;
 
@@ -153,10 +156,13 @@ public final class MainActivity extends AppCompatActivity implements TelegramRep
     private LinearLayout destinationsListContainer;
     private TextView destinationsListEmpty;
     private TextView archiveFolderStatus;
+    private TextView retainedAudioShareEmpty;
+    private LinearLayout retainedAudioShareList;
     private TelegramRepository telegram;
     private SecureSettingsStore settingsStore;
     private OverlayUiPreferences overlayUiPreferences;
     private ArchiveSettingsStore archiveSettingsStore;
+    private RetainedAudioShareStore retainedAudioShareStore;
     private ActivityResultLauncher<Intent> archiveFolderLauncher;
     private BroadcastReceiver serviceStateReceiver;
     private AppConfig savedConfig;
@@ -183,6 +189,7 @@ public final class MainActivity extends AppCompatActivity implements TelegramRep
         WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
         setContentView(R.layout.activity_main);
         archiveSettingsStore = new ArchiveSettingsStore(this);
+        retainedAudioShareStore = ((FloatingVoiceApp) getApplication()).retainedAudioShares();
         archiveFolderLauncher = registerForActivityResult(
                 new ActivityResultContracts.StartActivityForResult(), result -> {
                     if (result.getResultCode() != RESULT_OK || result.getData() == null
@@ -332,6 +339,8 @@ public final class MainActivity extends AppCompatActivity implements TelegramRep
         destinationsListContainer = findViewById(R.id.destinations_list_container);
         destinationsListEmpty = findViewById(R.id.destinations_list_empty);
         archiveFolderStatus = findViewById(R.id.archive_folder_status);
+        retainedAudioShareEmpty = findViewById(R.id.retained_audio_share_empty);
+        retainedAudioShareList = findViewById(R.id.retained_audio_share_list);
         apiId.setInputType(InputType.TYPE_CLASS_NUMBER);
     }
 
@@ -408,6 +417,7 @@ public final class MainActivity extends AppCompatActivity implements TelegramRep
         super.onResume();
         refreshPermissionStatus();
         refreshArchiveFolderStatus();
+        refreshRetainedAudioShares();
         refreshUi();
     }
 
@@ -494,6 +504,57 @@ public final class MainActivity extends AppCompatActivity implements TelegramRep
         };
         archiveFolderStatus.setText(selection.status() == ArchiveSettingsStore.Status.NOT_SELECTED
                 ? getString(text) : getString(text, selection.label()));
+    }
+
+    private void refreshRetainedAudioShares() {
+        if (retainedAudioShareList == null || retainedAudioShareEmpty == null
+                || retainedAudioShareStore == null) return;
+        List<RetainedAudioShareStore.Entry> entries = retainedAudioShareStore.list();
+        retainedAudioShareList.removeAllViews();
+        retainedAudioShareEmpty.setVisibility(entries.isEmpty() ? View.VISIBLE : View.GONE);
+        for (RetainedAudioShareStore.Entry entry : entries) {
+            LinearLayout row = new LinearLayout(this);
+            row.setGravity(Gravity.CENTER_VERTICAL);
+            row.setOrientation(LinearLayout.HORIZONTAL);
+            row.setPadding(0, dp(4), 0, dp(4));
+
+            TextView label = new TextView(this);
+            label.setText(getString(R.string.retained_audio_share_item,
+                    entry.name(), Math.max(1L, (entry.bytes() + 1023L) / 1024L),
+                    getString(entry.active() ? R.string.retained_audio_share_status_active
+                            : entry.completed() ? R.string.retained_audio_share_status_completed
+                            : R.string.retained_audio_share_status_incomplete)));
+            label.setTextAppearance(
+                    com.google.android.material.R.style.TextAppearance_Material3_BodyMedium);
+            row.addView(label, new LinearLayout.LayoutParams(
+                    0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+
+            MaterialButton delete = new MaterialButton(this);
+            delete.setText(R.string.retained_audio_share_delete);
+            delete.setEnabled(!entry.active());
+            delete.setContentDescription(getString(
+                    R.string.retained_audio_share_delete_named, entry.name()));
+            delete.setOnClickListener(view -> confirmRetainedAudioShareDelete(entry));
+            row.addView(delete, new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+            retainedAudioShareList.addView(row);
+        }
+    }
+
+    private void confirmRetainedAudioShareDelete(RetainedAudioShareStore.Entry entry) {
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.retained_audio_share_delete_confirm_title)
+                .setMessage(getString(R.string.retained_audio_share_delete_confirm_message,
+                        entry.name()))
+                .setNegativeButton(android.R.string.cancel, null)
+                .setPositiveButton(R.string.retained_audio_share_delete, (dialog, which) -> {
+                    boolean deleted = retainedAudioShareStore.delete(entry.id());
+                    presentStatus(getString(deleted ? R.string.retained_audio_share_deleted
+                            : R.string.retained_audio_share_delete_failed,
+                            entry.name()), false, true);
+                    refreshRetainedAudioShares();
+                })
+                .show();
     }
 
     private void setupLanguageSelector() {

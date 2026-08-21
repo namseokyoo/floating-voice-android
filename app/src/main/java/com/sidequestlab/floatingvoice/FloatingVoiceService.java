@@ -29,8 +29,10 @@ import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.WindowManager;
+import android.widget.Toast;
 
 import androidx.core.content.ContextCompat;
+import androidx.core.content.FileProvider;
 
 import com.sidequestlab.floatingvoice.core.AnchoredPanelPlacement;
 import com.sidequestlab.floatingvoice.core.AudioCaptureOwnership;
@@ -147,6 +149,7 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
     private Runnable prerequisiteMonitor;
     private ArchiveSettingsStore archiveSettingsStore;
     private LocalArchiveController localArchiveController;
+    private RetainedAudioShareStore retainedAudioShareStore;
     private ExecutorService archiveExecutor;
 
     @Override public void onCreate() {
@@ -169,6 +172,7 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
         FloatingVoiceApp app = (FloatingVoiceApp) getApplication();
         telegram = app.telegram();
         audioCaptureCoordinator = app.audioCaptureCoordinator();
+        retainedAudioShareStore = app.retainedAudioShares();
         initializeRouteState(telegram.destinationCatalog());
         telegram.addListener(this);
         overlayUiPreferences = new OverlayUiPreferences(this);
@@ -468,6 +472,11 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
                 dispatchOverlayEvent(OverlayEvent.OPEN_SPEECH_REVIEW);
             }
 
+            @Override public void onAudioShareRecording() {
+                if (isTearingDown()) return;
+                dispatchOverlayEvent(OverlayEvent.START_SYSTEM_AUDIO_SHARE_RECORDING);
+            }
+
             @Override public void onLocalArchiveRecording() {
                 if (isTearingDown()) return;
                 if (archiveSettingsStore.selection().status()
@@ -540,9 +549,11 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
             switch (effect) {
                 case START_VOICE -> startRecording(OutputRoute.TELEGRAM_VOICE);
                 case START_LOCAL_VOICE -> startRecording(OutputRoute.LOCAL_AUDIO_ARCHIVE);
+                case START_SYSTEM_AUDIO_VOICE -> startRecording(OutputRoute.SYSTEM_AUDIO_SHARE);
                 case STOP_VOICE -> stopRecordingAndSend();
                 case CANCEL_VOICE -> cancelRecording();
                 case SEND_VOICE -> sendReadyVoice();
+                case OPEN_AUDIO_SHARE_CHOOSER -> sendReadyVoice();
                 case SHOW_MENU -> showActionMenu();
                 case HIDE_MENU -> hideActionMenu();
                 case OPEN_TEXT_COMPOSER -> openTextComposer();
@@ -556,7 +567,9 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
 
     private void startRecording(OutputRoute requestedRoute) {
         boolean localArchive = requestedRoute == OutputRoute.LOCAL_AUDIO_ARCHIVE;
-        if ((!localArchive && !telegramOutputAvailable())
+        boolean systemAudioShare = requestedRoute == OutputRoute.SYSTEM_AUDIO_SHARE;
+        boolean standaloneOutput = localArchive || systemAudioShare;
+        if ((!standaloneOutput && !telegramOutputAvailable())
                 || (localArchive && archiveSettingsStore.selection().status()
                 != ArchiveSettingsStore.Status.READY)) {
             dispatchOverlayEvent(OverlayEvent.VOICE_START_FAILED);
@@ -572,41 +585,53 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
         }
         recordingLease = acquired;
         RouteStateMachine route = routeStateMachine;
-        Destination selectedDestination = localArchive || route == null
+        Destination selectedDestination = standaloneOutput || route == null
                 ? null : route.startRecording().orElse(null);
-        if (!localArchive && selectedDestination == null) {
+        if (!standaloneOutput && selectedDestination == null) {
             releaseRecordingOwnership();
             dispatchOverlayEvent(OverlayEvent.VOICE_START_FAILED);
             updateState(R.string.destination_required_before_recording);
             return;
         }
-        File externalMusic = getExternalFilesDir(Environment.DIRECTORY_MUSIC);
-        File root = new File(externalMusic == null ? getFilesDir() : externalMusic, "voice_notes");
-        if (!root.mkdirs() && !root.isDirectory()) {
-            if (!localArchive && route != null) route.cancelRecording();
-            releaseRecordingOwnership();
-            dispatchOverlayEvent(OverlayEvent.VOICE_START_FAILED);
-            updateState(R.string.recording_folder_failed);
-            return;
+        if (systemAudioShare) {
+            activeRecording = retainedAudioShareStore.createPending(System.currentTimeMillis());
+            if (activeRecording == null) {
+                releaseRecordingOwnership();
+                dispatchOverlayEvent(OverlayEvent.VOICE_START_FAILED);
+                updateState(R.string.recording_folder_failed);
+                return;
+            }
+        } else {
+            File externalMusic = getExternalFilesDir(Environment.DIRECTORY_MUSIC);
+            File root = new File(externalMusic == null ? getFilesDir() : externalMusic,
+                    "voice_notes");
+            if (!root.mkdirs() && !root.isDirectory()) {
+                if (!standaloneOutput && route != null) route.cancelRecording();
+                releaseRecordingOwnership();
+                dispatchOverlayEvent(OverlayEvent.VOICE_START_FAILED);
+                updateState(R.string.recording_folder_failed);
+                return;
+            }
+            activeRecording = new File(root, "voice-"
+                    + DateTimeFormatter.ISO_INSTANT.format(Instant.now()).replace(':', '-') + ".ogg");
         }
-        activeRecording = new File(root, "voice-"
-                + DateTimeFormatter.ISO_INSTANT.format(Instant.now()).replace(':', '-') + ".ogg");
-        OutputSnapshot localOutput = null;
-        if (localArchive) {
+        OutputSnapshot standaloneSnapshot = null;
+        if (standaloneOutput) {
             OutputRouteStateMachine output = new OutputRouteStateMachine(
                     OutputRoute.ContentKind.AUDIO, 0L, DestinationCatalog.empty(), null);
-            if (output.selectRoute(OutputRoute.LOCAL_AUDIO_ARCHIVE)) {
-                localOutput = output.freeze(activeRecording.getAbsolutePath()).orElse(null);
+            if (output.selectRoute(requestedRoute)) {
+                standaloneSnapshot = output.freeze(activeRecording.getAbsolutePath()).orElse(null);
             }
-            if (localOutput == null) {
+            if (standaloneSnapshot == null) {
                 releaseRecordingOwnership();
+                if (systemAudioShare) retainedAudioShareStore.releaseActive(activeRecording);
                 activeRecording = null;
                 dispatchOverlayEvent(OverlayEvent.VOICE_START_FAILED);
                 return;
             }
         }
         activeRecordingRoute = requestedRoute;
-        readyVoiceOutput = localOutput;
+        readyVoiceOutput = standaloneSnapshot;
         MediaRecorder next = null;
         try {
             next = new MediaRecorder();
@@ -622,8 +647,11 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
         } catch (Exception e) {
             boolean released = next == null || tryReleaseRecorder(next);
             recorder = released ? null : next;
-            if (!localArchive && route != null) route.cancelRecording();
+            if (!standaloneOutput && route != null) route.cancelRecording();
             File failedRecording = activeRecording;
+            if (RecordingRoutePolicy.releaseShareStoreOwnership(requestedRoute, released)) {
+                retainedAudioShareStore.releaseActive(failedRecording);
+            }
             if (released) {
                 releaseRecordingOwnership();
                 activeRecording = null;
@@ -641,11 +669,12 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
         recorder = next;
         recordingStartedAt = SystemClock.elapsedRealtime();
         dispatchOverlayEvent(OverlayEvent.VOICE_START_SUCCEEDED);
-        if (!localArchive) updateDestinationChip();
+        if (!standaloneOutput) updateDestinationChip();
         boolean dockShown = showRecordingDock();
         if (isRecordingState()) {
             updateState(dockShown
                     ? (localArchive ? R.string.local_recording_in_progress
+                    : systemAudioShare ? R.string.audio_share_recording_in_progress
                     : R.string.recording_in_progress)
                     : R.string.recording_in_progress_cancel_unavailable);
         }
@@ -657,7 +686,9 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
                 SystemClock.uptimeMillis() + TERMINAL_INPUT_SUPPRESSION_MS);
         RouteStateMachine route = routeStateMachine;
         boolean localArchive = activeRecordingRoute == OutputRoute.LOCAL_AUDIO_ARCHIVE;
-        boolean routeFreezing = !localArchive && route != null && route.beginFreezing();
+        boolean systemAudioShare = activeRecordingRoute == OutputRoute.SYSTEM_AUDIO_SHARE;
+        boolean standaloneOutput = localArchive || systemAudioShare;
+        boolean routeFreezing = !standaloneOutput && route != null && route.beginFreezing();
         long routeAttemptId = route == null ? 0L : route.routeAttemptId();
         MediaRecorder current = recorder;
         recorder = null;
@@ -675,16 +706,34 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
         if (released) releaseRecordingOwnership();
         if (!stopped || !released) {
             if (routeFreezing) route.abortFreezing(routeAttemptId);
+            if (RecordingRoutePolicy.releaseShareStoreOwnership(
+                    activeRecordingRoute, released)) {
+                retainedAudioShareStore.releaseActive(activeRecording);
+            }
             dispatchOverlayEvent(OverlayEvent.VOICE_STOP_FAILED);
             updateIdleBubble();
-            updateState(localArchive ? R.string.recording_stop_failed_retained_private
+            updateState(standaloneOutput ? R.string.recording_stop_failed_retained_private
                     : R.string.recording_stop_failed_retained, activeRecording);
             return;
         }
 
+        if (systemAudioShare) {
+            File completedShare = retainedAudioShareStore.promoteCompleted(activeRecording);
+            if (completedShare == null) {
+                activeRecording = null;
+                activeRecordingRoute = null;
+                readyVoiceOutput = null;
+                dispatchOverlayEvent(OverlayEvent.VOICE_STOP_FAILED);
+                updateIdleBubble();
+                updateState(R.string.audio_share_promotion_failed_retained);
+                return;
+            }
+            activeRecording = completedShare;
+        }
+
         DispatchTargetSnapshot frozen = routeFreezing
                 ? route.freeze().orElse(null) : null;
-        if (!localArchive && frozen == null) {
+        if (!standaloneOutput && frozen == null) {
             if (routeFreezing) route.abortFreezing(routeAttemptId);
             File retained = activeRecording;
             activeRecording = null;
@@ -701,8 +750,8 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
         readyVoiceAttemptId = overlayStateMachine.attemptId();
         activeRecording = null;
         updateIdleBubble();
-        dispatchOverlayEvent(localArchive
-                ? OverlayEvent.LOCAL_VOICE_STOP_SUCCEEDED
+        dispatchOverlayEvent(localArchive ? OverlayEvent.LOCAL_VOICE_STOP_SUCCEEDED
+                : systemAudioShare ? OverlayEvent.SYSTEM_AUDIO_SHARE_STOP_SUCCEEDED
                 : OverlayEvent.VOICE_STOP_SUCCEEDED);
     }
 
@@ -721,6 +770,10 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
 
         RecordingCancelOperation.Result result = cancelOperation.execute(
                 recorderPort(current), canceledRecording, filePort());
+        if (RecordingRoutePolicy.releaseShareStoreOwnership(
+                activeRecordingRoute, !result.releaseFailed())) {
+            retainedAudioShareStore.releaseActive(canceledRecording);
+        }
         if (result.releaseFailed()) {
             recorder = current;
             activeRecording = canceledRecording;
@@ -874,8 +927,13 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
         actionMenuController.setDestinationSummary(idleDestinationSummary());
         Rect display = currentDisplayBounds();
         int panelWidth = px(R.dimen.overlay_palette_width);
-        int panelHeight = px(R.dimen.overlay_palette_height);
         int margin = px(R.dimen.overlay_safe_margin);
+        int maxPanelHeight = display.height() - 2 * margin;
+        if (maxPanelHeight <= 0) {
+            dispatchOverlayEvent(OverlayEvent.GESTURE_CANCELED);
+            return;
+        }
+        int panelHeight = Math.min(px(R.dimen.overlay_palette_height), maxPanelHeight);
         int gap = px(R.dimen.overlay_gap);
         final AnchoredPanelPlacement.Placement placement;
         try {
@@ -1297,6 +1355,10 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
             archiveReadyVoice(completed, output, attemptId);
             return;
         }
+        if (output != null && output.route() == OutputRoute.SYSTEM_AUDIO_SHARE) {
+            shareReadyVoice(completed, attemptId);
+            return;
+        }
         readyVoiceRecording = null;
         readyVoiceTarget = null;
         readyVoiceOutput = null;
@@ -1342,6 +1404,39 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
             mainHandler.post(() -> handleArchiveResult(
                     completed, output, overlayAttemptId, outputAttemptId, result));
         });
+    }
+
+    private void shareReadyVoice(File completed, long overlayAttemptId) {
+        AndroidShareController.Result result = AndroidShareController.Result.LAUNCH_FAILED;
+        if (completed != null && completed.isFile() && completed.length() > 0L) {
+            try {
+                Uri uri = FileProvider.getUriForFile(this,
+                        BuildConfig.APPLICATION_ID + ".fileprovider", completed);
+                result = AndroidShareController.create(
+                        this, text(R.string.audio_share_chooser_title)).shareAudio(uri.toString());
+            } catch (RuntimeException ignored) { }
+        }
+        dispatchOverlayEvent(result
+                == AndroidShareController.Result.CHOOSER_OPENED_USER_CONFIRMATION_REQUIRED
+                ? OverlayEvent.AUDIO_SHARE_CHOOSER_OPENED
+                : OverlayEvent.AUDIO_SHARE_FAILED, overlayAttemptId);
+        String name = completed == null ? "" : completed.getName();
+        readyVoiceRecording = null;
+        readyVoiceOutput = null;
+        readyVoiceTarget = null;
+        readyVoiceDuration = 0;
+        readyVoiceAttemptId = 0L;
+        activeRecordingRoute = null;
+        int messageId = switch (result) {
+            case CHOOSER_OPENED_USER_CONFIRMATION_REQUIRED ->
+                    R.string.audio_share_opened_retained;
+            case NO_HANDLER -> R.string.audio_share_no_handler_retained;
+            default -> R.string.audio_share_failed_retained;
+        };
+        updateState(messageId, name);
+        if (result != AndroidShareController.Result.CHOOSER_OPENED_USER_CONFIRMATION_REQUIRED) {
+            Toast.makeText(this, text(messageId, name), Toast.LENGTH_LONG).show();
+        }
     }
 
     private void handleArchiveResult(File completed, OutputSnapshot output,
@@ -1400,11 +1495,17 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
         boolean released = current == null || tryReleaseRecorder(current);
         recorder = released ? null : current;
         if (released) releaseRecordingOwnership();
+        if (RecordingRoutePolicy.releaseShareStoreOwnership(activeRecordingRoute, released)
+                && activeRecording != null && retainedAudioShareStore != null) {
+            retainedAudioShareStore.releaseActive(activeRecording);
+        }
         if (activeRecording != null) {
-            notificationResourceId = activeRecordingRoute == OutputRoute.LOCAL_AUDIO_ARCHIVE
+            boolean privateOutput = activeRecordingRoute == OutputRoute.LOCAL_AUDIO_ARCHIVE
+                    || activeRecordingRoute == OutputRoute.SYSTEM_AUDIO_SHARE;
+            notificationResourceId = privateOutput
                     ? R.string.recording_interrupted_retained_private
                     : R.string.recording_interrupted_retained;
-            notificationArguments = activeRecordingRoute == OutputRoute.LOCAL_AUDIO_ARCHIVE
+            notificationArguments = privateOutput
                     ? new Object[0] : new Object[] {activeRecording.getAbsolutePath()};
             notificationText = null;
         }

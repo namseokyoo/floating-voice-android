@@ -14,6 +14,7 @@ public final class OverlayStateMachine {
         VOICE_QUEUEING,
         VOICE_PENDING,
         VOICE_ARCHIVING,
+        VOICE_SHARING,
         TEXT_COMPOSING,
         SPEECH_REVIEW_OPENING,
         SPEECH_REVIEW_OPEN,
@@ -27,9 +28,11 @@ public final class OverlayStateMachine {
     public enum Effect {
         START_VOICE,
         START_LOCAL_VOICE,
+        START_SYSTEM_AUDIO_VOICE,
         STOP_VOICE,
         CANCEL_VOICE,
         SEND_VOICE,
+        OPEN_AUDIO_SHARE_CHOOSER,
         SEND_TEXT,
         SHOW_MENU,
         HIDE_MENU,
@@ -105,6 +108,10 @@ public final class OverlayStateMachine {
                     attemptId++;
                     state = State.VOICE_STARTING;
                     effects = List.of(Effect.HIDE_MENU, Effect.START_LOCAL_VOICE);
+                } else if (event == OverlayEvent.START_SYSTEM_AUDIO_SHARE_RECORDING) {
+                    attemptId++;
+                    state = State.VOICE_STARTING;
+                    effects = List.of(Effect.HIDE_MENU, Effect.START_SYSTEM_AUDIO_VOICE);
                 }
             }
             case VOICE_STARTING -> {
@@ -130,6 +137,9 @@ public final class OverlayStateMachine {
                 } else if (event == OverlayEvent.LOCAL_VOICE_STOP_SUCCEEDED) {
                     state = State.VOICE_ARCHIVING;
                     effects = List.of(Effect.SEND_VOICE);
+                } else if (event == OverlayEvent.SYSTEM_AUDIO_SHARE_STOP_SUCCEEDED) {
+                    state = State.VOICE_SHARING;
+                    effects = List.of(Effect.OPEN_AUDIO_SHARE_CHOOSER);
                 } else if (event == OverlayEvent.VOICE_STOP_FAILED) {
                     state = State.IDLE;
                 }
@@ -156,6 +166,12 @@ public final class OverlayStateMachine {
             }
             case VOICE_ARCHIVING -> {
                 if (event == OverlayEvent.VOICE_COMPLETED) {
+                    state = State.IDLE;
+                }
+            }
+            case VOICE_SHARING -> {
+                if (event == OverlayEvent.AUDIO_SHARE_CHOOSER_OPENED
+                        || event == OverlayEvent.AUDIO_SHARE_FAILED) {
                     state = State.IDLE;
                 }
             }

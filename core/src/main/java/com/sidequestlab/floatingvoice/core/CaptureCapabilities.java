@@ -8,7 +8,8 @@ public final class CaptureCapabilities {
         SHOW_OVERLAY,
         START_TELEGRAM_RECORDING,
         START_STT,
-        START_LOCAL_CAPTURE
+        START_LOCAL_CAPTURE,
+        START_SYSTEM_AUDIO_SHARE
     }
 
     public enum UnavailableReason {
@@ -17,7 +18,8 @@ public final class CaptureCapabilities {
         TELEGRAM_UNAVAILABLE,
         STT_UNAVAILABLE,
         LOCAL_OUTPUT_NOT_SELECTED,
-        LOCAL_OUTPUT_UNAVAILABLE
+        LOCAL_OUTPUT_UNAVAILABLE,
+        SYSTEM_AUDIO_SHARE_UNAVAILABLE
     }
 
     public record Decision(Action requestedAction, Action effectiveAction,
@@ -37,13 +39,21 @@ public final class CaptureCapabilities {
     private final boolean sttAvailable;
     private final boolean localOutputSelected;
     private final boolean localOutputAvailable;
+    private final boolean systemAudioShareAvailable;
 
     public CaptureCapabilities(boolean telegramAvailable, boolean sttAvailable,
                                boolean localOutputSelected, boolean localOutputAvailable) {
+        this(telegramAvailable, sttAvailable, localOutputSelected, localOutputAvailable, false);
+    }
+
+    public CaptureCapabilities(boolean telegramAvailable, boolean sttAvailable,
+                               boolean localOutputSelected, boolean localOutputAvailable,
+                               boolean systemAudioShareAvailable) {
         this.telegramAvailable = telegramAvailable;
         this.sttAvailable = sttAvailable;
         this.localOutputSelected = localOutputSelected;
         this.localOutputAvailable = localOutputAvailable;
+        this.systemAudioShareAvailable = systemAudioShareAvailable;
     }
 
     public Decision decide(Action action) {
@@ -51,7 +61,8 @@ public final class CaptureCapabilities {
         return switch (action) {
             case SHOW_OVERLAY -> decision(action,
                     telegramAvailable || sttAvailable
-                            || (localOutputSelected && localOutputAvailable),
+                            || (localOutputSelected && localOutputAvailable)
+                            || systemAudioShareAvailable,
                     UnavailableReason.NO_CAPTURE_ACTION_AVAILABLE);
             case START_TELEGRAM_RECORDING -> decision(action, telegramAvailable,
                     UnavailableReason.TELEGRAM_UNAVAILABLE);
@@ -65,6 +76,8 @@ public final class CaptureCapabilities {
                 yield decision(action, localOutputAvailable,
                         UnavailableReason.LOCAL_OUTPUT_UNAVAILABLE);
             }
+            case START_SYSTEM_AUDIO_SHARE -> decision(action, systemAudioShareAvailable,
+                    UnavailableReason.SYSTEM_AUDIO_SHARE_UNAVAILABLE);
         };
     }
 

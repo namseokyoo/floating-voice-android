@@ -76,16 +76,71 @@ public class AndroidShareControllerTest {
                 AndroidShareController.Result.CHOOSER_OPENED_USER_CONFIRMATION_REQUIRED));
     }
 
+    @Test
+    public void audioShareUsesOnlyScopedContentUriWithReadGrant() {
+        FakePlatform platform = new FakePlatform();
+        AndroidShareController controller = new AndroidShareController(platform, "Share audio");
+
+        assertEquals(AndroidShareController.Result.CHOOSER_OPENED_USER_CONFIRMATION_REQUIRED,
+                controller.shareAudio("content://com.sidequestlab.floatingvoice.fileprovider/voice.ogg"));
+
+        assertEquals(1, platform.audioRequests.size());
+        AndroidShareController.AudioShareRequest request = platform.audioRequests.get(0);
+        assertEquals("android.intent.action.SEND", request.action());
+        assertEquals("audio/ogg", request.mimeType());
+        assertTrue(request.contentUri().startsWith("content://"));
+        assertTrue(request.grantReadPermission());
+        assertEquals("Share audio", request.chooserTitle());
+    }
+
+    @Test
+    public void rawFileUriIsRejectedBeforePlatformAccess() {
+        FakePlatform platform = new FakePlatform();
+        AndroidShareController controller = new AndroidShareController(platform, "Share audio");
+
+        assertEquals(AndroidShareController.Result.UNSAFE_URI_REJECTED,
+                controller.shareAudio("file:///private/voice.ogg"));
+        assertEquals(0, platform.launches);
+    }
+
+    @Test
+    public void audioNoHandlerIsExplicitFailureAndAllowsRetryWithoutChangingUri() {
+        FakePlatform platform = new FakePlatform();
+        platform.next = AndroidShareController.PlatformResult.NO_HANDLER;
+        AndroidShareController controller = new AndroidShareController(platform, "Share audio");
+        String uri = "content://com.sidequestlab.floatingvoice.fileprovider/voice.ogg";
+
+        assertEquals(AndroidShareController.Result.NO_HANDLER, controller.shareAudio(uri));
+        platform.next = AndroidShareController.PlatformResult.OPENED;
+        assertEquals(AndroidShareController.Result.CHOOSER_OPENED_USER_CONFIRMATION_REQUIRED,
+                controller.shareAudio(uri));
+        assertEquals(2, platform.audioRequests.size());
+        assertFalse(controller.resultMeansSentOrSharedSuccess(
+                AndroidShareController.Result.CHOOSER_OPENED_USER_CONFIRMATION_REQUIRED));
+    }
+
     private static final class FakePlatform implements AndroidShareController.Platform {
         int launches;
         boolean throwNext;
         AndroidShareController.PlatformResult next = AndroidShareController.PlatformResult.OPENED;
         final List<AndroidShareController.TextShareRequest> requests = new ArrayList<>();
+        final List<AndroidShareController.AudioShareRequest> audioRequests = new ArrayList<>();
 
         @Override public AndroidShareController.PlatformResult openTextChooser(
                 AndroidShareController.TextShareRequest request) {
             launches++;
             requests.add(request);
+            if (throwNext) {
+                throwNext = false;
+                throw new IllegalStateException("launch failed");
+            }
+            return next;
+        }
+
+        @Override public AndroidShareController.PlatformResult openAudioChooser(
+                AndroidShareController.AudioShareRequest request) {
+            launches++;
+            audioRequests.add(request);
             if (throwNext) {
                 throwNext = false;
                 throw new IllegalStateException("launch failed");

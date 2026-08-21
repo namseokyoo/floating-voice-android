@@ -448,4 +448,25 @@
     <string name="archive_copied_unverified">복사했지만 제공자가 다시 읽기를 지원하지 않습니다 · %1$s. 원본과 대상을 모두 보존했습니다.</string>
     <string name="archive_failed_source_retained">로컬 보관에 실패했습니다. 원본은 앱 내부에 보존했으며 Telegram으로 대체 전송하지 않았습니다.</string>
     <string name="archive_failed_partial_retained">로컬 보관에 실패했습니다. 원본과 일부 대상이 남았으며 Telegram으로 대체 전송하지 않았습니다.</string>
+    <string name="overlay_audio_share_action_title">Android 공유용 녹음</string>
+    <string name="overlay_audio_share_action_supporting">OGG 하나 녹음 후 공유창 열기</string>
+    <string name="content_description_audio_share_recording">Android에 명시적으로 공유할 OGG 녹음 시작</string>
+    <string name="audio_share_recording_in_progress">Android 공유용 녹음 중 — 다시 누르면 공유창을 엽니다</string>
+    <string name="audio_share_chooser_title">녹음한 OGG 공유</string>
+    <string name="audio_share_opened_retained">공유창을 열었습니다. 앱을 고르고 해당 앱에서 확인해 주세요. %1$s 파일은 직접 삭제할 때까지 앱에 보존됩니다.</string>
+    <string name="audio_share_no_handler_retained">OGG 오디오를 받을 앱이 없습니다. %1$s 파일은 앱에 보존됩니다.</string>
+    <string name="audio_share_failed_retained">공유창을 열지 못했습니다. %1$s 파일은 앱에 보존했으며 Telegram으로 대체 전송하지 않았습니다.</string>
+    <string name="audio_share_promotion_failed_retained">공유용 녹음을 마무리하지 못했습니다. 중단된 원본은 앱에 보존했으며 공유창이나 Telegram 대체 전송을 열지 않았습니다.</string>
+    <string name="retained_audio_share_title">보존된 Android 공유 녹음</string>
+    <string name="retained_audio_share_empty">보존된 공유 녹음이 없습니다.</string>
+    <string name="retained_audio_share_item">%1$s · %2$d KB · %3$s</string>
+    <string name="retained_audio_share_status_active">녹음 중</string>
+    <string name="retained_audio_share_status_completed">삭제 가능</string>
+    <string name="retained_audio_share_status_incomplete">중단됨/미완료</string>
+    <string name="retained_audio_share_delete">삭제</string>
+    <string name="retained_audio_share_delete_named">%1$s 삭제</string>
+    <string name="retained_audio_share_delete_confirm_title">보존된 녹음을 삭제할까요?</string>
+    <string name="retained_audio_share_delete_confirm_message">%1$s 파일을 영구 삭제할까요? 앱이 보존한 원본입니다. 수신 앱이 아직 읽는 중이라면 접근하지 못할 수 있습니다.</string>
+    <string name="retained_audio_share_deleted">%1$s 파일을 삭제했습니다.</string>
+    <string name="retained_audio_share_delete_failed">%1$s 파일을 삭제하지 못했습니다.</string>
 </resources>

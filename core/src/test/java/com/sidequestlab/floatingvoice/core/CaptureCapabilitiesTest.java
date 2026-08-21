@@ -49,6 +49,20 @@ class CaptureCapabilitiesTest {
     }
 
     @Test
+    void systemAudioShareIsIndependentFromTelegramSttAndSafSelection() {
+        CaptureCapabilities capabilities = new CaptureCapabilities(
+                false, false, false, false, true);
+
+        assertTrue(capabilities.decide(CaptureCapabilities.Action.SHOW_OVERLAY).allowed());
+        CaptureCapabilities.Decision share = capabilities.decide(
+                CaptureCapabilities.Action.START_SYSTEM_AUDIO_SHARE);
+        assertTrue(share.allowed());
+        assertFalse(share.fellBack());
+        assertFalse(capabilities.decide(
+                CaptureCapabilities.Action.START_TELEGRAM_RECORDING).allowed());
+    }
+
+    @Test
     void unselectedOrUnavailableLocalOutputCannotCapture() {
         CaptureCapabilities unselected = new CaptureCapabilities(false, false, false, true);
         assertEquals(CaptureCapabilities.UnavailableReason.LOCAL_OUTPUT_NOT_SELECTED,
