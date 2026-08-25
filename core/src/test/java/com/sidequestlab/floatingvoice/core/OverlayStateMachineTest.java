@@ -58,6 +58,21 @@ class OverlayStateMachineTest {
     }
 
     @Test
+    void inputFirstMenuVoiceActionStartsTelegramVoiceExactlyOnce() {
+        OverlayStateMachine machine = new OverlayStateMachine();
+        machine.accept(OverlayEvent.LONG_PRESS);
+
+        OverlayStateMachine.Transition transition =
+                machine.accept(OverlayEvent.START_TELEGRAM_RECORDING);
+
+        assertEquals(OverlayStateMachine.State.VOICE_STARTING, transition.nextState());
+        assertEquals(List.of(
+                OverlayStateMachine.Effect.HIDE_MENU,
+                OverlayStateMachine.Effect.START_VOICE), transition.effects());
+        assertEquals(List.of(), machine.accept(OverlayEvent.START_TELEGRAM_RECORDING).effects());
+    }
+
+    @Test
     void explicitLocalArchiveActionStartsExactlyOneLocalRecording() {
         OverlayStateMachine machine = new OverlayStateMachine();
         machine.accept(OverlayEvent.LONG_PRESS);
@@ -556,7 +571,8 @@ class OverlayStateMachineTest {
         legal.put(OverlayStateMachine.State.IDLE, EnumSet.of(OverlayEvent.TAP, OverlayEvent.LONG_PRESS));
         legal.put(OverlayStateMachine.State.MENU_OPEN, EnumSet.of(
                 OverlayEvent.TAP, OverlayEvent.GESTURE_CANCELED, OverlayEvent.COMPOSE_TEXT,
-                OverlayEvent.OPEN_SPEECH_REVIEW, OverlayEvent.START_LOCAL_RECORDING,
+                OverlayEvent.OPEN_SPEECH_REVIEW, OverlayEvent.START_TELEGRAM_RECORDING,
+                OverlayEvent.START_LOCAL_RECORDING,
                 OverlayEvent.START_SYSTEM_AUDIO_SHARE_RECORDING));
         legal.put(OverlayStateMachine.State.VOICE_STARTING, EnumSet.of(
                 OverlayEvent.VOICE_START_SUCCEEDED, OverlayEvent.VOICE_START_FAILED));

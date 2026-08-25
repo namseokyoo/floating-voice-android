@@ -479,6 +479,8 @@ completed OGG
 
 **구현 현황 (2026-08-21 21:48 KST):** source/자동검증/독립 review와 code 25 공식 서명 후보 생성 PASS. FileProvider는 `files/audio_share/retained/`만 노출하고, 녹음 중 `.part`는 active ownership으로 삭제를 차단한 뒤 정상 stop/release 성공 시에만 `.ogg`로 승격한다. 공유창이 열려도 전송 완료로 간주하지 않으며 source는 직접 확인 삭제 전까지 보존한다. signed APK SHA-256은 `bdd40af5e3e2e794d5ec926ec2da628d7093ac71dccc5dcf435ab2c43a815766`; A52s 실제 수신 앱 readability/chooser gate는 pending.
 
+**구현 현황 (2026-08-25 15:13 KST):** V8-08 code 26 구현/자동검증 통과. 핵심 diff로 메뉴 3행(음성/직접 텍스트/음성→텍스트), 입력-출력 경로 정책, output picker/route-state 정리를 반영했고, 텍스트 composer 진입이 Telegram 비준비 상태에서도 열리도록 가드 완화. 독립 review의 High issue 1건(telegram 미준비에서 텍스트 composer 봉쇄)을 수정해 release 후보 대상으로 정합성 확보. tests/localization/lint clean pass, lint warning debug 49 / release 42, 공식 서명 APK/실기기 게이트는 미완료.
+
 ---
 
 ## 11. V8-08 — 통합·privacy·접근성 hardening

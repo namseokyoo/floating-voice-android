@@ -14,11 +14,12 @@ import java.util.Objects;
 
 final class FloatingActionMenuController {
     interface Listener {
+        void onSendVoice();
+        void onChooseVoiceOutput();
         void onComposeText();
-        void onSpeechShare();
-        default void onAudioShareRecording() { }
-        void onLocalArchiveRecording();
-        void onChooseDestination();
+        void onChooseTextOutput();
+        void onSpeechText();
+        void onChooseSpeechTextOutput();
         void onDismissRequested();
     }
 
@@ -27,7 +28,7 @@ final class FloatingActionMenuController {
     private final Listener listener;
     private View palette;
     private boolean interactive;
-    private String destinationSummary;
+    private String defaultOutputSummary;
     private int removalRetries;
     private static final int MAX_REMOVAL_RETRIES = 3;
 
@@ -52,20 +53,19 @@ final class FloatingActionMenuController {
                 localizedContext, R.style.Theme_FloatingVoice_OverlayMaterial3);
         View next = LayoutInflater.from(themed)
                 .inflate(R.layout.overlay_action_palette, null, false);
-        View textAction = next.findViewById(R.id.overlay_text_action);
-        textAction.setOnClickListener(view -> listener.onComposeText());
-        View speechShareAction = next.findViewById(R.id.overlay_speech_share_action);
-        speechShareAction.setOnClickListener(view -> listener.onSpeechShare());
-        View audioShareAction = next.findViewById(R.id.overlay_audio_share_action);
-        audioShareAction.setOnClickListener(view -> listener.onAudioShareRecording());
-        View localArchiveAction = next.findViewById(R.id.overlay_local_archive_action);
-        localArchiveAction.setOnClickListener(view -> listener.onLocalArchiveRecording());
-        View destinationAction = next.findViewById(R.id.overlay_destination_action);
-        destinationAction.setOnClickListener(view -> listener.onChooseDestination());
-        if (destinationSummary != null && !destinationSummary.isBlank()) {
-            ((TextView) next.findViewById(R.id.overlay_destination_action_supporting))
-                    .setText(destinationSummary);
-        }
+        next.findViewById(R.id.overlay_voice_action)
+                .setOnClickListener(view -> listener.onSendVoice());
+        next.findViewById(R.id.overlay_voice_alternative)
+                .setOnClickListener(view -> listener.onChooseVoiceOutput());
+        next.findViewById(R.id.overlay_text_action)
+                .setOnClickListener(view -> listener.onComposeText());
+        next.findViewById(R.id.overlay_text_alternative)
+                .setOnClickListener(view -> listener.onChooseTextOutput());
+        next.findViewById(R.id.overlay_speech_text_action)
+                .setOnClickListener(view -> listener.onSpeechText());
+        next.findViewById(R.id.overlay_speech_text_alternative)
+                .setOnClickListener(view -> listener.onChooseSpeechTextOutput());
+        bindDefaultOutputSummary(next);
         applyFontScalePolicy(next);
         next.setOnTouchListener((view, event) -> {
             if (event.getActionMasked() == MotionEvent.ACTION_OUTSIDE) {
@@ -105,11 +105,12 @@ final class FloatingActionMenuController {
         View current = palette;
         if (current == null) return true;
         current.animate().cancel();
-        current.findViewById(R.id.overlay_text_action).setOnClickListener(null);
-        current.findViewById(R.id.overlay_speech_share_action).setOnClickListener(null);
-        current.findViewById(R.id.overlay_audio_share_action).setOnClickListener(null);
-        current.findViewById(R.id.overlay_local_archive_action).setOnClickListener(null);
-        current.findViewById(R.id.overlay_destination_action).setOnClickListener(null);
+        clearClick(current, R.id.overlay_voice_action);
+        clearClick(current, R.id.overlay_voice_alternative);
+        clearClick(current, R.id.overlay_text_action);
+        clearClick(current, R.id.overlay_text_alternative);
+        clearClick(current, R.id.overlay_speech_text_action);
+        clearClick(current, R.id.overlay_speech_text_alternative);
         current.setOnTouchListener(null);
         interactive = false;
         if (!registry.remove(current)) {
@@ -123,57 +124,55 @@ final class FloatingActionMenuController {
 
     boolean isShowing() { return palette != null; }
 
-    void setDestinationSummary(String summary) {
-        destinationSummary = summary;
-        View current = palette;
-        if (current != null) {
-            ((TextView) current.findViewById(R.id.overlay_destination_action_supporting))
-                    .setText(summary == null || summary.isBlank()
-                            ? text(R.string.overlay_destination_action_supporting) : summary);
-        }
+    void setDefaultOutputSummary(String summary) {
+        defaultOutputSummary = summary;
+        if (palette != null) bindDefaultOutputSummary(palette);
     }
 
     void refreshStrings() {
         View current = palette;
         if (current == null) return;
-        ((TextView) current.findViewById(R.id.overlay_text_action_title))
-                .setText(text(R.string.overlay_text_action_title));
-        ((TextView) current.findViewById(R.id.overlay_text_action_supporting))
-                .setText(text(R.string.overlay_text_action_supporting));
+        bindText(current, R.id.overlay_voice_action_title,
+                R.string.overlay_voice_action_title);
+        bindText(current, R.id.overlay_text_action_title,
+                R.string.overlay_text_action_title);
+        bindText(current, R.id.overlay_speech_text_action_title,
+                R.string.overlay_speech_text_action_title);
+        bindText(current, R.id.overlay_voice_alternative,
+                R.string.overlay_alternative_output);
+        bindText(current, R.id.overlay_text_alternative,
+                R.string.overlay_alternative_output);
+        bindText(current, R.id.overlay_speech_text_alternative,
+                R.string.overlay_alternative_output);
+        current.findViewById(R.id.overlay_voice_action)
+                .setContentDescription(text(R.string.content_description_send_voice_default));
         current.findViewById(R.id.overlay_text_action)
-                .setContentDescription(text(R.string.content_description_open_text_composer));
-        ((TextView) current.findViewById(R.id.overlay_speech_share_action_title))
-                .setText(text(R.string.overlay_speech_share_action_title));
-        ((TextView) current.findViewById(R.id.overlay_speech_share_action_supporting))
-                .setText(text(R.string.overlay_speech_share_action_supporting));
-        current.findViewById(R.id.overlay_speech_share_action)
-                .setContentDescription(text(R.string.content_description_open_speech_share));
-        ((TextView) current.findViewById(R.id.overlay_audio_share_action_title))
-                .setText(text(R.string.overlay_audio_share_action_title));
-        ((TextView) current.findViewById(R.id.overlay_audio_share_action_supporting))
-                .setText(text(R.string.overlay_audio_share_action_supporting));
-        current.findViewById(R.id.overlay_audio_share_action)
-                .setContentDescription(text(R.string.content_description_audio_share_recording));
-        ((TextView) current.findViewById(R.id.overlay_local_archive_action_title))
-                .setText(text(R.string.overlay_local_archive_action_title));
-        ((TextView) current.findViewById(R.id.overlay_local_archive_action_supporting))
-                .setText(text(R.string.overlay_local_archive_action_supporting));
-        current.findViewById(R.id.overlay_local_archive_action)
-                .setContentDescription(text(R.string.content_description_local_archive_recording));
-        ((TextView) current.findViewById(R.id.overlay_destination_action_title))
-                .setText(text(R.string.overlay_destination_action_title));
-        ((TextView) current.findViewById(R.id.overlay_destination_action_supporting))
-                .setText(destinationSummary == null || destinationSummary.isBlank()
-                        ? text(R.string.overlay_destination_action_supporting)
-                        : destinationSummary);
-        current.findViewById(R.id.overlay_destination_action)
-                .setContentDescription(text(R.string.content_description_open_destination_picker));
+                .setContentDescription(text(R.string.content_description_send_text_default));
+        current.findViewById(R.id.overlay_speech_text_action)
+                .setContentDescription(text(R.string.content_description_send_speech_text_default));
+        bindDefaultOutputSummary(current);
         applyFontScalePolicy(current);
     }
 
     void destroy() {
         removalRetries = 0;
         dismiss();
+    }
+
+    private void bindDefaultOutputSummary(View root) {
+        String summary = defaultOutputSummary == null || defaultOutputSummary.isBlank()
+                ? text(R.string.overlay_default_output_unavailable) : defaultOutputSummary;
+        ((TextView) root.findViewById(R.id.overlay_voice_action_supporting)).setText(summary);
+        ((TextView) root.findViewById(R.id.overlay_text_action_supporting)).setText(summary);
+        ((TextView) root.findViewById(R.id.overlay_speech_text_action_supporting)).setText(summary);
+    }
+
+    private static void clearClick(View root, int id) {
+        root.findViewById(id).setOnClickListener(null);
+    }
+
+    private void bindText(View root, int viewId, int stringId) {
+        ((TextView) root.findViewById(viewId)).setText(text(stringId));
     }
 
     private void scheduleRemovalRetry(View expected) {
@@ -197,15 +196,11 @@ final class FloatingActionMenuController {
     private void applyFontScalePolicy(View root) {
         boolean largeFont = serviceContext.getResources()
                 .getConfiguration().fontScale >= 1.5f;
-        root.findViewById(R.id.overlay_text_action_supporting)
+        root.findViewById(R.id.overlay_voice_icon)
                 .setVisibility(largeFont ? View.GONE : View.VISIBLE);
-        root.findViewById(R.id.overlay_speech_share_action_supporting)
+        root.findViewById(R.id.overlay_text_icon)
                 .setVisibility(largeFont ? View.GONE : View.VISIBLE);
-        root.findViewById(R.id.overlay_audio_share_action_supporting)
-                .setVisibility(largeFont ? View.GONE : View.VISIBLE);
-        root.findViewById(R.id.overlay_local_archive_action_supporting)
-                .setVisibility(largeFont ? View.GONE : View.VISIBLE);
-        root.findViewById(R.id.overlay_destination_action_supporting)
+        root.findViewById(R.id.overlay_speech_text_icon)
                 .setVisibility(largeFont ? View.GONE : View.VISIBLE);
     }
 }

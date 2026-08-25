@@ -19,12 +19,16 @@ import androidx.core.content.ContextCompat;
 import com.sidequestlab.floatingvoice.core.Destination;
 import com.sidequestlab.floatingvoice.core.DestinationCatalog;
 import com.sidequestlab.floatingvoice.core.DestinationScope;
+import com.sidequestlab.floatingvoice.core.InputMode;
+import com.sidequestlab.floatingvoice.core.InputOutputPolicy;
+import com.sidequestlab.floatingvoice.core.OutputRoute;
 
 /** Secure non-exported, activity-backed destination picker used by the overlay service. */
 public final class DestinationPickerActivity extends AppCompatActivity {
     private static final float PICKER_MAX_HEIGHT_FRACTION = 0.70f;
     private long requestId;
     private DestinationScope scope;
+    private InputMode inputMode;
     private boolean resultSent;
     private BroadcastReceiver serviceTeardownReceiver;
 
@@ -45,17 +49,30 @@ public final class DestinationPickerActivity extends AppCompatActivity {
 
         requestId = getIntent().getLongExtra(
                 FloatingVoiceService.EXTRA_DESTINATION_PICKER_REQUEST_ID, 0L);
-        String scopeName = getIntent().getStringExtra(
-                FloatingVoiceService.EXTRA_DESTINATION_SCOPE);
-        try {
-            scope = DestinationScope.valueOf(scopeName == null ? "" : scopeName);
-        } catch (IllegalArgumentException error) {
-            finish();
-            return;
+        String inputModeName = getIntent().getStringExtra(
+                FloatingVoiceService.EXTRA_INPUT_MODE);
+        if (inputModeName != null) {
+            try {
+                inputMode = InputMode.valueOf(inputModeName);
+            } catch (IllegalArgumentException error) {
+                finish();
+                return;
+            }
+        } else {
+            String scopeName = getIntent().getStringExtra(
+                    FloatingVoiceService.EXTRA_DESTINATION_SCOPE);
+            try {
+                scope = DestinationScope.valueOf(scopeName == null ? "" : scopeName);
+            } catch (IllegalArgumentException error) {
+                finish();
+                return;
+            }
         }
-        if (requestId <= 0L || (scope != DestinationScope.DEFAULT
-                && scope != DestinationScope.NEXT_ONE
-                && scope != DestinationScope.CURRENT_RECORDING)) {
+        boolean validDestinationScope = scope == DestinationScope.DEFAULT
+                || scope == DestinationScope.NEXT_ONE
+                || scope == DestinationScope.CURRENT_RECORDING;
+        boolean validOutputMode = inputMode == InputMode.RAW_VOICE;
+        if (requestId <= 0L || (!validDestinationScope && !validOutputMode)) {
             finish();
             return;
         }
@@ -87,13 +104,17 @@ public final class DestinationPickerActivity extends AppCompatActivity {
                 FloatingVoiceService.EXTRA_DESTINATION_LOCAL_ID);
 
         TextView title = findViewById(R.id.destination_picker_title);
-        title.setText(scope == DestinationScope.CURRENT_RECORDING
+        title.setText(inputMode == InputMode.RAW_VOICE
+                ? R.string.voice_output_picker_title
+                : scope == DestinationScope.CURRENT_RECORDING
                 ? R.string.destination_picker_recording_title
                 : scope == DestinationScope.DEFAULT
                 ? R.string.destination_picker_default_title
                 : R.string.destination_picker_idle_title);
         TextView supporting = findViewById(R.id.destination_picker_supporting);
-        supporting.setText(scope == DestinationScope.DEFAULT
+        supporting.setText(inputMode == InputMode.RAW_VOICE
+                ? R.string.voice_output_picker_supporting
+                : scope == DestinationScope.DEFAULT
                 ? R.string.destination_picker_default_supporting
                 : R.string.destination_picker_supporting);
         LinearLayout list = findViewById(R.id.destination_picker_list);
@@ -106,9 +127,20 @@ public final class DestinationPickerActivity extends AppCompatActivity {
                     R.layout.destination_picker_row, list, false);
             boolean selectable = destination.selectableBy(accountUserId);
             boolean selected = destination.localId().equals(selectedLocalId);
-            bindRow(row, destination, selectable, selected);
+            bindRow(row, destination, selectable, selected,
+                    inputMode == InputMode.RAW_VOICE
+                            ? OutputRoute.TELEGRAM_VOICE : null);
             if (selectable) selectableCount++;
             list.addView(row);
+        }
+        if (inputMode == InputMode.RAW_VOICE) {
+            addOutputRow(list, OutputRoute.SYSTEM_AUDIO_SHARE,
+                    R.string.voice_output_android_share,
+                    R.string.voice_output_android_share_supporting);
+            addOutputRow(list, OutputRoute.LOCAL_AUDIO_ARCHIVE,
+                    R.string.voice_output_local_archive,
+                    R.string.voice_output_local_archive_supporting);
+            selectableCount += 2;
         }
         empty.setVisibility(selectableCount == 0 ? View.VISIBLE : View.GONE);
         boolean largeFont = getResources().getConfiguration().fontScale >= 1.5f;
@@ -116,7 +148,8 @@ public final class DestinationPickerActivity extends AppCompatActivity {
     }
 
     private void bindRow(View row, Destination destination,
-                         boolean selectable, boolean selected) {
+                         boolean selectable, boolean selected,
+                         OutputRoute oneOperationRoute) {
         TextView alias = row.findViewById(R.id.destination_picker_row_alias);
         TextView identity = row.findViewById(R.id.destination_picker_row_identity);
         TextView status = row.findViewById(R.id.destination_picker_row_status);
@@ -144,17 +177,57 @@ public final class DestinationPickerActivity extends AppCompatActivity {
                 + getString(selectable ? R.string.destination_picker_verified_status
                         : R.string.destination_picker_disabled_status));
         if (selectable) {
-            row.setOnClickListener(view -> submit(destination.localId()));
+            row.setOnClickListener(view -> {
+                if (oneOperationRoute == null) {
+                    submitDestination(destination.localId());
+                } else {
+                    submitOutput(oneOperationRoute, destination.localId());
+                }
+            });
         }
     }
 
-    private void submit(String localId) {
+    private void addOutputRow(LinearLayout list, OutputRoute route,
+                              int titleResource, int supportingResource) {
+        if (!InputOutputPolicy.allows(InputMode.RAW_VOICE, route)) return;
+        View row = LayoutInflater.from(this).inflate(
+                R.layout.destination_picker_row, list, false);
+        TextView alias = row.findViewById(R.id.destination_picker_row_alias);
+        TextView identity = row.findViewById(R.id.destination_picker_row_identity);
+        TextView status = row.findViewById(R.id.destination_picker_row_status);
+        TextView check = row.findViewById(R.id.destination_picker_row_check);
+        alias.setText(titleResource);
+        identity.setText(supportingResource);
+        status.setVisibility(View.GONE);
+        check.setVisibility(View.INVISIBLE);
+        row.setFilterTouchesWhenObscured(true);
+        row.setContentDescription(getString(titleResource) + ", "
+                + getString(supportingResource));
+        row.setOnClickListener(view -> submitOutput(route, null));
+        list.addView(row);
+    }
+
+    private void submitDestination(String localId) {
         if (resultSent) return;
         resultSent = true;
         sendBroadcast(new Intent(FloatingVoiceService.ACTION_DESTINATION_PICKED)
                 .setPackage(getPackageName())
                 .putExtra(FloatingVoiceService.EXTRA_DESTINATION_PICKER_REQUEST_ID, requestId)
                 .putExtra(FloatingVoiceService.EXTRA_DESTINATION_LOCAL_ID, localId));
+        finish();
+    }
+
+    private void submitOutput(OutputRoute route, String localId) {
+        if (resultSent || !InputOutputPolicy.allows(InputMode.RAW_VOICE, route)) return;
+        resultSent = true;
+        Intent result = new Intent(FloatingVoiceService.ACTION_DESTINATION_PICKED)
+                .setPackage(getPackageName())
+                .putExtra(FloatingVoiceService.EXTRA_DESTINATION_PICKER_REQUEST_ID, requestId)
+                .putExtra(FloatingVoiceService.EXTRA_OUTPUT_ROUTE, route.name());
+        if (localId != null) {
+            result.putExtra(FloatingVoiceService.EXTRA_DESTINATION_LOCAL_ID, localId);
+        }
+        sendBroadcast(result);
         finish();
     }
 

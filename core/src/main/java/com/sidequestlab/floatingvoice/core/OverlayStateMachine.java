@@ -104,6 +104,10 @@ public final class OverlayStateMachine {
                 } else if (event == OverlayEvent.OPEN_SPEECH_REVIEW) {
                     state = State.SPEECH_REVIEW_OPENING;
                     effects = List.of(Effect.HIDE_MENU, Effect.OPEN_SPEECH_REVIEW);
+                } else if (event == OverlayEvent.START_TELEGRAM_RECORDING) {
+                    attemptId++;
+                    state = State.VOICE_STARTING;
+                    effects = List.of(Effect.HIDE_MENU, Effect.START_VOICE);
                 } else if (event == OverlayEvent.START_LOCAL_RECORDING) {
                     attemptId++;
                     state = State.VOICE_STARTING;

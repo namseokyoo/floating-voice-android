@@ -21,286 +21,213 @@
             android:layout_height="wrap_content"
             android:orientation="vertical">
 
-        <LinearLayout
-            android:id="@+id/overlay_text_action"
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="1"
-            android:background="?attr/selectableItemBackground"
-            android:clickable="true"
-            android:contentDescription="@string/content_description_open_text_composer"
-            android:focusable="true"
-            android:gravity="center_vertical"
-            android:minHeight="48dp"
-            android:orientation="horizontal"
-            android:paddingHorizontal="16dp"
-            android:paddingVertical="6dp">
+            <LinearLayout
+                android:id="@+id/overlay_voice_action"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="?attr/selectableItemBackground"
+                android:clickable="true"
+                android:contentDescription="@string/content_description_send_voice_default"
+                android:focusable="true"
+                android:gravity="center_vertical"
+                android:minHeight="88dp"
+                android:orientation="horizontal"
+                android:paddingStart="16dp"
+                android:paddingTop="8dp"
+                android:paddingEnd="8dp"
+                android:paddingBottom="8dp">
 
-            <ImageView
-                android:layout_width="24dp"
-                android:layout_height="24dp"
-                android:contentDescription="@null"
-                android:importantForAccessibility="no"
-                android:src="@drawable/ic_overlay_text"
-                app:tint="@color/fv_on_surface" />
+                <ImageView
+                    android:id="@+id/overlay_voice_icon"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:contentDescription="@null"
+                    android:importantForAccessibility="no"
+                    android:src="@drawable/ic_floating_voice"
+                    app:tint="@color/fv_on_surface" />
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="12dp"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:id="@+id/overlay_voice_action_title"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:ellipsize="end"
+                        android:maxLines="3"
+                        android:text="@string/overlay_voice_action_title"
+                        android:textColor="@color/fv_on_surface"
+                        android:textSize="14sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/overlay_voice_action_supporting"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:ellipsize="end"
+                        android:maxLines="3"
+                        android:text="@string/overlay_default_output_unavailable"
+                        android:textColor="@color/fv_on_surface_variant"
+                        android:textSize="11sp" />
+                </LinearLayout>
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/overlay_voice_alternative"
+                    style="@style/Widget.Material3.Button.TextButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="4dp"
+                    android:contentDescription="@string/content_description_choose_voice_output"
+                    android:minHeight="48dp"
+                    android:minWidth="64dp"
+                    android:text="@string/overlay_alternative_output" />
+            </LinearLayout>
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="@color/fv_outline" />
 
             <LinearLayout
-                android:layout_width="0dp"
+                android:id="@+id/overlay_text_action"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="12dp"
-                android:layout_weight="1"
-                android:orientation="vertical">
+                android:background="?attr/selectableItemBackground"
+                android:clickable="true"
+                android:contentDescription="@string/content_description_send_text_default"
+                android:focusable="true"
+                android:gravity="center_vertical"
+                android:minHeight="88dp"
+                android:orientation="horizontal"
+                android:paddingStart="16dp"
+                android:paddingTop="8dp"
+                android:paddingEnd="8dp"
+                android:paddingBottom="8dp">
 
-                <TextView
-                    android:id="@+id/overlay_text_action_title"
+                <ImageView
+                    android:id="@+id/overlay_text_icon"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:contentDescription="@null"
+                    android:importantForAccessibility="no"
+                    android:src="@drawable/ic_overlay_text"
+                    app:tint="@color/fv_on_surface" />
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="12dp"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:id="@+id/overlay_text_action_title"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:ellipsize="end"
+                        android:maxLines="3"
+                        android:text="@string/overlay_text_action_title"
+                        android:textColor="@color/fv_on_surface"
+                        android:textSize="14sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/overlay_text_action_supporting"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:ellipsize="end"
+                        android:maxLines="3"
+                        android:text="@string/overlay_default_output_unavailable"
+                        android:textColor="@color/fv_on_surface_variant"
+                        android:textSize="11sp" />
+                </LinearLayout>
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/overlay_text_alternative"
+                    style="@style/Widget.Material3.Button.TextButton"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="@string/overlay_text_action_title"
-                    android:textColor="@color/fv_on_surface"
-                    android:textSize="14sp"
-                    android:maxLines="2"
-                    android:ellipsize="end"
-                    android:textStyle="bold" />
-
-                <TextView
-                    android:id="@+id/overlay_text_action_supporting"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/overlay_text_action_supporting"
-                    android:textColor="@color/fv_on_surface_variant"
-                    android:textSize="11sp"
-                    android:maxLines="2"
-                    android:ellipsize="end" />
+                    android:layout_marginStart="4dp"
+                    android:contentDescription="@string/content_description_choose_text_output"
+                    android:minHeight="48dp"
+                    android:minWidth="64dp"
+                    android:text="@string/overlay_alternative_output" />
             </LinearLayout>
-        </LinearLayout>
 
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="1dp"
-            android:background="@color/fv_outline" />
-
-        <LinearLayout
-            android:id="@+id/overlay_speech_share_action"
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="1"
-            android:background="?attr/selectableItemBackground"
-            android:clickable="true"
-            android:contentDescription="@string/content_description_open_speech_share"
-            android:focusable="true"
-            android:gravity="center_vertical"
-            android:minHeight="48dp"
-            android:orientation="horizontal"
-            android:paddingHorizontal="16dp"
-            android:paddingVertical="6dp">
-
-            <ImageView
-                android:layout_width="24dp"
-                android:layout_height="24dp"
-                android:contentDescription="@null"
-                android:importantForAccessibility="no"
-                android:src="@drawable/ic_quiet_mic"
-                app:tint="@color/fv_on_surface" />
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="@color/fv_outline" />
 
             <LinearLayout
-                android:layout_width="0dp"
+                android:id="@+id/overlay_speech_text_action"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="12dp"
-                android:layout_weight="1"
-                android:orientation="vertical">
+                android:background="?attr/selectableItemBackground"
+                android:clickable="true"
+                android:contentDescription="@string/content_description_send_speech_text_default"
+                android:focusable="true"
+                android:gravity="center_vertical"
+                android:minHeight="88dp"
+                android:orientation="horizontal"
+                android:paddingStart="16dp"
+                android:paddingTop="8dp"
+                android:paddingEnd="8dp"
+                android:paddingBottom="8dp">
 
-                <TextView
-                    android:id="@+id/overlay_speech_share_action_title"
+                <ImageView
+                    android:id="@+id/overlay_speech_text_icon"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:contentDescription="@null"
+                    android:importantForAccessibility="no"
+                    android:src="@drawable/ic_quiet_mic"
+                    app:tint="@color/fv_on_surface" />
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="12dp"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:id="@+id/overlay_speech_text_action_title"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:ellipsize="end"
+                        android:maxLines="3"
+                        android:text="@string/overlay_speech_text_action_title"
+                        android:textColor="@color/fv_on_surface"
+                        android:textSize="14sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/overlay_speech_text_action_supporting"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:ellipsize="end"
+                        android:maxLines="3"
+                        android:text="@string/overlay_default_output_unavailable"
+                        android:textColor="@color/fv_on_surface_variant"
+                        android:textSize="11sp" />
+                </LinearLayout>
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/overlay_speech_text_alternative"
+                    style="@style/Widget.Material3.Button.TextButton"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:ellipsize="end"
-                    android:maxLines="2"
-                    android:text="@string/overlay_speech_share_action_title"
-                    android:textColor="@color/fv_on_surface"
-                    android:textSize="14sp"
-                    android:textStyle="bold" />
-
-                <TextView
-                    android:id="@+id/overlay_speech_share_action_supporting"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:ellipsize="end"
-                    android:maxLines="2"
-                    android:text="@string/overlay_speech_share_action_supporting"
-                    android:textColor="@color/fv_on_surface_variant"
-                    android:textSize="11sp" />
+                    android:layout_marginStart="4dp"
+                    android:contentDescription="@string/content_description_choose_speech_text_output"
+                    android:minHeight="48dp"
+                    android:minWidth="64dp"
+                    android:text="@string/overlay_alternative_output" />
             </LinearLayout>
-        </LinearLayout>
-
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="1dp"
-            android:background="@color/fv_outline" />
-
-        <LinearLayout
-            android:id="@+id/overlay_audio_share_action"
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="1"
-            android:background="?attr/selectableItemBackground"
-            android:clickable="true"
-            android:contentDescription="@string/content_description_audio_share_recording"
-            android:focusable="true"
-            android:gravity="center_vertical"
-            android:minHeight="48dp"
-            android:orientation="horizontal"
-            android:paddingHorizontal="16dp"
-            android:paddingVertical="6dp">
-
-            <ImageView
-                android:layout_width="24dp"
-                android:layout_height="24dp"
-                android:contentDescription="@null"
-                android:importantForAccessibility="no"
-                android:src="@drawable/ic_overlay_send"
-                app:tint="@color/fv_on_surface" />
-
-            <LinearLayout
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="12dp"
-                android:layout_weight="1"
-                android:orientation="vertical">
-
-                <TextView
-                    android:id="@+id/overlay_audio_share_action_title"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:ellipsize="end"
-                    android:maxLines="2"
-                    android:text="@string/overlay_audio_share_action_title"
-                    android:textColor="@color/fv_on_surface"
-                    android:textSize="14sp"
-                    android:textStyle="bold" />
-
-                <TextView
-                    android:id="@+id/overlay_audio_share_action_supporting"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/overlay_audio_share_action_supporting"
-                    android:textColor="@color/fv_on_surface_variant"
-                    android:textSize="11sp" />
-            </LinearLayout>
-        </LinearLayout>
-
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="1dp"
-            android:background="@color/fv_outline" />
-
-        <LinearLayout
-            android:id="@+id/overlay_local_archive_action"
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="1"
-            android:background="?attr/selectableItemBackground"
-            android:clickable="true"
-            android:contentDescription="@string/content_description_local_archive_recording"
-            android:focusable="true"
-            android:gravity="center_vertical"
-            android:minHeight="48dp"
-            android:orientation="horizontal"
-            android:paddingHorizontal="16dp"
-            android:paddingVertical="6dp">
-
-            <ImageView
-                android:layout_width="24dp"
-                android:layout_height="24dp"
-                android:contentDescription="@null"
-                android:importantForAccessibility="no"
-                android:src="@drawable/ic_quiet_wave"
-                app:tint="@color/fv_on_surface" />
-
-            <LinearLayout
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="12dp"
-                android:layout_weight="1"
-                android:orientation="vertical">
-
-                <TextView
-                    android:id="@+id/overlay_local_archive_action_title"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:ellipsize="end"
-                    android:maxLines="2"
-                    android:text="@string/overlay_local_archive_action_title"
-                    android:textColor="@color/fv_on_surface"
-                    android:textSize="14sp"
-                    android:textStyle="bold" />
-
-                <TextView
-                    android:id="@+id/overlay_local_archive_action_supporting"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/overlay_local_archive_action_supporting"
-                    android:textColor="@color/fv_on_surface_variant"
-                    android:textSize="11sp" />
-            </LinearLayout>
-        </LinearLayout>
-
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="1dp"
-            android:background="@color/fv_outline" />
-
-        <LinearLayout
-            android:id="@+id/overlay_destination_action"
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="1"
-            android:background="?attr/selectableItemBackground"
-            android:clickable="true"
-            android:contentDescription="@string/content_description_open_destination_picker"
-            android:focusable="true"
-            android:gravity="center_vertical"
-            android:minHeight="48dp"
-            android:orientation="horizontal"
-            android:paddingHorizontal="16dp"
-            android:paddingVertical="6dp">
-
-            <ImageView
-                android:layout_width="24dp"
-                android:layout_height="24dp"
-                android:contentDescription="@null"
-                android:importantForAccessibility="no"
-                android:src="@drawable/ic_quiet_link"
-                app:tint="@color/fv_on_surface" />
-
-            <LinearLayout
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="12dp"
-                android:layout_weight="1"
-                android:orientation="vertical">
-
-                <TextView
-                    android:id="@+id/overlay_destination_action_title"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/overlay_destination_action_title"
-                    android:textColor="@color/fv_on_surface"
-                    android:textSize="14sp"
-                    android:maxLines="2"
-                    android:ellipsize="end"
-                    android:textStyle="bold" />
-
-                <TextView
-                    android:id="@+id/overlay_destination_action_supporting"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/overlay_destination_action_supporting"
-                    android:textColor="@color/fv_on_surface_variant"
-                    android:textSize="11sp"
-                    android:maxLines="2"
-                    android:ellipsize="end" />
-            </LinearLayout>
-        </LinearLayout>
         </LinearLayout>
     </ScrollView>
 </com.google.android.material.card.MaterialCardView>

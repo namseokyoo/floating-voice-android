@@ -117,6 +117,13 @@ public final class RouteStateMachine {
         return Optional.of(currentDestination);
     }
 
+    /** Discards an idle one-operation override when capture never actually started. */
+    public synchronized boolean clearNextOne() {
+        if (phase != Phase.IDLE || nextOneLocalId == null) return false;
+        nextOneLocalId = null;
+        return true;
+    }
+
     public synchronized boolean cancelRecording() {
         if (phase != Phase.RECORDING) return false;
         currentDestination = null;

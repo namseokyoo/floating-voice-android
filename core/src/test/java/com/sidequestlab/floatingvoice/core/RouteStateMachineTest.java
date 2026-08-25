@@ -86,6 +86,17 @@ class RouteStateMachineTest {
     }
 
     @Test
+    void abandonedOneShotBeforeCaptureRestoresConfiguredDefault() {
+        RouteStateMachine machine = machine(catalog(primary(), secondary()), "primary");
+
+        assertTrue(machine.select(DestinationScope.NEXT_ONE, "secondary"));
+        assertTrue(machine.clearNextOne());
+        assertTrue(machine.nextOneLocalId().isEmpty());
+        assertEquals("primary", machine.startRecording().orElseThrow().localId());
+        assertFalse(machine.clearNextOne());
+    }
+
+    @Test
     void canceledNextOneRecordingNeverResurrects() {
         RouteStateMachine machine = machine(catalog(primary(), secondary()), "primary");
         machine.select(DestinationScope.NEXT_ONE, "secondary");

@@ -10,8 +10,8 @@ android {
         applicationId "com.sidequestlab.floatingvoice"
         minSdk 29
         targetSdk 36
-        versionCode 25
-        versionName "0.8.0-v8-07-audio-sharesheet"
+        versionCode 26
+        versionName "0.8.0-v8-08-input-output-routing-rc1"
 
         testInstrumentationRunner "android.app.Instrumentation"
 

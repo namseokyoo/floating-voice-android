@@ -41,6 +41,8 @@ import com.sidequestlab.floatingvoice.core.DestinationCatalog;
 import com.sidequestlab.floatingvoice.core.DestinationScope;
 import com.sidequestlab.floatingvoice.core.DispatchTargetSnapshot;
 import com.sidequestlab.floatingvoice.core.GestureClassifier;
+import com.sidequestlab.floatingvoice.core.InputMode;
+import com.sidequestlab.floatingvoice.core.InputOutputPolicy;
 import com.sidequestlab.floatingvoice.core.OverlayColorPreset;
 import com.sidequestlab.floatingvoice.core.OverlayEvent;
 import com.sidequestlab.floatingvoice.core.OverlayReflowPolicy;
@@ -91,6 +93,9 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
             "destination_picker_request_id";
     public static final String EXTRA_DESTINATION_SCOPE = "destination_scope";
     public static final String EXTRA_DESTINATION_LOCAL_ID = "destination_local_id";
+    public static final String EXTRA_INPUT_MODE = "input_mode";
+    public static final String EXTRA_OUTPUT_ROUTE = "output_route";
+    public static final String EXTRA_OPEN_OUTPUT_CHOOSER = "open_output_chooser";
     static final int COMPOSER_SUBMIT_REJECTED = 0;
     static final int COMPOSER_SUBMIT_ACCEPTED = 1;
     private static final int NOTIFICATION_ID = 41;
@@ -136,7 +141,10 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
     private volatile RouteStateMachine routeStateMachine;
     private long destinationPickerRequestId;
     private DestinationScope pendingDestinationScope;
+    private InputMode pendingOutputInputMode;
     private boolean destinationPickerOpen;
+    private boolean discardNextOneOnVoiceStartFailure;
+    private boolean composerAlternativeRequested;
     private long accountRouteGraceDeadline;
     private String notificationText;
     private int notificationResourceId = R.string.notification_ready;
@@ -208,12 +216,8 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
                     return;
                 }
                 if (ACTION_COMPOSER_SUBMIT.equals(intent.getAction())) {
-                    String text = intent.getStringExtra(EXTRA_COMPOSER_TEXT);
-                    if (overlayStateMachine.state() == OverlayStateMachine.State.TEXT_COMPOSING
-                            && text != null && !text.trim().isEmpty()) {
+                    if (prepareComposerTelegramSubmit(intent)) {
                         setResultCode(COMPOSER_SUBMIT_ACCEPTED);
-                        readyText = text.trim();
-                        readyTextAttemptId = overlayStateMachine.attemptId();
                         dispatchOverlayEvent(OverlayEvent.SUBMIT_TEXT);
                     } else {
                         setResultCode(COMPOSER_SUBMIT_REJECTED);
@@ -451,18 +455,40 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
         });
         actionMenuController = new FloatingActionMenuController(
                 this, windowRegistry, new FloatingActionMenuController.Listener() {
+            @Override public void onSendVoice() {
+                if (isTearingDown()) return;
+                dispatchOverlayEvent(OverlayEvent.START_TELEGRAM_RECORDING);
+            }
+
+            @Override public void onChooseVoiceOutput() {
+                if (isTearingDown()) return;
+                openVoiceOutputPicker();
+            }
+
             @Override public void onComposeText() {
-                // The reducer closes the palette, opens the transient composer, and keeps
-                // Telegram transport ownership in this service.
-                if (!telegramOutputAvailable()) {
-                    dispatchOverlayEvent(OverlayEvent.GESTURE_CANCELED);
-                    updateState(R.string.telegram_target_required_first);
-                    return;
-                }
+                openComposer(false);
+            }
+
+            @Override public void onChooseTextOutput() {
+                openComposer(true);
+            }
+
+            private void openComposer(boolean chooseOutput) {
+                composerAlternativeRequested = chooseOutput;
                 dispatchOverlayEvent(OverlayEvent.COMPOSE_TEXT);
             }
 
-            @Override public void onSpeechShare() {
+            @Override public void onSpeechText() {
+                openSpeechTextReview();
+            }
+
+            @Override public void onChooseSpeechTextOutput() {
+                // Speech review owns the one-operation Telegram destination and Android
+                // Sharesheet controls, so the labeled alternative affordance opens it directly.
+                openSpeechTextReview();
+            }
+
+            private void openSpeechTextReview() {
                 if (isTearingDown() || recorder != null || audioCaptureCoordinator == null
                         || audioCaptureCoordinator.owner()
                         != AudioCaptureOwnership.Owner.NONE) {
@@ -470,29 +496,6 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
                     return;
                 }
                 dispatchOverlayEvent(OverlayEvent.OPEN_SPEECH_REVIEW);
-            }
-
-            @Override public void onAudioShareRecording() {
-                if (isTearingDown()) return;
-                dispatchOverlayEvent(OverlayEvent.START_SYSTEM_AUDIO_SHARE_RECORDING);
-            }
-
-            @Override public void onLocalArchiveRecording() {
-                if (isTearingDown()) return;
-                if (archiveSettingsStore.selection().status()
-                        != ArchiveSettingsStore.Status.READY) {
-                    dispatchOverlayEvent(OverlayEvent.GESTURE_CANCELED);
-                    updateState(R.string.archive_folder_reselection_required);
-                    openArchiveFolderPicker();
-                    return;
-                }
-                dispatchOverlayEvent(OverlayEvent.START_LOCAL_RECORDING);
-            }
-
-            @Override public void onChooseDestination() {
-                if (isTearingDown()) return;
-                dispatchOverlayEvent(OverlayEvent.GESTURE_CANCELED);
-                openDestinationPicker(DestinationScope.DEFAULT);
             }
 
             @Override public void onDismissRequested() {
@@ -572,6 +575,7 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
         if ((!standaloneOutput && !telegramOutputAvailable())
                 || (localArchive && archiveSettingsStore.selection().status()
                 != ArchiveSettingsStore.Status.READY)) {
+            discardPendingVoiceOverride();
             dispatchOverlayEvent(OverlayEvent.VOICE_START_FAILED);
             updateState(localArchive ? R.string.archive_folder_reselection_required
                     : R.string.destination_required_before_recording);
@@ -580,6 +584,7 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
         AudioCaptureOwnership.Lease acquired = audioCaptureCoordinator == null
                 ? null : audioCaptureCoordinator.startRecording().orElse(null);
         if (acquired == null) {
+            discardPendingVoiceOverride();
             dispatchOverlayEvent(OverlayEvent.VOICE_START_FAILED);
             return;
         }
@@ -588,11 +593,13 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
         Destination selectedDestination = standaloneOutput || route == null
                 ? null : route.startRecording().orElse(null);
         if (!standaloneOutput && selectedDestination == null) {
+            discardPendingVoiceOverride();
             releaseRecordingOwnership();
             dispatchOverlayEvent(OverlayEvent.VOICE_START_FAILED);
             updateState(R.string.destination_required_before_recording);
             return;
         }
+        discardNextOneOnVoiceStartFailure = false;
         if (systemAudioShare) {
             activeRecording = retainedAudioShareStore.createPending(System.currentTimeMillis());
             if (activeRecording == null) {
@@ -924,7 +931,7 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
 
     private void showActionMenu() {
         if (actionMenuController == null || layoutParams == null) return;
-        actionMenuController.setDestinationSummary(idleDestinationSummary());
+        actionMenuController.setDefaultOutputSummary(defaultDestinationSummary());
         Rect display = currentDisplayBounds();
         int panelWidth = px(R.dimen.overlay_palette_width);
         int margin = px(R.dimen.overlay_safe_margin);
@@ -967,11 +974,14 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
     }
 
     private void openTextComposer() {
+        boolean chooseOutput = composerAlternativeRequested;
+        composerAlternativeRequested = false;
+        int flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                | Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS
+                | Intent.FLAG_ACTIVITY_NO_ANIMATION;
         Intent composer = new Intent(this, TextComposerActivity.class)
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK
-                        | Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS
-                        | Intent.FLAG_ACTIVITY_NO_HISTORY
-                        | Intent.FLAG_ACTIVITY_NO_ANIMATION);
+                .putExtra(EXTRA_OPEN_OUTPUT_CHOOSER, chooseOutput)
+                .addFlags(flags);
         try {
             startActivity(composer);
             hidePrimaryOverlay();
@@ -1023,6 +1033,42 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
         }
     }
 
+    private void openVoiceOutputPicker() {
+        RouteStateMachine route = routeStateMachine;
+        if (route == null || destinationPickerOpen
+                || overlayStateMachine.state() != OverlayStateMachine.State.MENU_OPEN
+                || route.phase() != RouteStateMachine.Phase.IDLE) {
+            return;
+        }
+        long requestId = ++destinationPickerRequestId;
+        pendingDestinationScope = null;
+        pendingOutputInputMode = InputMode.RAW_VOICE;
+        destinationPickerOpen = true;
+        terminalInputGate.suppressTouchesThrough(
+                SystemClock.uptimeMillis() + TERMINAL_INPUT_SUPPRESSION_MS);
+        hideActionMenu();
+        if (primaryOverlay != null) primaryOverlay.setVisibility(View.INVISIBLE);
+
+        Intent picker = new Intent(this, DestinationPickerActivity.class)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK
+                        | Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS
+                        | Intent.FLAG_ACTIVITY_NO_HISTORY
+                        | Intent.FLAG_ACTIVITY_NO_ANIMATION)
+                .putExtra(EXTRA_DESTINATION_PICKER_REQUEST_ID, requestId)
+                .putExtra(EXTRA_INPUT_MODE, InputMode.RAW_VOICE.name());
+        route.defaultLocalId().ifPresent(localId ->
+                picker.putExtra(EXTRA_DESTINATION_LOCAL_ID, localId));
+        try {
+            startActivity(picker);
+        } catch (RuntimeException launchFailure) {
+            destinationPickerOpen = false;
+            pendingOutputInputMode = null;
+            dispatchOverlayEvent(OverlayEvent.GESTURE_CANCELED);
+            restoreAfterDestinationPicker();
+            updateState(R.string.destination_selection_rejected);
+        }
+    }
+
     private void openDestinationPicker(DestinationScope scope) {
         RouteStateMachine route = routeStateMachine;
         if (route == null || destinationPickerOpen) return;
@@ -1044,6 +1090,7 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
                         () -> route.defaultLocalId().orElse(null));
         long requestId = ++destinationPickerRequestId;
         pendingDestinationScope = scope;
+        pendingOutputInputMode = null;
         destinationPickerOpen = true;
         terminalInputGate.suppressTouchesThrough(
                 SystemClock.uptimeMillis() + TERMINAL_INPUT_SUPPRESSION_MS);
@@ -1073,6 +1120,10 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
     private void handleDestinationPicked(Intent intent) {
         long requestId = intent.getLongExtra(EXTRA_DESTINATION_PICKER_REQUEST_ID, 0L);
         if (!destinationPickerOpen || requestId != destinationPickerRequestId) return;
+        if (pendingOutputInputMode != null) {
+            handleOneOperationOutputPicked(intent, pendingOutputInputMode);
+            return;
+        }
         String localId = intent.getStringExtra(EXTRA_DESTINATION_LOCAL_ID);
         DestinationScope scope = pendingDestinationScope;
         destinationPickerOpen = false;
@@ -1102,11 +1153,79 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
                 destinationLabel(localId));
     }
 
+    private void handleOneOperationOutputPicked(Intent intent, InputMode inputMode) {
+        destinationPickerOpen = false;
+        pendingDestinationScope = null;
+        pendingOutputInputMode = null;
+        String routeName = intent.getStringExtra(EXTRA_OUTPUT_ROUTE);
+        OutputRoute outputRoute;
+        try {
+            outputRoute = OutputRoute.valueOf(routeName == null ? "" : routeName);
+        } catch (IllegalArgumentException invalidRoute) {
+            dispatchOverlayEvent(OverlayEvent.GESTURE_CANCELED);
+            restoreAfterDestinationPicker();
+            updateState(R.string.destination_selection_rejected);
+            return;
+        }
+        if (!InputOutputPolicy.allows(inputMode, outputRoute)
+                || inputMode != InputMode.RAW_VOICE) {
+            dispatchOverlayEvent(OverlayEvent.GESTURE_CANCELED);
+            restoreAfterDestinationPicker();
+            updateState(R.string.destination_selection_rejected);
+            return;
+        }
+
+        RouteStateMachine route = routeStateMachine;
+        OverlayEvent startEvent = null;
+        if (outputRoute == OutputRoute.TELEGRAM_VOICE) {
+            String localId = intent.getStringExtra(EXTRA_DESTINATION_LOCAL_ID);
+            if (route != null && localId != null
+                    && route.select(DestinationScope.NEXT_ONE, localId)) {
+                discardNextOneOnVoiceStartFailure = true;
+                startEvent = OverlayEvent.START_TELEGRAM_RECORDING;
+            }
+        } else if (outputRoute == OutputRoute.SYSTEM_AUDIO_SHARE) {
+            startEvent = OverlayEvent.START_SYSTEM_AUDIO_SHARE_RECORDING;
+        } else if (outputRoute == OutputRoute.LOCAL_AUDIO_ARCHIVE) {
+            if (archiveSettingsStore.selection().status()
+                    != ArchiveSettingsStore.Status.READY) {
+                dispatchOverlayEvent(OverlayEvent.GESTURE_CANCELED);
+                restoreAfterDestinationPicker();
+                updateState(R.string.archive_folder_reselection_required);
+                openArchiveFolderPicker();
+                return;
+            }
+            startEvent = OverlayEvent.START_LOCAL_RECORDING;
+        }
+
+        restoreAfterDestinationPicker();
+        if (startEvent == null) {
+            dispatchOverlayEvent(OverlayEvent.GESTURE_CANCELED);
+            updateState(R.string.destination_selection_rejected);
+            return;
+        }
+        OverlayStateMachine.Transition transition = dispatchOverlayEvent(startEvent);
+        if (startEvent == OverlayEvent.START_TELEGRAM_RECORDING
+                && transition.nextState() != OverlayStateMachine.State.VOICE_STARTING) {
+            discardPendingVoiceOverride();
+        }
+    }
+
+    private void discardPendingVoiceOverride() {
+        if (!discardNextOneOnVoiceStartFailure) return;
+        discardNextOneOnVoiceStartFailure = false;
+        RouteStateMachine route = routeStateMachine;
+        if (route != null) route.clearNextOne();
+    }
+
     private void handleDestinationPickerClosed(Intent intent) {
         long requestId = intent.getLongExtra(EXTRA_DESTINATION_PICKER_REQUEST_ID, 0L);
         if (!destinationPickerOpen || requestId != destinationPickerRequestId) return;
+        boolean outputPicker = pendingOutputInputMode != null;
         destinationPickerOpen = false;
         pendingDestinationScope = null;
+        pendingOutputInputMode = null;
+        if (outputPicker) dispatchOverlayEvent(OverlayEvent.GESTURE_CANCELED);
         restoreAfterDestinationPicker();
     }
 
@@ -1144,18 +1263,14 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
         return "@" + destination.resolvedUsername();
     }
 
-    private String idleDestinationSummary() {
+    private String defaultDestinationSummary() {
         RouteStateMachine route = routeStateMachine;
-        if (route == null) return text(R.string.overlay_destination_action_supporting);
-        String next = route.nextOneLocalId().orElse(null);
-        if (next != null) {
-            return text(R.string.destination_chip_next_one, destinationLabel(next));
+        if (route == null) return text(R.string.overlay_default_output_unavailable);
+        String defaultLocalId = route.defaultLocalId().orElse(null);
+        if (defaultLocalId != null) {
+            return text(R.string.destination_chip_default, destinationLabel(defaultLocalId));
         }
-        String fallback = route.defaultLocalId().orElse(null);
-        if (fallback != null) {
-            return text(R.string.destination_chip_default, destinationLabel(fallback));
-        }
-        return text(R.string.overlay_destination_no_default);
+        return text(R.string.overlay_default_output_unavailable);
     }
 
     private void hidePrimaryOverlay() {
@@ -1238,8 +1353,8 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
     private void sendReadyText() {
         String text = readyText;
         DispatchTargetSnapshot target = readyTextTarget;
-        boolean speechText = target != null;
         long handoffId = readyTextHandoffId;
+        boolean speechText = handoffId > 0L;
         long attemptId = readyTextAttemptId;
         readyText = null;
         readyTextTarget = null;
@@ -1296,6 +1411,39 @@ public final class FloatingVoiceService extends Service implements TelegramRepos
                 .putExtra(EXTRA_SPEECH_TELEGRAM_RESULT, result);
         if (detail != null) event.putExtra(EXTRA_SPEECH_TELEGRAM_DETAIL, detail);
         sendBroadcast(event);
+    }
+
+    private boolean prepareComposerTelegramSubmit(Intent intent) {
+        if (overlayStateMachine.state() != OverlayStateMachine.State.TEXT_COMPOSING
+                || telegram == null) {
+            return false;
+        }
+        String text = intent.getStringExtra(EXTRA_COMPOSER_TEXT);
+        String requestedLocalId = intent.getStringExtra(EXTRA_DESTINATION_LOCAL_ID);
+        DestinationCatalog catalog = telegram.destinationCatalog();
+        long accountUserId = telegram.authenticatedAccountUserId();
+        if (text == null || text.isBlank() || requestedLocalId == null
+                || accountUserId <= 0L) {
+            return false;
+        }
+        final OutputRouteStateMachine output;
+        try {
+            output = new OutputRouteStateMachine(
+                    OutputRoute.ContentKind.TEXT, accountUserId, catalog,
+                    catalog.defaultLocalId().orElse(null));
+        } catch (IllegalArgumentException invalidState) {
+            return false;
+        }
+        if (!output.selectTelegramDestination(requestedLocalId)) return false;
+        OutputSnapshot snapshot = output.freeze(text.trim()).orElse(null);
+        if (snapshot == null || snapshot.route() != OutputRoute.TELEGRAM_TEXT) return false;
+        DispatchTargetSnapshot target = snapshot.telegramTarget().orElse(null);
+        if (target == null) return false;
+        readyText = snapshot.payload();
+        readyTextTarget = target;
+        readyTextHandoffId = 0L;
+        readyTextAttemptId = overlayStateMachine.attemptId();
+        return true;
     }
 
     private boolean prepareSpeechTelegramSubmit(Intent intent) {

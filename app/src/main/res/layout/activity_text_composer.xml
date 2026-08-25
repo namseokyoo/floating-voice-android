@@ -65,6 +65,16 @@
                         android:textColor="@color/fv_on_surface"
                         android:textColorHint="@color/fv_on_surface_variant" />
 
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/text_composer_output"
+                        style="@style/FloatingVoice.QuietOutlinedButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:contentDescription="@string/text_composer_output_content_description"
+                        android:filterTouchesWhenObscured="true"
+                        android:text="@string/text_composer_destination_required" />
+
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
